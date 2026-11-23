@@ -87,9 +87,13 @@ describe("error codes end in a sensible screen", () => {
     [503, "LINKEDIN_DISABLED", "notAvailable"],
     [409, "LINKEDIN_SECTION_STALE", "failed"],
     [409, "LINKEDIN_CAPTURE_FINALIZED", "failed"],
-    [410, "LINKEDIN_CAPTURE_EXPIRED", "failed"],
+    [410, "LINKEDIN_CAPTURE_EXPIRED", "expired"],
   ] as const)("%i %s → %s", (status, code, kind) => {
     expect(noticeFor(new ApiError(status, code, { error: "x", code }, null), code === "LINKEDIN_PROFILE_UNAVAILABLE").kind).toBe(kind);
+  });
+
+  it("410 LINKEDIN_CAPTURE_EXPIRED is answered only for a held capture; at create it stays failed", () => {
+    expect(noticeFor(new ApiError(410, "LINKEDIN_CAPTURE_EXPIRED", { error: "x", code: "LINKEDIN_CAPTURE_EXPIRED" }, null), true).kind).toBe("failed");
   });
 
   it("LINKEDIN_DISABLED during an upload is an answer, not an outage: not retried, ends in notAvailable", async () => {
@@ -142,13 +146,14 @@ describe("error codes end in a sensible screen", () => {
     expect(await r.phase()).toBe("done");
   });
 
-  it("an expired capture (410) clears everything and says so once", async () => {
+  it("an expired capture (410) clears everything and says so once: the expired screen, not failed", async () => {
     const r = await rig();
     await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
     // The server expires the capture early (its clock, not ours).
     for (const capture of r.stub.state.captures.values()) capture.expiresAt = r.clock.now - 1;
     await r.read();
-    expect(await r.controller.current()).toEqual({ phase: "idle", notice: { kind: "failed" } });
+    expect(r.stub.state.requests.filter((q) => q.status === 410)).toHaveLength(1);
+    expect(await r.controller.current()).toEqual({ phase: "idle", notice: { kind: "expired" } });
     expect(await outbox.load()).toBeNull();
   });
 });

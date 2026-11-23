@@ -42,7 +42,9 @@ one API client, least-privilege manifests, nothing reduced submitted as complete
    page-state and click rules depend on their presence. Every other id and every value is dropped.
 10. **State names.** The machine has the plan's states plus a `blocked` flag on `finalizing`
     (`offline` after a network failure, `server` when Scouty answered 408, 429, 502, 503 or 504, or
-    `auth` while waiting for a reconnect) and notices on `idle` for terminal errors.
+    `auth` while waiting for a reconnect) and notices on `idle` for terminal errors. The `expired`
+    event no longer returns to a bare `idle`: like `failed`, it lands on `idle` carrying a notice
+    (`expired`, screen 27), so a capture that ran out of time never vanishes without a word.
 11. **Section step limit.** A section that reaches 40 steps or 90 seconds without reaching its end
     or cap is uploaded as `partial` with reason `timeout`, and the capture continues.
 12. **Empty pages.** An activity or detail page that LinkedIn itself shows as empty is declared
@@ -137,10 +139,21 @@ extension follows the app's `src/lib/linkedin/protocol.ts`:
   right now. A 500 and any other 5xx are terminal: never repeated, they end in "Scouty couldn't
   receive this capture" with **Capture again** (`RETRYABLE_STATUSES` in `src/background/api.ts`,
   `isTransient` in `src/background/session.ts`). `LINKEDIN_AUTH_REQUIRED` gets one
-  refresh and retry, then "Connect to Scouty again". Expired (410), stale (409), origin refused
+  refresh and retry, then "Connect to Scouty again". Stale (409), origin refused
   (403), unsupported media type (415) and a finalized capture refusing a different manifest (409)
-  end in "Something went wrong" with the outbox cleared. Each mapping is tested in
+  end in "Scouty couldn't receive this capture" with the outbox cleared. Each mapping is tested in
   `test/contract/server-decisions.test.ts`.
+- A capture has 20 minutes to be sent. When they run out, the capture ends in screen 27, "This
+  capture ran out of time" (`expired`: **Capture**, which starts a new capture of the profile in
+  the tab the popup is on, the same action as **Capture here** on 25, or **OK**), and its outbox is
+  cleared; nothing is tried again. Two causes lead there: this browser's clock (checked lazily by
+  every handler, on a restart and whenever the popup or the overlay asks for the state), and
+  Scouty's clock, which answers `410 LINKEDIN_CAPTURE_EXPIRED` (or any 410) to the capture's
+  owner on status, section `PUT` and finalize. A 410 on create is not expected and ends in
+  "Scouty couldn't receive this capture". Before this screen, a local expiry returned to the
+  start with no notice and a 410 showed screen 22. Like 25 and 26, it is not in plan 12.4 and is
+  numbered after it (tested in `test/unit/session.test.ts`, `test/contract/server-decisions.test.ts`
+  and `test/ui/states.test.tsx`).
 
 ## Open points for the owner
 

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import * as auth from "../../src/background/auth";
 import * as outbox from "../../src/background/outbox";
 import {
-  EVENT_TYPES, IDLE, PAGE_STATE_STOPS, PHASES, SERVER_RETRY_MS, isTransient, noticeFor, transition,
+  EVENT_TYPES, EXPIRED, IDLE, PAGE_STATE_STOPS, PHASES, SERVER_RETRY_MS, isTransient, noticeFor, transition,
   type CaptureEvent, type CaptureState, type DoneResult, type EventType, type Phase,
 } from "../../src/background/session";
 import { ApiError, NetworkError } from "../../src/background/api";
@@ -72,6 +72,16 @@ describe("state machine: every state × event pair", () => {
     expect(PHASES.length * EVENT_TYPES.length).toBe(90);
     expect(Object.keys(samples).sort()).toEqual([...PHASES].sort());
     expect(Object.keys(events).sort()).toEqual([...EVENT_TYPES].sort());
+  });
+
+  it("expired lands in idle carrying the expired notice, from every phase that holds a capture", () => {
+    for (const phase of ["starting", "running", "stopped", "finalizing"] as const) {
+      expect(transition(samples[phase], events.expired), phase).toEqual({ phase: "idle", notice: { kind: "expired" } });
+    }
+    expect(EXPIRED).toEqual({ phase: "idle", notice: { kind: "expired" } });
+    // Its notice is dismissed like any other, and Capture starts a new capture from it.
+    expect(transition(EXPIRED, events.dismiss)).toEqual(IDLE);
+    expect(transition(EXPIRED, events.capture)).toMatchObject({ phase: "starting" });
   });
 
   it("walks the sections in order and finalizes after the last", () => {
@@ -308,15 +318,47 @@ describe("capture controller", () => {
     expect(manifest.stop).toBeNull();
   });
 
-  it("expiry is noticed lazily by the next event and clears everything", async () => {
+  it("expiry is noticed lazily by the next event, clears everything and says so (screen 27)", async () => {
     const r = await rig();
     await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
     await r.read();
     r.clock.now += 20 * 60_000 + 1;
     expect(await r.controller.readerProgress(TAB, "experience", 3)).toEqual({ stop: true });
-    expect(await r.phase()).toBe("idle");
+    const state = await r.controller.current();
+    expect(state).toEqual({ phase: "idle", notice: { kind: "expired" } });
+    expect(captureUi(state, { clickLog: [], minutesLeft: null }, "W", 0)).toEqual({ kind: "expired", workspace: "W" });
     expect(await outbox.load()).toBeNull();
     expect(await r.controller.readerHello(TAB)).toEqual({ args: null });
+    // Not silent: the notice stays until the user dismisses it or captures again.
+    expect(await r.controller.current()).toEqual(state);
+    await r.controller.dismiss();
+    expect(await r.controller.current()).toEqual(IDLE);
+  });
+
+  it("expiry while finalizing waits (offline) ends in the expired notice on the next look, with nothing sent", async () => {
+    const r = await rig({ capsBySlug: { "synthetic-person-one": { posts: 0, comments: 0, reactions: 0 } } });
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    r.stub.fail(/POST .*\/finalize$/, "drop", 99);
+    await r.readAll();
+    expect(await r.controller.current()).toMatchObject({ phase: "finalizing", blocked: "offline" });
+    r.clock.now += 20 * 60_000 + 1;
+    const before = r.stub.state.requests.length;
+    expect(await r.controller.current()).toEqual({ phase: "idle", notice: { kind: "expired" } });
+    await r.controller.resume();
+    expect(r.stub.state.requests).toHaveLength(before);
+    expect(await outbox.load()).toBeNull();
+  });
+
+  it("a restart after the capture ran out of time ends in the expired notice", async () => {
+    const r = await rig();
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    await r.read();
+    await r.controller.settledWork();
+    r.clock.now += 20 * 60_000 + 1;
+    const restarted = r.newController();
+    await restarted.recover();
+    expect(await restarted.current()).toEqual({ phase: "idle", notice: { kind: "expired" } });
+    expect(await outbox.load()).toBeNull();
   });
 
   it("a restarted background context picks the capture up from storage", async () => {
@@ -388,6 +430,62 @@ describe("capture controller", () => {
     expect(r.tab.updates).toHaveLength(1); // nothing more of LinkedIn was opened
   });
 
+  describe("410 LINKEDIN_CAPTURE_EXPIRED on a held capture (Scouty's clock): screen 27, outbox cleared, not retried", () => {
+    const NO_NETWORK = { capsBySlug: { "synthetic-person-one": { posts: 0, comments: 0, reactions: 0 } } };
+    /** Ends the capture on the server only; this browser's clock still has time left. */
+    const expireOnServer = (r: Awaited<ReturnType<typeof rig>>): void => {
+      for (const capture of r.stub.state.captures.values()) capture.expiresAt = r.clock.now - 1;
+    };
+    const expectExpired = async (r: Awaited<ReturnType<typeof rig>>, method: string, path: RegExp): Promise<void> => {
+      const answered = r.stub.state.requests.filter((q) => q.method === method && path.test(q.path));
+      expect(answered.at(-1)?.status).toBe(410);
+      expect(answered.filter((q) => q.status === 410)).toHaveLength(1); // not retried
+      const state = await r.controller.current();
+      expect(state).toEqual({ phase: "idle", notice: { kind: "expired" } });
+      expect(captureUi(state, { clickLog: [], minutesLeft: null }, "W", 0)).toEqual({ kind: "expired", workspace: "W" });
+      expect(await outbox.load()).toBeNull();
+      expect(r.timers.map((tm) => tm.ms)).not.toContain(SERVER_RETRY_MS);
+    };
+
+    it("on a section PUT", async () => {
+      const r = await rig();
+      await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+      await r.read();
+      expireOnServer(r);
+      await r.read();
+      await expectExpired(r, "PUT", /sections\/experience$/);
+      expect(r.tab.updates).toHaveLength(1); // nothing more of LinkedIn was opened
+    });
+
+    it("on finalize", async () => {
+      const r = await rig(NO_NETWORK);
+      await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+      const original = r.stub.handle.bind(r.stub);
+      r.stub.handle = (request) => {
+        if (request.method === "POST" && request.url.endsWith("/finalize")) expireOnServer(r);
+        return original(request);
+      };
+      await r.readAll();
+      await expectExpired(r, "POST", /\/finalize$/);
+    });
+
+    it("on status, when a capture waiting to be sent is resumed", async () => {
+      const r = await rig(NO_NETWORK);
+      await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+      r.stub.fail(/POST .*\/finalize$/, "drop", 6);
+      await r.readAll();
+      expect(await r.controller.current()).toMatchObject({ phase: "finalizing", blocked: "offline" });
+      r.stub.clearFaults();
+      expireOnServer(r);
+      await r.controller.resume();
+      await expectExpired(r, "GET", /\/captures\/[^/]+$/);
+    });
+
+    it("a 410 on create is not expected and stays 'failed'", async () => {
+      expect(noticeFor(new ApiError(410, "LINKEDIN_CAPTURE_EXPIRED", null, null), true)).toEqual({ kind: "failed" });
+    });
+  });
+
   it("426 ends in the outdated state; 403, 429 and a refused profile have their own", async () => {
     let r = await rig({ minVersion: "9.0.0" });
     await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
@@ -420,7 +518,8 @@ describe("capture controller", () => {
   });
 
   it("maps errors to one notice each", () => {
-    expect(noticeFor(new ApiError(410, "LINKEDIN_CAPTURE_EXPIRED", null, null))).toEqual({ kind: "failed" });
+    expect(noticeFor(new ApiError(410, "LINKEDIN_CAPTURE_EXPIRED", null, null))).toEqual({ kind: "expired" });
+    expect(noticeFor(new ApiError(410, null, null, null))).toEqual({ kind: "expired" });
     expect(noticeFor(new ApiError(404, "LINKEDIN_CAPTURE_NOT_FOUND", null, null))).toEqual({ kind: "takenOver" });
     expect(noticeFor(new ApiError(503, "LINKEDIN_DISABLED", null, null))).toEqual({ kind: "notAvailable" });
     expect(noticeFor(new ApiError(503, "LINKEDIN_UNAVAILABLE", null, null))).toEqual({ kind: "failed" });
@@ -445,7 +544,8 @@ describe("capture controller", () => {
     [400, "LINKEDIN_INVALID_PAYLOAD", false, "failed"],
     [400, "LINKEDIN_URL_UNSUPPORTED", true, "failed"],
     [404, "LINKEDIN_CAPTURE_NOT_FOUND", false, "takenOver"],
-    [410, "LINKEDIN_CAPTURE_EXPIRED", false, "failed"],
+    [410, "LINKEDIN_CAPTURE_EXPIRED", false, "expired"],
+    [410, "LINKEDIN_CAPTURE_EXPIRED", true, "failed"], // not expected on create
     [409, "LINKEDIN_CAPTURE_FINALIZED", false, "failed"],
     [409, "LINKEDIN_CAPTURE_TARGET_MISMATCH", false, "failed"],
     [409, "LINKEDIN_SECTION_STALE", false, "failed"],

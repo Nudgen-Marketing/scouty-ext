@@ -31,6 +31,12 @@ export type Notice =
    */
   | { kind: "takenOver" }
   /**
+   * Screen 27, "This capture ran out of time": the capture's 20 minutes ran out before it was sent,
+   * noticed by this browser's clock or answered by Scouty (410 LINKEDIN_CAPTURE_EXPIRED). Nothing of
+   * it was saved.
+   */
+  | { kind: "expired" }
+  /**
    * Screen 26 at create: Scouty answered but could not start the capture (408, 429, 502, 503, 504
    * after the retries). retryAt (ISO) only for a rate limit.
    */
@@ -87,6 +93,8 @@ export const EVENT_TYPES: readonly EventType[] = [
 ];
 
 export const IDLE: CaptureState = { phase: "idle", notice: null };
+/** Where a capture whose time ran out ends: idle, with the notice that says so. */
+export const EXPIRED: CaptureState = { phase: "idle", notice: { kind: "expired" } };
 
 /** The pure machine. Null means the event is refused: the state does not change and nothing is done. */
 export function transition(state: CaptureState, event: CaptureEvent): CaptureState | null {
@@ -103,7 +111,7 @@ export function transition(state: CaptureState, event: CaptureEvent): CaptureSta
       }
       if (event.type === "recent") return { phase: "idle", notice: event.notice };
       if (event.type === "failed") return { phase: "idle", notice: event.notice };
-      if (event.type === "expired") return IDLE;
+      if (event.type === "expired") return EXPIRED;
       return null;
     case "running":
       if (event.type === "loaded") return { ...state, loading: false };
@@ -117,12 +125,12 @@ export function transition(state: CaptureState, event: CaptureEvent): CaptureSta
       }
       if (event.type === "stop") return { phase: "stopped", tabId: state.tabId, reason: event.reason, address: event.address };
       if (event.type === "failed") return { phase: "idle", notice: event.notice };
-      if (event.type === "expired") return IDLE;
+      if (event.type === "expired") return EXPIRED;
       return null;
     case "stopped":
       if (event.type === "settled") return { phase: "finalizing", tabId: state.tabId, stop: state.reason, address: state.address, blocked: null, slow: false };
       if (event.type === "failed") return { phase: "idle", notice: event.notice };
-      if (event.type === "expired") return IDLE;
+      if (event.type === "expired") return EXPIRED;
       return null;
     case "finalizing":
       if (event.type === "blocked") {
@@ -139,7 +147,7 @@ export function transition(state: CaptureState, event: CaptureEvent): CaptureSta
       }
       if (event.type === "finalized") return { phase: "done", tabId: state.tabId, result: event.result };
       if (event.type === "failed") return { phase: "idle", notice: event.notice };
-      if (event.type === "expired") return IDLE;
+      if (event.type === "expired") return EXPIRED;
       return null;
     case "done":
       if (event.type === "dismiss") return IDLE;
@@ -252,19 +260,28 @@ export class CaptureController {
     return run;
   }
 
-  /** Expiry is checked lazily, by every handler, not by a timer. */
+  /**
+   * Expiry is checked lazily, by every handler, not by a timer. A capture whose time ran out ends in
+   * "This capture ran out of time", not silently.
+   */
   private async expireIfDue(): Promise<boolean> {
     if (this.state.phase === "idle" || this.state.phase === "done" || this.state.phase === "starting") return false;
     const box = await outbox.load();
     if (box && box.expiresAt > this.deps.now()) return false;
+    await this.expire();
+    return true;
+  }
+
+  /** The capture ran out of time (this browser's clock, or Scouty's 410): nothing of it is kept or tried again. */
+  private async expire(): Promise<void> {
     await outbox.clear();
     this.aux = freshAux();
     await this.saveAux();
     await this.dispatch({ type: "expired" });
-    return true;
   }
 
   private async fail(notice: Notice | null): Promise<void> {
+    if (notice?.kind === "expired") return this.expire();
     await outbox.clear();
     this.aux = freshAux();
     await this.saveAux();
@@ -767,6 +784,9 @@ export function noticeFor(error: unknown, creating = false): Notice {
     // browser or device was handed this capture with a new upload token (plan 5.5), or the capture was
     // removed in Scouty. Either way ours no longer opens it.
     if (error.status === 404) return { kind: "takenOver" };
+    // A capture this extension holds ran out of time by Scouty's clock: status, section PUT or
+    // finalize. Not expected on create (a create starts a new window), so there it stays "failed".
+    if (!creating && (error.status === 410 || error.code === "LINKEDIN_CAPTURE_EXPIRED")) return { kind: "expired" };
   }
   return { kind: "failed" };
 }
