@@ -1,0 +1,82 @@
+/*
+ * Popup stylesheet source. Compiled at build time by the Tailwind CLI to a static popup.css;
+ * nothing is injected at runtime, so the extension-pages CSP stays `style-src 'self'`.
+ * The theme is driven by the token stylesheet copied from the app (src/ui/tokens.css), with the
+ * same variable-to-utility mapping as the app's globals.css.
+ */
+@import "tailwindcss" source(none);
+@import "../ui/tokens.css";
+@source "./";
+
+@theme inline {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-strong: var(--primary-strong);
+  --color-secondary: var(--secondary);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-pill-good-bg: var(--pill-good-bg);
+  --color-pill-good-fg: var(--pill-good-fg);
+  --color-pill-good-ring: var(--pill-good-ring);
+  --color-pill-active-bg: var(--pill-active-bg);
+  --color-pill-active-fg: var(--pill-active-fg);
+  --color-pill-active-ring: var(--pill-active-ring);
+  --color-pill-waiting-bg: var(--pill-waiting-bg);
+  --color-pill-waiting-fg: var(--pill-waiting-fg);
+  --color-pill-waiting-ring: var(--pill-waiting-ring);
+  --color-pill-problem-bg: var(--pill-problem-bg);
+  --color-pill-problem-fg: var(--pill-problem-fg);
+  --color-pill-problem-ring: var(--pill-problem-ring);
+  --color-pill-neutral-bg: var(--pill-neutral-bg);
+  --color-pill-neutral-fg: var(--pill-neutral-fg);
+  --color-pill-neutral-ring: var(--pill-neutral-ring);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --animate-shimmer: shimmer 1.4s ease-in-out infinite;
+
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(300%); }
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html,
+  body {
+    margin: 0;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  /* The popup is 360 px wide; its height follows the content up to 560 px, then it scrolls. */
+  body {
+    width: 360px;
+  }
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+}

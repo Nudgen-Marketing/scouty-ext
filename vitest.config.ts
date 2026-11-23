@@ -15,7 +15,7 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
-    include: ["**/*.test.ts"], exclude: ["**/node_modules/**", "e2e/**", "gallery/**", "dist/**"],
+    include: ["**/*.test.{ts,tsx}"], exclude: ["**/node_modules/**", "e2e/**", "gallery/**", "dist/**"],
     restoreMocks: false,
     setupFiles: ["./test/helpers/setup.ts"],
     testTimeout: 20000,
