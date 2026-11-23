@@ -15,7 +15,7 @@ is the control. Store uploads are done by hand; no store credential exists in CI
 | 3 | Contract in sync: `diff -r protocol-v1 ../scouty/src/lib/linkedin/__fixtures__/protocol-v1` is empty, and `cmp src/ui/tokens.json ../scouty/src/lib/linkedin/__fixtures__/extension-tokens.json` reports no difference | Command output pasted | |
 | 4 | The extension works against the real local app: the eight scripted scenarios S1–S8 of the app plan's §15.4 (E15) all pass | `## E15 real local app` in `validation/RESULTS-<version>.md` | |
 | 5 | State gallery (`npm run gallery`, open `gallery/index.html`) reviewed in light and dark and signed off | Owner's initials and date | |
-| 6 | Real-LinkedIn validation complete for this version's selectors: every row passes, click logs clean | `validation/RESULTS-<version>.md` | |
+| 6 | Real-LinkedIn validation complete for this version's selectors: every mandatory row passes (app plan §13.4), click logs clean | `validation/RESULTS-<version>.md` | |
 | 7 | Live AI eval passes on real-shaped data (app task A0) | Run log | |
 | 8 | Firefox: `npm run smoke:firefox` passes (CI) and `validation/FIREFOX-SMOKE.md` is completed, and the source archive rebuilds to an identical package following BUILD.md on a clean machine with Node 24 | CI run link, tester's initials, hashes pasted | |
 | 9 | Edge: the Edge build loaded in Edge completes `validation/EDGE-SMOKE.md` | Tester's initials | |
@@ -39,9 +39,18 @@ the app plan (§14.1).
 3. Tag the merge commit `v<version>` and push the tag. The release workflow checks CI for that
    commit, checks the tag against `package.json`, builds, and attaches the four archives.
 4. Upload by hand. The order depends on the rollout configuration the owner chose (app plan
-   §14.2): **Recommended**, Chrome first (private testers), then Edge and Firefox after that stage
-   has passed; **Fast track**, all three submitted together the same day. Firefox needs `scouty-ext-<version>-source.zip` and
-   a pointer to BUILD.md, because the package is bundled and the popup script is minified.
+   §14.2, which has the exact settings):
+   - **Recommended** (default): Chrome first with Visibility **Private** (trusted testers); after
+     approval, a 7-day tester soak and the exit criteria; then Chrome **Public**, Edge submitted
+     **Public** and Firefox submitted **"On this site"** (listed on AMO); watch 14 days.
+   - **Fast track**: Chrome **Public**, Edge **Public** and Firefox listed, all submitted the same
+     day; no private stage; watch 14 days.
+   - **Cautious**: as Recommended, but Edge is first submitted **Hidden** (installable by link
+     only) and Firefox **"On your own"** (signed, self-distributed file), each for a 7-day tester
+     soak, before Edge is switched to Public and Firefox is submitted as listed.
+
+   Firefox needs `scouty-ext-<version>-source.zip` and a pointer to BUILD.md, because the package
+   is bundled and the popup script is minified.
 
 ## Rollback, fastest first
 
