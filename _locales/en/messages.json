@@ -302,6 +302,15 @@
   "offlineBody": {
     "message": "Scouty will finish sending as soon as you're back online. Keep the browser open."
   },
+  "notAnsweringTitle": {
+    "message": "Scouty isn't answering right now"
+  },
+  "notAnsweringBody": {
+    "message": "Your capture is kept in this browser. Scouty will keep trying to send it while this browser is open."
+  },
+  "notAnsweringRetryAt": {
+    "message": "Scouty asked to wait a little. The next try is at about $1."
+  },
   "actionTryNow": {
     "message": "Try now"
   },

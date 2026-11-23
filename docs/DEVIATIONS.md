@@ -35,12 +35,14 @@ one API client, least-privilege manifests, nothing reduced submitted as complete
    outbox is cleared unless a capture is in flight, and always on Disconnect.
 8. **Uploads do not block reading.** If the Scouty API is unreachable while LinkedIn is still
    readable, the remaining sections are read and everything is sent when the connection returns
-   ("You're offline", **Try now**). A section is never dropped for it.
+   ("You're offline", **Try now**, after a network failure; "Scouty isn't answering right now",
+   **Try now**, when Scouty answered but could not take it). A section is never dropped for it.
 9. **Sanitizer keeps a few things the plan's list drops:** the bare attribute names `hidden`,
    `disabled` and `href` (no value), and the ids `global-nav` and `captcha-internal`, because the
    page-state and click rules depend on their presence. Every other id and every value is dropped.
 10. **State names.** The machine has the plan's states plus a `blocked` flag on `finalizing`
-    (offline, or waiting for a reconnect) and notices on `idle` for terminal errors.
+    (`offline` after a network failure, `server` when Scouty answered 408, 429, 502, 503 or 504, or
+    `auth` while waiting for a reconnect) and notices on `idle` for terminal errors.
 11. **Section step limit.** A section that reaches 40 steps or 90 seconds without reaching its end
     or cap is uploaded as `partial` with reason `timeout`, and the capture continues.
 12. **Empty pages.** An activity or detail page that LinkedIn itself shows as empty is declared
@@ -111,8 +113,20 @@ extension follows the app's `src/lib/linkedin/protocol.ts`:
   `{ recent }`, which shows the "captured recently" screen.
 - `LINKEDIN_DISABLED` (503) is not retried and not treated as an outage: it ends in "not
   available". `LINKEDIN_UNAVAILABLE` (503) and `LINKEDIN_RATE_LIMITED` (429) are retried with
-  `Retry-After` (a wait longer than 30 s is an answer), then shown as "offline" with **Try now**
-  during upload, or "something went wrong" when creating. The plan names only
+  `Retry-After` (a wait longer than 30 s is an answer), then shown during upload as screen 26,
+  "Scouty isn't answering right now" (`notAnswering`), not as 16, "You're offline", which is kept
+  for a network failure that got no answer at all. The app answers every unexpected fault on these
+  routes with 503 `LINKEDIN_UNAVAILABLE` and `Retry-After: 5`, and its per-account rate limit with
+  429 and `Retry-After: 60`; neither means the user is offline. Screen 26 says the capture is kept
+  and that Scouty keeps trying while this browser is open; for a 429 it also says roughly when
+  (the time from `Retry-After`). It has the same **Try now** as screen 16, and it tries again on
+  its own after the longer of 20 s and `Retry-After` (`SERVER_RETRY_MS` in
+  `src/background/session.ts`; under the 30 s a Chromium service worker may idle). A timer lost
+  to a stopped background context is picked up on its next start (`recover`) and whenever the
+  popup or the overlay asks for the state. Like 25, this screen is not in plan 12.4 and is
+  numbered after it (tested in `test/unit/session.test.ts`, "waiting on Scouty is not being
+  offline", and `test/ui/states.test.tsx`). When creating, either ends in "something went wrong".
+  The plan names only
   `LINKEDIN_UNAVAILABLE` as retried; the extension also retries a network error, 408 and the
   gateway answers 502 and 504 with the same backoff, because those say the server could not answer
   right now. A 500 and any other 5xx are terminal: never repeated, they end in "Scouty couldn't

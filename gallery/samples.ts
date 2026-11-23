@@ -1,5 +1,6 @@
-// Fixed sample data: one UiState per screen (the 24 of plan 12.4 in its order, then "takenOver", "This capture stopped").
-// Used by the state gallery and by the UI tests, so both show exactly the same 25 states. All names are invented.
+// Fixed sample data: one UiState per screen (the 24 of plan 12.4 in its order, then "takenOver", "This capture stopped",
+// and "notAnswering", "Scouty isn't answering right now"). Used by the state gallery and by the UI tests, so both
+// show exactly the same 26 states. All names are invented.
 import type { UiState } from "../src/ui/state";
 
 const workspace = "Example Workspace";
@@ -43,11 +44,13 @@ export const SAMPLES: readonly UiState[] = [
   { kind: "busy", workspace },
   { kind: "settings", name: "Synthetic Tester", email: "tester@example.invalid", workspace, version: "0.1.0" },
   { kind: "takenOver", workspace },
+  // A rate limit: the screen also says roughly when the next try is.
+  { kind: "notAnswering", retryAt: "2026-11-23T10:42:00.000Z", workspace },
 ];
 
 /** What the in-page overlay shows during and after a capture. */
 export const OVERLAY_SAMPLES: readonly UiState[] = [
   SAMPLES[7]!,
   { kind: "capturing", section: "experience", count: 0, cap: 0, loading: true, minutesLeft: 2, workspace, steps: [{ section: "profile", status: "done" }, { section: "experience", status: "current" }, { section: "skills", status: "waiting" }, { section: "posts", status: "waiting" }] },
-  SAMPLES[8]!, SAMPLES[9]!, SAMPLES[10]!, SAMPLES[12]!, SAMPLES[15]!,
+  SAMPLES[8]!, SAMPLES[9]!, SAMPLES[10]!, SAMPLES[12]!, SAMPLES[15]!, SAMPLES[25]!,
 ];

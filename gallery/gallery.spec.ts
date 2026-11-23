@@ -13,12 +13,12 @@ async function open(page: Page): Promise<void> {
   await page.addScriptTag({ path: path.join(root, "node_modules", "axe-core", "axe.min.js") });
 }
 
-test("shows all 25 states in both themes, plus the overlay", async ({ page }) => {
+test("shows all 26 states in both themes, plus the overlay", async ({ page }) => {
   await open(page);
-  await expect(page.locator("[data-frame='popup']")).toHaveCount(50);
-  await expect(page.locator("[data-frame='popup'][data-theme='dark']")).toHaveCount(25);
+  await expect(page.locator("[data-frame='popup']")).toHaveCount(52);
+  await expect(page.locator("[data-frame='popup'][data-theme='dark']")).toHaveCount(26);
   const kinds = await page.locator("[data-frame='popup'][data-theme='light']").evaluateAll((els) => els.map((el) => el.getAttribute("data-state")));
-  expect(new Set(kinds).size).toBe(25);
+  expect(new Set(kinds).size).toBe(26);
   expect(await page.locator("[data-frame='overlay']").count()).toBeGreaterThanOrEqual(10);
   await expect(page.locator("[data-frame='popup'][data-state='ready'][data-theme='light'] h1")).toHaveText("Capture this profile");
   // The two themes really differ: the dark frame has a dark background.

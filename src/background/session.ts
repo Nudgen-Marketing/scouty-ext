@@ -41,8 +41,19 @@ export type CaptureState =
   | { phase: "starting"; tabId: number; profileKey: string }
   | { phase: "running"; tabId: number; profileKey: string; section: SectionName; count: number; loading: boolean; expected: SectionName[]; caps: Caps; finished: SectionName[] }
   | { phase: "stopped"; tabId: number; reason: StopReason; address: string | null }
-  | { phase: "finalizing"; tabId: number; stop: StopReason | null; address: string | null; blocked: null | "offline" | "auth"; slow: boolean }
+  | {
+    phase: "finalizing"; tabId: number; stop: StopReason | null; address: string | null; blocked: null | Blocked; slow: boolean;
+    /** While blocked by "server": when the next automatic try is due (ms), and whether a rate limit (429) said so. */
+    retryAt?: number | null; rateLimited?: boolean;
+  }
   | { phase: "done"; tabId: number; result: DoneResult };
+
+/**
+ * Why sending is waiting: "offline" when the last failure got no answer at all (a network error),
+ * "server" when Scouty answered but could not take it right now (408, 429, 502, 503, 504), and
+ * "auth" when the connection to Scouty ended.
+ */
+export type Blocked = "offline" | "server" | "auth";
 
 export type Phase = CaptureState["phase"];
 export const PHASES: readonly Phase[] = ["idle", "starting", "running", "stopped", "finalizing", "done"];
@@ -57,7 +68,7 @@ export type CaptureEvent =
   | { type: "sectionDone"; section: SectionName }
   | { type: "stop"; reason: StopReason; address: string | null }
   | { type: "settled" }
-  | { type: "blocked"; by: "offline" | "auth" }
+  | { type: "blocked"; by: Blocked; retryAt?: number | null; rateLimited?: boolean }
   | { type: "slow" }
   | { type: "resume" }
   | { type: "finalized"; result: DoneResult }
@@ -109,9 +120,18 @@ export function transition(state: CaptureState, event: CaptureEvent): CaptureSta
       if (event.type === "expired") return IDLE;
       return null;
     case "finalizing":
-      if (event.type === "blocked") return { ...state, blocked: event.by };
+      if (event.type === "blocked") {
+        const { retryAt: _retryAt, rateLimited: _rateLimited, ...rest } = state;
+        return event.by === "server"
+          ? { ...rest, blocked: "server", retryAt: event.retryAt ?? null, rateLimited: event.rateLimited ?? false }
+          : { ...rest, blocked: event.by };
+      }
       if (event.type === "slow") return { ...state, slow: true };
-      if (event.type === "resume") return state.blocked ? { ...state, blocked: null, slow: false } : null;
+      if (event.type === "resume") {
+        if (!state.blocked) return null;
+        const { retryAt: _retryAt, rateLimited: _rateLimited, ...rest } = state;
+        return { ...rest, blocked: null, slow: false };
+      }
       if (event.type === "finalized") return { phase: "done", tabId: state.tabId, result: event.result };
       if (event.type === "failed") return { phase: "idle", notice: event.notice };
       if (event.type === "expired") return IDLE;
@@ -163,6 +183,13 @@ const AUX_KEY = "capture.aux";
 const LOAD_POLL_MS = 250;
 const LOAD_TIMEOUT_MS = 30_000;
 const STOP_GRACE_MS = 6000;
+/**
+ * The least wait before trying again on its own after Scouty answered but could not take the
+ * capture (the API client has already retried with backoff by then). Kept under the 30 s a
+ * Chromium service worker may idle, so the timer is not lost; a longer Retry-After is honored, and
+ * a timer that is lost anyway is picked up on the next wake (recover, or the popup asking).
+ */
+export const SERVER_RETRY_MS = 20_000;
 
 export type StartOutcome = "started" | "busy" | "not_profile";
 
@@ -535,10 +562,7 @@ export class CaptureController {
           await this.dispatch({ type: "blocked", by: "auth" });
           return;
         }
-        if (isTransient(error)) {
-          await this.dispatch({ type: "blocked", by: "offline" });
-          return;
-        }
+        if (isTransient(error)) return this.waitOut(error);
         if (error instanceof ApiError && error.code === "LINKEDIN_MANIFEST_MISMATCH" && !reconciled) {
           // One reconcile: send the named sections again from the outbox, then finalize again.
           reconciled = true;
@@ -565,36 +589,69 @@ export class CaptureController {
    * without reading LinkedIn again: ask what the server holds, re-send what differs, finalize.
    */
   resume(): Promise<void> {
+    return this.enqueue(() => this.resumeNow());
+  }
+
+  private async resumeNow(): Promise<void> {
+    await this.ready();
+    if (await this.expireIfDue()) return;
+    if (this.state.phase !== "finalizing") return;
+    await this.dispatch({ type: "resume" });
+    const ref = await this.captureRef();
+    const box = await outbox.load();
+    if (!ref || !box) return this.fail({ kind: "failed" });
+    try {
+      const status = await this.deps.api.status(ref);
+      // Finalized already: the server lists nothing as received any more, and re-sending a section
+      // would be refused. The same finalize again (same key, same manifest) returns the answer.
+      if (status.status === "finalized") await outbox.ackAll();
+      else for (const entry of box.sections) {
+        const held = status.received.find((r) => r.section === entry.section);
+        if (held && held.seq === entry.seq && held.sha256 === entry.sha256) await outbox.ack(entry.section, entry.sha256);
+        else await outbox.unack(entry.section);
+      }
+    } catch (error) {
+      if (error instanceof SignedOutError) {
+        await this.dispatch({ type: "blocked", by: "auth" });
+        return;
+      }
+      if (isTransient(error)) return this.waitOut(error);
+      return this.failWith(error);
+    }
+    return this.finalize();
+  }
+
+  /**
+   * Sending failed after the API client's own retries. A network error shows "You're offline"; an
+   * answer from Scouty that it cannot take the capture right now (408, 429, 502, 503, 504) shows
+   * "Scouty isn't answering right now" and is tried again on its own after a wait (the server's
+   * Retry-After when longer), for as long as this browser keeps the capture.
+   */
+  private async waitOut(error: unknown): Promise<void> {
+    if (!(error instanceof ApiError)) {
+      await this.dispatch({ type: "blocked", by: "offline" });
+      return;
+    }
+    const wait = Math.max(SERVER_RETRY_MS, error.retryAfterMs ?? 0);
+    await this.dispatch({ type: "blocked", by: "server", retryAt: this.deps.now() + wait, rateLimited: error.status === 429 });
+    this.scheduleRetry(wait);
+  }
+
+  private scheduleRetry(ms: number): void {
+    void this.deps.sleep(ms).then(() => this.retryIfDue());
+  }
+
+  /**
+   * Tries again when sending waits on Scouty and the wait is over. Called by the timer, on a restart
+   * of the background context, and whenever the popup or the overlay asks for the state.
+   */
+  retryIfDue(): Promise<void> {
     return this.enqueue(async () => {
       await this.ready();
-      if (await this.expireIfDue()) return;
-      if (this.state.phase !== "finalizing") return;
-      await this.dispatch({ type: "resume" });
-      const ref = await this.captureRef();
-      const box = await outbox.load();
-      if (!ref || !box) return this.fail({ kind: "failed" });
-      try {
-        const status = await this.deps.api.status(ref);
-        // Finalized already: the server lists nothing as received any more, and re-sending a section
-        // would be refused. The same finalize again (same key, same manifest) returns the answer.
-        if (status.status === "finalized") await outbox.ackAll();
-        else for (const entry of box.sections) {
-          const held = status.received.find((r) => r.section === entry.section);
-          if (held && held.seq === entry.seq && held.sha256 === entry.sha256) await outbox.ack(entry.section, entry.sha256);
-          else await outbox.unack(entry.section);
-        }
-      } catch (error) {
-        if (error instanceof SignedOutError) {
-          await this.dispatch({ type: "blocked", by: "auth" });
-          return;
-        }
-        if (isTransient(error)) {
-          await this.dispatch({ type: "blocked", by: "offline" });
-          return;
-        }
-        return this.failWith(error);
-      }
-      return this.finalize();
+      const state = this.state;
+      if (state.phase !== "finalizing" || state.blocked !== "server") return;
+      if ((state.retryAt ?? 0) > this.deps.now()) return;
+      return this.resumeNow();
     });
   }
 
@@ -608,6 +665,13 @@ export class CaptureController {
       if (state.phase === "finalizing" && !state.blocked) {
         await this.dispatch({ type: "blocked", by: "offline" });
         void this.resume();
+        return;
+      }
+      if (state.phase === "finalizing" && state.blocked === "server") {
+        // A restart lost the timer: try now if the wait is over, else when it is.
+        const left = (state.retryAt ?? 0) - this.deps.now();
+        if (left > 0) this.scheduleRetry(left);
+        else void this.retryIfDue();
         return;
       }
       if (state.phase === "running" && !this.aux.readerActive) {
@@ -666,9 +730,9 @@ function samePage(actual: string, expected: string): boolean {
 }
 
 /**
- * An error the capture waits out ("You're offline" with Try now) instead of ending: a network error,
- * or a status the API client retries (408, 429, 502, 503, 504; not LINKEDIN_DISABLED). A 500 or any
- * other 5xx is terminal and ends in "failed".
+ * An error the capture waits out instead of ending: a network error ("You're offline"), or a status
+ * the API client retries (408, 429, 502, 503, 504; not LINKEDIN_DISABLED), which shows "Scouty isn't
+ * answering right now". A 500 or any other 5xx is terminal and ends in "failed".
  */
 export function isTransient(error: unknown): boolean {
   if (error instanceof NetworkError) return true;

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import * as auth from "../../src/background/auth";
 import * as outbox from "../../src/background/outbox";
 import {
-  EVENT_TYPES, IDLE, PAGE_STATE_STOPS, PHASES, isTransient, noticeFor, transition,
+  EVENT_TYPES, IDLE, PAGE_STATE_STOPS, PHASES, SERVER_RETRY_MS, isTransient, noticeFor, transition,
   type CaptureEvent, type CaptureState, type DoneResult, type EventType, type Phase,
 } from "../../src/background/session";
 import { ApiError, NetworkError } from "../../src/background/api";
@@ -463,5 +463,89 @@ describe("capture controller", () => {
       const ui = captureUi({ phase: "done", tabId: TAB, result: { ...result, completeness: "partial", stop } }, { clickLog: [], minutesLeft: null }, "W", 0);
       expect(ui, stop).not.toBeNull();
     }
+  });
+});
+
+describe("waiting on Scouty is not being offline", () => {
+  const NO_NETWORK_SECTIONS = { "synthetic-person-one": { posts: 0, comments: 0, reactions: 0 } };
+  const ui = (state: CaptureState) => captureUi(state, { clickLog: [], minutesLeft: null }, "W", 0);
+  /** Lets a fired timer's continuation run, then waits for the controller's queue. */
+  const flush = async (r: Awaited<ReturnType<typeof rig>>): Promise<void> => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await r.controller.settledWork();
+  };
+
+  it("the blocked event keeps the next try and the rate limit only for 'server'; resume clears them", () => {
+    const finalizing = { ...samples.finalizing, blocked: null } as CaptureState;
+    const server = transition(finalizing, { type: "blocked", by: "server", retryAt: 5, rateLimited: true })!;
+    expect(server).toMatchObject({ phase: "finalizing", blocked: "server", retryAt: 5, rateLimited: true });
+    const offline = transition(server, { type: "blocked", by: "offline" })!;
+    expect(offline).toEqual({ ...finalizing, blocked: "offline" });
+    expect(transition(server, events.resume)).toEqual(finalizing);
+  });
+
+  it("503 on finalize after the retries: 'Scouty isn't answering', not 'offline'; tried again on its own, then done", async () => {
+    const r = await rig({ capsBySlug: NO_NETWORK_SECTIONS });
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    r.stub.fail(/POST .*\/finalize$/, "503", 6);
+    await r.readAll();
+    expect(r.stub.state.requests.filter((q) => q.path.endsWith("/finalize"))).toHaveLength(6);
+    const state = await r.controller.current();
+    expect(state).toMatchObject({ phase: "finalizing", blocked: "server", rateLimited: false, retryAt: r.clock.now + SERVER_RETRY_MS });
+    expect(ui(state)).toEqual({ kind: "notAnswering", retryAt: null, workspace: "W" });
+    // It tries again by itself after the wait; nothing of LinkedIn is opened again.
+    const timer = r.timers.find((tm) => tm.ms === SERVER_RETRY_MS)!;
+    expect(timer).toBeDefined();
+    const opened = r.tab.updates.length;
+    r.clock.now += SERVER_RETRY_MS;
+    timer.fire();
+    await flush(r);
+    expect(await r.phase()).toBe("done");
+    expect(r.tab.updates).toHaveLength(opened);
+  });
+
+  it("429 with a Retry-After over 30 s: not retried at once, 'Scouty isn't answering' with roughly when; tried again after the wait, also after a restart", async () => {
+    const r = await rig({ capsBySlug: NO_NETWORK_SECTIONS });
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    r.stub.fail(/POST .*\/finalize$/, "429-long", 1);
+    await r.readAll();
+    expect(r.stub.state.requests.filter((q) => q.path.endsWith("/finalize"))).toHaveLength(1);
+    const blockedAt = r.clock.now;
+    const state = await r.controller.current();
+    expect(state).toMatchObject({ phase: "finalizing", blocked: "server", rateLimited: true, retryAt: blockedAt + 60_000 });
+    expect(ui(state)).toEqual({ kind: "notAnswering", retryAt: new Date(blockedAt + 60_000).toISOString(), workspace: "W" });
+    expect(r.timers.map((tm) => tm.ms)).toContain(60_000);
+    // Asked before the wait is over (the popup polls): nothing is sent.
+    const before = r.stub.state.requests.length;
+    await r.controller.retryIfDue();
+    expect(r.stub.state.requests).toHaveLength(before);
+    // The background context restarts after the wait (the timer is lost): recover tries again.
+    r.clock.now = blockedAt + 60_000;
+    r.newController();
+    await r.controller.recover();
+    await flush(r);
+    expect(await r.phase()).toBe("done");
+  });
+
+  it("a network failure still shows 'You're offline' and is not tried again on its own", async () => {
+    const r = await rig({ capsBySlug: NO_NETWORK_SECTIONS });
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    r.stub.fail(/POST .*\/finalize$/, "drop", 6);
+    await r.readAll();
+    const state = await r.controller.current();
+    expect(state).toMatchObject({ phase: "finalizing", blocked: "offline" });
+    expect(state).not.toHaveProperty("retryAt");
+    expect(ui(state)).toEqual({ kind: "offline", workspace: "W" });
+    expect(r.timers.map((tm) => tm.ms)).not.toContain(SERVER_RETRY_MS);
+    await r.controller.retryIfDue();
+    expect(await r.controller.current()).toMatchObject({ blocked: "offline" });
+  });
+
+  it("a 500 on finalize stays terminal", async () => {
+    const r = await rig({ capsBySlug: NO_NETWORK_SECTIONS });
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    r.stub.fail(/POST .*\/finalize$/, "500", 1);
+    await r.readAll();
+    expect(await r.controller.current()).toEqual({ phase: "idle", notice: { kind: "failed" } });
   });
 });

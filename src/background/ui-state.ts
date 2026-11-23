@@ -101,6 +101,10 @@ export function captureUi(state: CaptureState, extras: { clickLog: ClickLogEntry
     case "finalizing":
       if (state.blocked === "auth") return { kind: "connectionEnded" };
       if (state.blocked === "offline") return { kind: "offline", workspace };
+      if (state.blocked === "server") {
+        const retryAt = state.rateLimited && typeof state.retryAt === "number" ? new Date(state.retryAt).toISOString() : null;
+        return { kind: "notAnswering", retryAt, workspace };
+      }
       return { kind: "sending", slow: state.slow, workspace };
     case "done": {
       const r = state.result;

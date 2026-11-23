@@ -170,6 +170,9 @@ async function handle(message: Message, sender: Sender): Promise<unknown> {
   if (sender.id !== ext.runtime.id) return null;
   const fromPage = typeof sender.url === "string" && sender.url.startsWith(ext.runtime.getURL(""));
   const senderTab = sender.tab?.id ?? null;
+  // A capture waiting on Scouty is tried again whenever the popup or the overlay asks for the state
+  // and its wait is over, in case a stopped background context lost the timer.
+  if (message.type === "ui:getState" || message.type === "overlay:hello") void controller.retryIfDue();
   switch (message.type) {
     case "reader:hello": return fromPage ? null : controller.readerHello(senderTab);
     case "reader:progress": return fromPage ? null : controller.readerProgress(senderTab, message.section, message.count);

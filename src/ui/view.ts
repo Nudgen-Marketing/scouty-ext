@@ -12,7 +12,7 @@ export type PillTone = "good" | "active" | "waiting" | "problem" | "neutral";
 export type ViewAction = { id: UiAction; label: string; variant: ButtonVariant; icon: IconName | null };
 
 export type View = {
-  /** 1 to 25: the row of plan 12.4 (1 to 24), or 25 for "takenOver". */
+  /** 1 to 26: the row of plan 12.4 (1 to 24), 25 for "takenOver", 26 for "notAnswering". */
   n: number;
   kind: UiKind;
   /** "alert" for errors (role="alert"), "status" otherwise (a polite live region). */
@@ -156,6 +156,12 @@ function draft(state: UiState): Draft {
       return { tone: "alert", icon: "alert", title: t("addressChangedTitle"), body: [t("addressChangedBody", state.address)], primary: action("capture", "actionCaptureThisPage") };
     case "offline":
       return { tone: "alert", icon: "alert", title: t("offlineTitle"), body: [t("offlineBody")], primary: action("retryNow", "actionTryNow") };
+    case "notAnswering":
+      return {
+        tone: "alert", icon: "alert", title: t("notAnsweringTitle"),
+        body: state.retryAt ? [t("notAnsweringBody"), t("notAnsweringRetryAt", clockTime(state.retryAt))] : [t("notAnsweringBody")],
+        primary: action("retryNow", "actionTryNow"),
+      };
     case "connectionEnded":
       return { tone: "alert", icon: "alert", title: t("connectionEndedTitle"), body: [t("connectionEndedBody")], primary: action("connect", "actionConnect") };
     case "limit":

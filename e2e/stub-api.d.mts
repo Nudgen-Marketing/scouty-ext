@@ -18,7 +18,7 @@ export type StubApi = {
   listen(port?: number): Promise<import("node:http").Server>;
   expireAccessTokens(): void;
   revokeAll(): void;
-  fail(match: RegExp, kind: "503" | "500" | "502" | "504" | "drop" | "429" | "401" | "disabled" | "lose-answer", times?: number): void;
+  fail(match: RegExp, kind: "503" | "500" | "502" | "504" | "drop" | "429" | "429-long" | "401" | "disabled" | "lose-answer", times?: number): void;
   clearFaults(): void;
   fetch(url: string, init?: RequestInit): Promise<Response>;
 };

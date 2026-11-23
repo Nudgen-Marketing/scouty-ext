@@ -40,8 +40,9 @@ const EXPECTED: [string, string | null, string | null][] = [
   ["A capture is in progress", "Show it", null],
   ["Settings", null, "Disconnect"],
   ["This capture stopped", "OK", "Capture here"],
+  ["Scouty isn't answering right now", "Try now", null],
 ];
-const ERRORS = new Set(["linkedinSignIn", "verification", "unavailable", "addressChanged", "offline", "connectionEnded", "limit", "outdated", "notAvailable", "suppressed", "failed", "busy", "takenOver"]);
+const ERRORS = new Set(["linkedinSignIn", "verification", "unavailable", "addressChanged", "offline", "connectionEnded", "limit", "outdated", "notAvailable", "suppressed", "failed", "busy", "takenOver", "notAnswering"]);
 
 let root: Root | null = null;
 let container: HTMLElement | null = null;
@@ -66,11 +67,11 @@ afterEach(() => {
 const audit = async (node: Element): Promise<string[]> =>
   (await axe.run(node, { rules: { "color-contrast": { enabled: false }, region: { enabled: false } } })).violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.html).join(" | ")}`);
 
-describe("the 25 screens", () => {
+describe("the 26 screens", () => {
   it("there is one sample per screen, in the plan's order", () => {
     expect(SAMPLES.map((s) => s.kind)).toEqual(UI_KINDS);
-    expect(SAMPLES).toHaveLength(25);
-    expect(SAMPLES.map((s) => viewFor(s).n)).toEqual(Array.from({ length: 25 }, (_, i) => i + 1));
+    expect(SAMPLES).toHaveLength(26);
+    expect(SAMPLES.map((s) => viewFor(s).n)).toEqual(Array.from({ length: 26 }, (_, i) => i + 1));
   });
 
   describe.each(["light", "dark"] as const)("%s theme", (theme) => {
@@ -121,6 +122,27 @@ describe("the 25 screens", () => {
     expect(text(23)).toContain("Synthetic Tester · tester@example.invalid");
     expect(text(24)).toContain("It was started again from another browser or device, or removed in Scouty. Nothing more from this capture will be sent.");
     expect(text(24)).toContain("To read this profile again from here, press Capture here.");
+    expect(text(25)).toContain("Your capture is kept in this browser. Scouty will keep trying to send it while this browser is open.");
+    expect(text(25)).toContain(`The next try is at about ${new Date("2026-11-23T10:42:00.000Z").toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`);
+  });
+
+  it("26 \"Scouty isn't answering\" is not 16 \"You're offline\": its own copy, the same Try now", () => {
+    const busy = viewFor({ kind: "notAnswering", retryAt: null, workspace: "W" });
+    const offline = viewFor({ kind: "offline", workspace: "W" });
+    expect(busy.n).toBe(26);
+    expect(offline.n).toBe(16);
+    expect(busy.title).toBe("Scouty isn't answering right now");
+    expect(busy.title).not.toBe(offline.title);
+    expect(busy.body.join(" ")).not.toMatch(/offline|online|connection/i);
+    // Without a rate limit there is no time, only that it keeps trying.
+    expect(busy.body).toEqual(["Your capture is kept in this browser. Scouty will keep trying to send it while this browser is open."]);
+    expect([busy.primary, busy.secondary, busy.links]).toEqual([offline.primary, offline.secondary, offline.links]);
+    expect(busy.primary).toMatchObject({ id: "retryNow", label: "Try now" });
+    expect(busy.tone).toBe("alert");
+    // With a rate limit it says roughly when.
+    const limited = viewFor({ kind: "notAnswering", retryAt: "2026-11-23T10:42:00.000Z", workspace: "W" });
+    expect(limited.body).toHaveLength(2);
+    expect(limited.body[1]).toBe(`Scouty asked to wait a little. The next try is at about ${new Date("2026-11-23T10:42:00.000Z").toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`);
   });
 
   it("the primary action is the first control after the title, and Enter activates it", () => {

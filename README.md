@@ -103,7 +103,7 @@ in [BUILD.md](BUILD.md). In short: Node 24, `npm ci`, `npm run build`, `npm run 
 | --- | --- | --- |
 | Unit | `npm run test:unit` | Reader, clamps, URN, page state, interactions (traps are never clicked), pacing, auth, API client, outbox, every state × event pair of the state machine |
 | Static | `npm run test:static` | The read-only and network rules on `src/` and on every built bundle; exact manifests; dependency allow-list; no secrets; tokens; sanitizer |
-| UI | `npm run test:ui` | All 25 states rendered with React in jsdom, light and dark, with axe; the overlay's closed shadow root |
+| UI | `npm run test:ui` | All 26 states rendered with React in jsdom, light and dark, with axe; the overlay's closed shadow root |
 | Contract | `npm run test:contract` | `protocol-v1/` matches its checksum (and the app's copy when checked out next to this repo); builders produce the valid examples; the stub gives every example its recorded outcome |
 | Browser e2e | `npm run test:e2e` | The whole flow in Chromium; in every scenario LinkedIn saw only GET navigations to the expected pages and clicks only on expand and load-more controls |
 | Gallery | `npm run test:gallery` | axe, measured WCAG AA contrast and the popup size limit for every state |
