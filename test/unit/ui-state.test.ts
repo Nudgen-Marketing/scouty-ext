@@ -1,0 +1,84 @@
+import { afterEach, describe, expect, it } from "vitest";
+import * as auth from "../../src/background/auth";
+import { giveConsent, minutesLeft, popupUi, type UiContext } from "../../src/background/ui-state";
+import { fake, installFakeExt } from "../helpers/fake-ext";
+import { PROFILE_URL, rig, TAB, type Rig } from "../helpers/session";
+import { unwire } from "../helpers/stub";
+
+afterEach(() => { unwire(); installFakeExt("chrome"); });
+
+const grant = (): void => { fake.granted.add("https://www.linkedin.com/in/*"); fake.granted.add("https://scouty.to/*"); };
+const ctx = (r: Rig, connecting = false): UiContext => ({ api: r.api, controller: r.controller, connecting: () => connecting, now: () => r.clock.now });
+const on = { tabId: TAB, tabUrl: PROFILE_URL, settings: false };
+
+describe("popup state", () => {
+  it("without both host permissions, asks for them and offers nothing else (the Firefox default)", async () => {
+    const r = await rig();
+    expect(await popupUi(ctx(r), on)).toEqual({ kind: "permission" });
+    fake.granted.add("https://www.linkedin.com/in/*");
+    expect(await popupUi(ctx(r), on)).toEqual({ kind: "permission" });
+    expect(r.stub.state.requests).toEqual([]); // nothing is read or sent until both are granted
+    grant();
+    expect((await popupUi(ctx(r), on)).kind).toBe("consent");
+  });
+
+  it("the same flow works through a Firefox-shaped browser.* namespace", async () => {
+    installFakeExt("browser");
+    expect((globalThis as { chrome?: unknown }).chrome).toBeUndefined();
+    const { ext } = await import("../../src/ext");
+    // ext.ts reads the namespace once at load; both shapes expose the same promise API.
+    expect(typeof ext.storage.session.get).toBe("function");
+  });
+
+  it("signed out, connecting, then connected", async () => {
+    const r = await rig();
+    grant();
+    await auth.signOut();
+    expect(await popupUi(ctx(r), on)).toEqual({ kind: "signedOut", devRedirectUrl: null });
+    expect(await popupUi(ctx(r, true), on)).toEqual({ kind: "connecting" });
+    await auth.connect();
+    expect(await popupUi(ctx(r), { tabId: 3, tabUrl: "https://www.linkedin.com/feed/", settings: false })).toEqual({ kind: "notOnProfile", workspace: "Synthetic Workspace" });
+    expect(await popupUi(ctx(r), { tabId: 3, tabUrl: null, settings: false })).toEqual({ kind: "notOnProfile", workspace: "Synthetic Workspace" });
+  });
+
+  it("on a profile: consent first, then ready with the allowance", async () => {
+    const r = await rig();
+    grant();
+    expect(await popupUi(ctx(r), on)).toEqual({ kind: "consent", slug: "synthetic-person-one", workspace: "Synthetic Workspace" });
+    await giveConsent();
+    expect(await popupUi(ctx(r), on)).toEqual({ kind: "ready", slug: "synthetic-person-one", workspace: "Synthetic Workspace", capturesLeft: 40 });
+    expect(fake.local.data.get("consent.v1")).toBe(true);
+  });
+
+  it("settings, a running capture, and a capture running in another tab", async () => {
+    const r = await rig();
+    grant();
+    await giveConsent();
+    expect(await popupUi(ctx(r), { ...on, settings: true })).toEqual({ kind: "settings", name: "Synthetic Tester", email: "tester@example.invalid", workspace: "Synthetic Workspace", version: "0.1.0", devRedirectUrl: null });
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    await r.controller.settledWork();
+    expect(await popupUi(ctx(r), on)).toMatchObject({ kind: "capturing", section: "profile", cap: 0 });
+    expect(await popupUi(ctx(r), { tabId: 99, tabUrl: "https://www.linkedin.com/in/synthetic-person-two/", settings: false })).toEqual({ kind: "busy", workspace: "Synthetic Workspace" });
+  });
+
+  it("an outdated extension or an account without access says so before anything else", async () => {
+    let r = await rig({ minVersion: "9.0.0" });
+    grant();
+    expect(await popupUi(ctx(r), on)).toEqual({ kind: "outdated" });
+    unwire();
+    fake.session.data.clear();
+    r = await rig();
+    grant();
+    r.stub.state.available = false;
+    expect(await popupUi(ctx(r), on)).toEqual({ kind: "notAvailable" });
+  });
+
+  it("the time estimate comes from the sections left and never counts up", () => {
+    const running = { phase: "running" as const, tabId: 1, profileKey: "k", section: "profile" as const, count: 0, loading: false, expected: ["profile", "experience", "skills", "posts", "comments", "reactions"] as const, caps: { posts: 50, comments: 50, reactions: 50 }, finished: [] as never[] };
+    const all = minutesLeft({ ...running, expected: [...running.expected] }, null);
+    expect(all).toBe(3);
+    const later = minutesLeft({ ...running, expected: [...running.expected], finished: ["profile", "experience", "skills", "posts", "comments"] }, all);
+    expect(later).toBe(1);
+    expect(minutesLeft({ ...running, expected: [...running.expected] }, 1)).toBe(1);
+  });
+});

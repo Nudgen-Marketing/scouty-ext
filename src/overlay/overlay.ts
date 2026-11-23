@@ -27,8 +27,8 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string,
 export function renderOverlay(view: View, onAction: (action: UiAction) => void): HTMLElement {
   const message = el("div", { class: "message", role: view.tone === "alert" ? "alert" : "status", "aria-live": view.tone === "alert" ? "assertive" : "polite" },
     el("p", { class: "title" }, view.title),
-    ...view.body.map((line) => el("p", { class: "text" }, line)),
     view.bullets.length > 0 && el("ul", { class: "lines" }, ...view.bullets.map((line) => el("li", {}, line))),
+    ...view.body.map((line) => el("p", { class: "text" }, line)),
   );
   if (view.progress) {
     const p = view.progress;

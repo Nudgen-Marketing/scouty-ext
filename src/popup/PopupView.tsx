@@ -58,10 +58,10 @@ export function PopupView({ view, onAction, reducedMotion = false }: PopupViewPr
             {view.icon ? <Icon name={view.icon} className={view.tone === "alert" ? "mt-0.5 text-destructive" : "mt-0.5 text-pill-good-fg"} /> : null}
             <span>{view.title}</span>
           </h1>
-          {view.body.map((line, i) => <p key={i} className="text-sm break-words text-muted-foreground">{line}</p>)}
           {view.bullets.length ? (
             <ul className="grid list-disc gap-1.5 pl-5 text-[13px] text-muted-foreground">{view.bullets.map((line, i) => <li key={i} className="break-words">{line}</li>)}</ul>
           ) : null}
+          {view.body.map((line, i) => <p key={i} className="text-sm break-words text-muted-foreground">{line}</p>)}
           {view.progress ? (
             <div className="grid gap-1.5">
               <Progress value={view.progress.value} max={view.progress.max} valueText={view.progress.valueText} label={view.title} indeterminate={view.progress.indeterminate} reducedMotion={reducedMotion} />

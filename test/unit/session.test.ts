@@ -137,7 +137,7 @@ describe("capture controller", () => {
     const r = await rig();
     await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
     expect(await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false })).toBe("busy");
-    expect(await r.controller.start({ tabId: 99, url: "https://www.linkedin.com/in/someone-else/", recapture: false })).toBe("busy");
+    expect(await r.controller.start({ tabId: 99, url: "https://www.linkedin.com/in/synthetic-person-two/", recapture: false })).toBe("busy");
     expect(r.stub.state.requests.filter((q) => q.path === "/api/linkedin/ext/captures")).toHaveLength(1);
     expect(await r.controller.start({ tabId: 5, url: "https://www.linkedin.com/feed/", recapture: false })).toBe("not_profile");
     expect(await r.controller.start({ tabId: 5, url: "https://evil.example/in/synthetic-person-one/", recapture: false })).toBe("not_profile");
@@ -250,6 +250,20 @@ describe("capture controller", () => {
     await r.controller.tabLoaded(TAB);
     expect(await r.controller.current()).toMatchObject({ phase: "done", result: { stop: "left_linkedin" } });
     expect(captureUi(await r.controller.current(), { clickLog: [], minutesLeft: null }, "W", 0)).toEqual({ kind: "linkedinSignIn", workspace: "W" });
+  });
+
+  it("a LinkedIn page outside /in/ is never read, even where the browser would allow it", async () => {
+    // Chromium grants host permissions per host, so a sign-in or checkpoint page on
+    // www.linkedin.com is visible and injectable. The controller refuses it by address.
+    const r = await rig();
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    await r.read();
+    const injectedBefore = r.injected.length;
+    r.tab.info = { url: "https://www.linkedin.com/checkpoint/challenge/", status: "complete" };
+    await r.controller.tabLoaded(TAB);
+    expect(await r.controller.current()).toMatchObject({ phase: "done", result: { stop: "left_linkedin" } });
+    expect(r.injected.length).toBe(injectedBefore);
+    expect(await r.controller.start({ tabId: TAB, url: "https://www.linkedin.com/feed/", recapture: false })).toBe("not_profile");
   });
 
   it("a redirect to another slug stops with wrong_profile and shows the address LinkedIn uses", async () => {
