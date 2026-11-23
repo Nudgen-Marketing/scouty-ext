@@ -166,7 +166,7 @@ describe("the 27 screens", () => {
     [SAMPLES[14]!, "Capture this page", "capture"],
     [{ kind: "notAnswering", retryAt: null, sending: false, workspace: "W" }, "Try now", "capture"],
   ];
-  const HINT = "Open the lead's LinkedIn profile in this tab to capture it again.";
+  const HINT = "Open the lead's LinkedIn profile in this tab to capture it.";
 
   describe.each(["light", "dark"] as const)("capture actions (%s)", (theme) => {
     it.each(CAPTURE_SCREENS.map(([state, label, id]) => [state.kind, label, id, state] as const))("%s on a profile: %s is enabled and sends %s; axe", async (_kind, label, id, state) => {

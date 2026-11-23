@@ -390,7 +390,7 @@
     "message": "Capture"
   },
   "captureNeedsProfile": {
-    "message": "Open the lead's LinkedIn profile in this tab to capture it again."
+    "message": "Open the lead's LinkedIn profile in this tab to capture it."
   },
   "busyTitle": {
     "message": "A capture is in progress"

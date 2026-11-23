@@ -25,7 +25,7 @@ test("shows all 27 states in both themes, plus the overlay", async ({ page }) =>
   const off = page.locator("[data-frame='popup-off-profile']");
   await expect(off).toHaveCount(6);
   await expect(off.locator("[data-action='captureAgain']:disabled")).toHaveCount(6);
-  await expect(off.locator("[data-slot='hint']")).toHaveText(Array(6).fill("Open the lead's LinkedIn profile in this tab to capture it again."));
+  await expect(off.locator("[data-slot='hint']")).toHaveText(Array(6).fill("Open the lead's LinkedIn profile in this tab to capture it."));
   // The two themes really differ: the dark frame has a dark background.
   const backgrounds = await page.evaluate(() => ["light", "dark"].map((theme) => getComputedStyle(document.querySelector(`[data-frame='popup'][data-theme='${theme}']`)!).backgroundColor));
   expect(backgrounds[0]).not.toBe(backgrounds[1]);
