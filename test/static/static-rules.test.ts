@@ -168,7 +168,7 @@ describe("repository rules", () => {
 
   it("no secrets or internal hostnames in tracked files", () => {
     const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8" }).split("\0").filter(Boolean).filter((f) => !/\.(png)$/.test(f) && f !== "package-lock.json");
-    const forbidden = /BEGIN [A-Z ]*PRIVATE KEY|client_secret|rk_live|sk-[A-Za-z0-9]{20}|AKIA[0-9A-Z]{16}|staging\.scouty/;
+    const forbidden = /BEGIN [A-Z ]*PRIVATE KEY|client_secret|rk_live|sk-[A-Za-z0-9]{20}|AKIA[0-9A-Z]{16}/;
     // Internal hostnames are never named in this public repository: set PRIVATE_DENY_PATTERNS (a regex) locally or as a CI secret.
     const extra = process.env.PRIVATE_DENY_PATTERNS ? new RegExp(process.env.PRIVATE_DENY_PATTERNS, "i") : null;
     // This test and the CI scan that name the generic patterns are the only files allowed to contain them.

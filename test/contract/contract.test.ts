@@ -41,8 +41,18 @@ describe("protocol-v1 contract directory", () => {
     for (const file of walk(dir)) expect(readFileSync(path.join(appCopy, file), "utf8"), file).toBe(read(file));
   });
 
-  it("is labelled synthetic and names no real host", () => {
-    for (const file of walk(dir)) expect(read(file), file).not.toMatch(/staging\./i);
+  it("is labelled synthetic and names only public or reserved hosts", () => {
+    // Every host in a URL or an email address is a public host the extension already talks to, or a
+    // name reserved for examples and tests (RFC 2606, RFC 6761). Anything else fails, internal or not.
+    const PUBLIC = new Set(["www.linkedin.com", "scouty.to", "chromewebstore.google.com"]);
+    const RESERVED = /(^|\.)(example|invalid|test|localhost)$|^example\.(com|net|org)$/;
+    const hosts = new Set<string>();
+    for (const file of walk(dir).filter((f) => f !== "CHECKSUMS.sha256")) {
+      for (const m of read(file).matchAll(/\b[a-z][a-z0-9+.-]*:\/\/(?:[^/?#@\s"]*@)?([^/?#:\s"]+)/gi)) hosts.add(m[1]!.toLowerCase());
+      for (const m of read(file).matchAll(/[A-Za-z0-9._%+-]+@([A-Za-z0-9.-]+\.[A-Za-z]{2,})/g)) hosts.add(m[1]!.toLowerCase());
+    }
+    expect(hosts.size).toBeGreaterThan(0);
+    expect([...hosts].filter((h) => !PUBLIC.has(h) && !RESERVED.test(h)).sort()).toEqual([]);
     expect(read("index.json")).toContain("All content is synthetic");
   });
 });
