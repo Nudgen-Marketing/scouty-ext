@@ -44,3 +44,30 @@ Paste the list shown at the end of each capture (control name and matched select
 ## Selector changes made
 
 List each change to `src/reader/selectors.ts` (and `urn.ts`), with the new `SELECTORS_VERSION`.
+
+## E15 real local app
+
+App plan §15.4. Commits of both repositories, Chrome version, then each scenario.
+
+| Scenario | Pass, or the state observed |
+| --- | --- |
+| S1 happy path | |
+| S2 analysis (plan within 5 minutes, ends with the reply step, no link) | |
+| S3 Stop | |
+| S4 network cut, resumed without reloading LinkedIn | |
+| S5 connection revoked mid-capture, reconnect finishes it | |
+| S6 taken over by another window (state 25) | |
+| S7 extension below the minimum version (state 19) | |
+| S8 recent capture reused (state 7) | |
+
+## A0 AI eval on real-shaped data
+
+App plan §15.3. Command, model id, pass count, and for each failing assertion the change made.
+
+| Assertion | Pass | Change made |
+| --- | --- | --- |
+| | | |
+
+## Gallery review
+
+App plan §15.7. Reviewer's initials, date, and any state that needs a change.

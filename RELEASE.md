@@ -13,7 +13,7 @@ is the control. Store uploads are done by hand; no store credential exists in CI
 | 1 | CI green on the tagged commit: typecheck, lint, unit, static, UI, contract, browser e2e, gallery, Firefox lint, Firefox start-up smoke, double-build hash equality | The CI run | |
 | 2 | The app's gates green on the commit to be deployed (`yarn lint && yarn typecheck && yarn test`, MCP, LinkedIn, integration, e2e, build) | The app's CI run | |
 | 3 | Contract in sync: `diff -r protocol-v1 ../scouty/src/lib/linkedin/__fixtures__/protocol-v1` is empty, and `cmp src/ui/tokens.json ../scouty/src/lib/linkedin/__fixtures__/extension-tokens.json` reports no difference | Command output pasted | |
-| 4 | The Playwright suite also passes against a real local app: `E2E_API=http://localhost:3000 npm run test:e2e` | Run log | |
+| 4 | The extension works against the real local app: the eight scripted scenarios S1–S8 of the app plan's §15.4 (E15) all pass | `## E15 real local app` in `validation/RESULTS-<version>.md` | |
 | 5 | State gallery (`npm run gallery`, open `gallery/index.html`) reviewed in light and dark and signed off | Owner's initials and date | |
 | 6 | Real-LinkedIn validation complete for this version's selectors: every row passes, click logs clean | `validation/RESULTS-<version>.md` | |
 | 7 | Live AI eval passes on real-shaped data (app task A0) | Run log | |
@@ -23,8 +23,9 @@ is the control. Store uploads are done by hand; no store credential exists in CI
 | 11 | Server configured: `SCOUTY_EXTENSION_CLIENTS` has the three ids; `SCOUTY_EXTENSION_MIN_VERSION` set; migration applied; feature limited to administrators | Owner's confirmation | |
 | 12 | Exit criteria of the rollout stage being entered are met | The metric query results | |
 
-Gate 4 is not wired yet: the suite always starts its own stub of the capture API. Pointing it at a
-real local app is an owner task (E15).
+Gate 4 is a scripted manual run, because the automated browser suite always starts its own stub of
+the capture API. An `E2E_API` mode that points the suite at a real app is listed under "Later" in
+the app plan (§14.1).
 
 ## Steps
 
