@@ -5,7 +5,7 @@ green.** Copy this table into the release pull request and fill it in.
 
 Gate 1 is enforced by machine: `.github/workflows/release.yml` builds the packages only if the CI
 workflow succeeded for the tagged commit. Gates 2 to 4 are commands whose output is pasted.
-Gates 5 to 12 are attestations by a named person; the owner's sign-off on the filled-in checklist
+Gates 5 to 13 are attestations by a named person; the owner's sign-off on the filled-in checklist
 is the control. Store uploads are done by hand; no store credential exists in CI.
 
 | # | Gate | Evidence | Done by / date |
@@ -20,8 +20,9 @@ is the control. Store uploads are done by hand; no store credential exists in CI
 | 8 | Firefox: `npm run smoke:firefox` passes (CI) and `validation/FIREFOX-SMOKE.md` is completed, and the source archive rebuilds to an identical package following BUILD.md on a clean machine with Node 24 | CI run link, tester's initials, hashes pasted | |
 | 9 | Edge: the Edge build loaded in Edge completes `validation/EDGE-SMOKE.md` | Tester's initials | |
 | 10 | Privacy text, consent text and store disclosures match PRIVACY.md and have legal sign-off | Reference to the approval | |
-| 11 | Server configured: `SCOUTY_EXTENSION_CLIENTS` has the three ids; `SCOUTY_EXTENSION_MIN_VERSION` set; migration applied; feature limited to administrators | Owner's confirmation | |
+| 11 | Server configured: `SCOUTY_EXTENSION_CLIENTS` has the three ids; `SCOUTY_EXTENSION_MIN_VERSION` set; migration applied; `LINKEDIN_COACH_AUDIENCE=all` set before the first store submission (app plan Q15), so store reviewers can use the feature; rollout is controlled by store listing visibility | Owner's confirmation | |
 | 12 | Exit criteria of the rollout stage being entered are met | The metric query results | |
+| 13 | Store approval (Chrome / Edge / Firefox) with date | Each store's approval notice (Chrome Web Store, Microsoft Partner Center, AMO), with its date, per browser submitted | |
 
 Gate 4 is a scripted manual run, because the automated browser suite always starts its own stub of
 the capture API. An `E2E_API` mode that points the suite at a real app is listed under "Later" in
@@ -30,22 +31,29 @@ the app plan (§14.1).
 ## Steps
 
 1. Set `version` in `package.json` (it is copied into every manifest and sent as
-   `X-Scouty-Extension-Version`). If a store assigned client ids other than `scouty-ext-chrome`,
-   `scouty-ext-edge`, `scouty-ext-firefox`, set them in `build.mjs`.
+   `X-Scouty-Extension-Version`). The OAuth client ids are fixed in `build.mjs`
+   (`scouty-ext-chrome`, `scouty-ext-edge`, `scouty-ext-firefox`) and no store changes them; a store
+   assigns only the extension id. That id goes into the server's `SCOUTY_EXTENSION_CLIENTS` entry
+   for the browser (redirect URL, origin and store URL), not into the build.
 2. Open the release pull request with this checklist filled in; merge when CI is green.
 3. Tag the merge commit `v<version>` and push the tag. The release workflow checks CI for that
    commit, checks the tag against `package.json`, builds, and attaches the four archives.
-4. Upload by hand, in the order of the rollout plan: Chrome private testers first; Edge and
-   Firefox only after that stage has passed. Firefox needs `scouty-ext-<version>-source.zip` and
+4. Upload by hand. The order depends on the rollout configuration the owner chose (app plan
+   §14.2): **Recommended**, Chrome first (private testers), then Edge and Firefox after that stage
+   has passed; **Fast track**, all three submitted together the same day. Firefox needs `scouty-ext-<version>-source.zip` and
    a pointer to BUILD.md, because the package is bundled and the popup script is minified.
 
 ## Rollback, fastest first
 
 1. On the server, raise `SCOUTY_EXTENSION_MIN_VERSION`: older extensions are told to update at
    their next call.
-2. Remove one browser's entry from `SCOUTY_EXTENSION_CLIENTS`: its connections stop at once.
+2. Remove one browser's entry from `SCOUTY_EXTENSION_CLIENTS`: its connections stop at their next
+   request.
 3. `LINKEDIN_COACH_ENABLED=false`: the whole feature is off.
 4. Unpublish the store listing (slow; last).
+
+After changing any of these settings, restart the web and worker processes: they read the
+environment only at start.
 
 ## What the automated tests do not prove
 
