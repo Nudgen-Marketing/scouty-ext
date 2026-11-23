@@ -1,0 +1,28 @@
+{
+  "section": "comments",
+  "seq": 1,
+  "pageSlug": "synthetic-person-0001",
+  "capturedAt": "2026-11-23T09:00:00.000Z",
+  "selectorsVersion": 1,
+  "browser": "chrome",
+  "locale": "en",
+  "read": "ok",
+  "expanded": true,
+  "reachedCap": false,
+  "blockCount": 2,
+  "profile": null,
+  "blocks": [
+    {
+      "text": "Another Author\n3w\nSYNTHETIC. A long parent post about route planning.\nSynthetic Person\nSYNTHETIC. Agree: the hard part is the last 50 metres, not the last mile.",
+      "urn": "urn:li:activity:7255000000000000003",
+      "urnTime": "2026-11-01T08:00:00.000Z",
+      "truncated": false
+    },
+    {
+      "text": "مؤلف آخر\nSYNTHETIC. منشور تجريبي عن سلاسل الإمداد.\nSynthetic Person\nSYNTHETIC. Great point.",
+      "urn": "urn:li:activity:7254000000000000004",
+      "urnTime": null,
+      "truncated": false
+    }
+  ]
+}

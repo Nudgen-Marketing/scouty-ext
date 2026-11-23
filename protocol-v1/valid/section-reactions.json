@@ -1,0 +1,22 @@
+{
+  "section": "reactions",
+  "seq": 1,
+  "pageSlug": "synthetic-person-0001",
+  "capturedAt": "2026-11-23T09:00:00.000Z",
+  "selectorsVersion": 1,
+  "browser": "chrome",
+  "locale": "en",
+  "read": "ok",
+  "expanded": true,
+  "reachedCap": false,
+  "blockCount": 1,
+  "profile": null,
+  "blocks": [
+    {
+      "text": "Third Author\n5d\nSYNTHETIC. Hiring a planner for our Hanoi hub.",
+      "urn": "urn:li:activity:7262000000000000005",
+      "urnTime": "2026-11-18T08:00:00.000Z",
+      "truncated": false
+    }
+  ]
+}

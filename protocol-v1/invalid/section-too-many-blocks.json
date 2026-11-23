@@ -1,0 +1,631 @@
+{
+  "note": "More than 100 blocks.",
+  "kind": "section",
+  "pathSection": "reactions",
+  "expect": {
+    "status": 400,
+    "code": "LINKEDIN_INVALID_PAYLOAD"
+  },
+  "body": {
+    "section": "reactions",
+    "seq": 1,
+    "pageSlug": "synthetic-person-0001",
+    "capturedAt": "2026-11-23T09:00:00.000Z",
+    "selectorsVersion": 1,
+    "browser": "chrome",
+    "locale": "en",
+    "read": "ok",
+    "expanded": true,
+    "reachedCap": false,
+    "blockCount": 101,
+    "profile": null,
+    "blocks": [
+      {
+        "text": "SYNTHETIC block 0",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 1",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 2",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 3",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 4",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 5",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 6",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 7",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 8",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 9",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 10",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 11",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 12",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 13",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 14",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 15",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 16",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 17",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 18",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 19",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 20",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 21",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 22",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 23",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 24",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 25",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 26",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 27",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 28",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 29",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 30",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 31",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 32",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 33",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 34",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 35",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 36",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 37",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 38",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 39",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 40",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 41",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 42",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 43",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 44",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 45",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 46",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 47",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 48",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 49",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 50",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 51",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 52",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 53",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 54",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 55",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 56",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 57",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 58",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 59",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 60",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 61",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 62",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 63",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 64",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 65",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 66",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 67",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 68",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 69",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 70",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 71",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 72",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 73",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 74",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 75",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 76",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 77",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 78",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 79",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 80",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 81",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 82",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 83",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 84",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 85",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 86",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 87",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 88",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 89",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 90",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 91",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 92",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 93",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 94",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 95",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 96",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 97",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 98",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 99",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      },
+      {
+        "text": "SYNTHETIC block 100",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      }
+    ]
+  }
+}

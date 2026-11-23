@@ -15,7 +15,7 @@ import { samplePayload, unwire } from "../helpers/stub";
 afterEach(() => unwire());
 
 const caps = { posts: 50, comments: 50, reactions: 50 };
-const result: DoneResult = { completeness: "complete", captured: { profile: true, posts: 1, comments: 0, reactions: 0 }, appUrl: "https://scouty.to/dashboard", stop: null, address: null, sections: [], notExpanded: false };
+const result: DoneResult = { completeness: "complete", captured: { profileSections: 1, posts: 1, comments: 0, reactions: 0 }, appUrl: "https://scouty.to/dashboard", stop: null, address: null, sections: [], notExpanded: false };
 const expected: SectionName[] = ["profile", "experience", "skills", "posts"];
 
 const samples: Record<Phase, CaptureState> = {
@@ -116,7 +116,7 @@ describe("capture controller", () => {
     expect(await r.controller.start({ tabId: TAB, url: PROFILE_URL + "?trk=x#y", recapture: false })).toBe("started");
     await r.readAll();
     const state = await r.controller.current();
-    expect(state).toMatchObject({ phase: "done", result: { completeness: "complete", stop: null, captured: { profile: true, posts: 1, comments: 1, reactions: 1 } } });
+    expect(state).toMatchObject({ phase: "done", result: { completeness: "complete", stop: null, captured: { profileSections: 3, posts: 1, comments: 1, reactions: 1 } } });
     // The profile page was already open; the other five were opened with tabs.update, built from the key.
     expect(r.tab.updates).toEqual([
       "https://www.linkedin.com/in/synthetic-person-one/details/experience/", "https://www.linkedin.com/in/synthetic-person-one/details/skills/",
@@ -381,6 +381,8 @@ describe("capture controller", () => {
     expect(noticeFor(new ApiError(410, "LINKEDIN_CAPTURE_EXPIRED", null, null))).toEqual({ kind: "failed" });
     expect(noticeFor(new ApiError(404, "LINKEDIN_CAPTURE_NOT_FOUND", null, null))).toEqual({ kind: "failed" });
     expect(noticeFor(new ApiError(503, "LINKEDIN_DISABLED", null, null))).toEqual({ kind: "notAvailable" });
+    expect(noticeFor(new ApiError(503, "LINKEDIN_UNAVAILABLE", null, null))).toEqual({ kind: "failed" });
+    expect(noticeFor(new ApiError(404, "LINKEDIN_PROFILE_UNAVAILABLE", null, null), true)).toEqual({ kind: "suppressed" });
     expect(noticeFor(new ApiError(426, null, { error: "x", storeUrl: "javascript:alert(1)" }, null))).toEqual({ kind: "outdated", storeUrl: null });
     expect(noticeFor(new NetworkError("x"))).toEqual({ kind: "failed" });
   });

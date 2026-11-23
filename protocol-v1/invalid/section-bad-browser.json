@@ -1,0 +1,43 @@
+{
+  "note": "browser is chrome, edge or firefox.",
+  "kind": "section",
+  "pathSection": "posts",
+  "expect": {
+    "status": 400,
+    "code": "LINKEDIN_INVALID_PAYLOAD"
+  },
+  "body": {
+    "section": "posts",
+    "seq": 1,
+    "pageSlug": "synthetic-person-0001",
+    "capturedAt": "2026-11-23T09:00:00.000Z",
+    "selectorsVersion": 1,
+    "browser": "safari",
+    "locale": "en",
+    "read": "ok",
+    "expanded": true,
+    "reachedCap": false,
+    "blockCount": 3,
+    "profile": null,
+    "blocks": [
+      {
+        "text": "Synthetic Person\n2w\nSYNTHETIC. We cut picking errors by a third after re-slotting the warehouse. Three things we learned…",
+        "urn": "urn:li:activity:7260000000000000001",
+        "urnTime": "2026-11-09T08:00:00.000Z",
+        "truncated": false
+      },
+      {
+        "text": "Synthetic Person reposted this\nAnother Author\n1mo\nSYNTHETIC. Tự động hoá kho hàng không chỉ là robot 🤖 mà còn là dữ liệu.",
+        "urn": "urn:li:activity:7250000000000000002",
+        "urnTime": "2026-10-12T08:00:00.000Z",
+        "truncated": true
+      },
+      {
+        "text": "SYNTHETIC. A block without a permalink.",
+        "urn": null,
+        "urnTime": null,
+        "truncated": false
+      }
+    ]
+  }
+}

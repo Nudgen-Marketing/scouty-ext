@@ -49,7 +49,7 @@ export async function sessionInfo(ctx: UiContext, fresh = false): Promise<Sessio
       const store = error.body?.storeUrl;
       return { kind: "outdated", storeUrl: typeof store === "string" && store.startsWith("https://") ? store : null };
     }
-    if (error instanceof ApiError && (error.status === 403 || error.status === 503)) return { kind: "notAvailable" };
+    if (error instanceof ApiError && (error.status === 403 || error.code === "LINKEDIN_DISABLED")) return { kind: "notAvailable" };
     // Offline or a server fault: show what is known rather than blocking the popup.
     return cached?.data ?? { protocol: 1, user: { name: "", email: "" }, workspace: { id: "", name: "" }, caps: { posts: 50, comments: 50, reactions: 50 }, limits: { capturesLeftToday: -1 }, serverTime: new Date(ctx.now()).toISOString() };
   }
@@ -134,9 +134,9 @@ export async function popupUi(ctx: UiContext, query: PopupQuery): Promise<UiStat
   const info = await sessionInfo(ctx);
   if (info === null) return ctx.connecting() ? { kind: "connecting" } : { kind: "signedOut", devRedirectUrl };
   if ("kind" in info) return info.kind === "outdated" ? { kind: "outdated" } : { kind: "notAvailable" };
-  const workspace = info.workspace.name;
+  const workspace = info.workspace.name ?? "";
 
-  if (query.settings) return { kind: "settings", name: info.user.name, email: info.user.email, workspace, version: EXTENSION_VERSION, devRedirectUrl };
+  if (query.settings) return { kind: "settings", name: info.user.name ?? "", email: info.user.email, workspace, version: EXTENSION_VERSION, devRedirectUrl };
 
   const active = state.phase !== "idle" && state.phase !== "done";
   if (active && "tabId" in state && query.tabId !== null && query.tabId !== state.tabId) return { kind: "busy", workspace };

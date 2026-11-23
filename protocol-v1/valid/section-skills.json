@@ -1,0 +1,25 @@
+{
+  "section": "skills",
+  "seq": 1,
+  "pageSlug": "synthetic-person-0001",
+  "capturedAt": "2026-11-23T09:00:00.000Z",
+  "selectorsVersion": 1,
+  "browser": "chrome",
+  "locale": "en",
+  "read": "ok",
+  "expanded": true,
+  "reachedCap": false,
+  "blockCount": 1,
+  "profile": {
+    "name": null,
+    "headline": null,
+    "sections": [
+      {
+        "label": "Skills",
+        "text": "Supply chain management\nWarehouse automation\nLean operations"
+      }
+    ],
+    "truncated": []
+  },
+  "blocks": []
+}

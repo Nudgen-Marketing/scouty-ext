@@ -1,5 +1,6 @@
 // Protocol version 1 of the Scouty capture API (plan sections 5.2 to 5.4).
-// The server's zod schema is the source of truth; this file mirrors it for the extension.
+// The server's zod schema (scouty: src/lib/linkedin/protocol.ts) is the source of truth; this file
+// mirrors it for the extension, and protocol-v1/ holds the examples both sides are tested against.
 // It has no imports and only erasable TypeScript syntax, so Node can load it directly
 // (the e2e API stub and the contract tools do).
 
@@ -33,9 +34,12 @@ export const LIMITS = {
   maxLabelChars: 80,
   maxProfileSectionChars: 8000,
   maxProfileChars: 40000,
-  maxNameChars: 120,
-  maxHeadlineChars: 220,
+  // Wire bounds of the server schema. The reader clamps tighter (config.HARD_LIMITS).
+  maxNameChars: 300,
+  maxHeadlineChars: 500,
   maxSlugChars: 200,
+  maxWireSlugChars: 1800,
+  maxSeq: 10_000,
   maxSectionBodyBytes: 1_500_000,
   maxControlBodyBytes: 64_000,
 } as const;
@@ -78,13 +82,14 @@ export type ManifestEntry = {
 export type Manifest = { sections: ManifestEntry[]; stop: StopReason | null };
 
 export type Caps = { posts: number; comments: number; reactions: number };
-export type Counts = { profile: boolean; posts: number; comments: number; reactions: number };
+/** What was captured, as counts only. */
+export type Counts = { profileSections: number; posts: number; comments: number; reactions: number };
 export type Completeness = "complete" | "partial" | "insufficient";
 
 export type SessionResponse = {
   protocol: number;
-  user: { name: string; email: string };
-  workspace: { id: string; name: string };
+  user: { name: string | null; email: string };
+  workspace: { id: string; name: string | null };
   caps: Caps;
   limits: { capturesLeftToday: number };
   serverTime: string;
@@ -94,10 +99,10 @@ export type CreateCreated = {
   captureId: string; uploadToken: string; profileKey: string; profileUrl: string;
   expected: SectionName[]; caps: Caps; expiresAt: string; serverTime: string;
 };
-export type CreateRecent = { recent: { finalizedAt: string; completeness: Completeness; counts: Counts } };
+export type CreateRecent = { recent: { finalizedAt: string; completeness: "complete" | "partial"; counts: Counts } };
 export type FinalizeResponse = { status: "finalized"; completeness: Completeness; captured: Counts; appUrl: string };
 export type StatusResponse = {
-  status: "open" | "finalized" | "expired";
+  status: "open" | "finalized";
   received: { section: SectionName; seq: number; sha256: string; blockCount: number }[];
   expiresAt: string;
 };
@@ -173,7 +178,9 @@ function exactKeys(v: Record<string, unknown>, keys: readonly string[]): string 
   for (const k of keys) if (!(k in v)) return `missing field "${k}"`;
   return null;
 }
-const isStr = (v: unknown, max: number, min = 0): v is string => typeof v === "string" && v.length >= min && v.length <= max;
+/** At most `max` Unicode code points (an emoji counts once), as the server counts. */
+const isStr = (v: unknown, max: number, min = 0): v is string =>
+  typeof v === "string" && v.length >= min && v.length <= max * 2 && (v.length <= max || Array.from(v).length <= max);
 const isInt = (v: unknown, min: number, max: number): v is number => typeof v === "number" && Number.isInteger(v) && v >= min && v <= max;
 const isIso = (v: unknown): v is string => isStr(v, 40, 10) && !Number.isNaN(Date.parse(v));
 const oneOf = <T extends string>(v: unknown, list: readonly T[]): v is T => typeof v === "string" && (list as readonly string[]).includes(v);
@@ -185,10 +192,10 @@ export function validateSectionPayload(input: unknown): Validation<SectionPayloa
   const keyProblem = exactKeys(input, PAYLOAD_KEYS);
   if (keyProblem) return bad(keyProblem);
   if (!oneOf(input.section, SECTION_NAMES)) return bad("section");
-  if (!isInt(input.seq, 1, 1000)) return bad("seq");
-  if (!isStr(input.pageSlug, LIMITS.maxSlugChars, 1)) return bad("pageSlug");
+  if (!isInt(input.seq, 1, LIMITS.maxSeq)) return bad("seq");
+  if (!(typeof input.pageSlug === "string" && input.pageSlug.length >= 1 && input.pageSlug.length <= LIMITS.maxWireSlugChars)) return bad("pageSlug");
   if (!isIso(input.capturedAt)) return bad("capturedAt");
-  if (!isInt(input.selectorsVersion, 1, 100000)) return bad("selectorsVersion");
+  if (!isInt(input.selectorsVersion, 0, 1_000_000)) return bad("selectorsVersion");
   if (!oneOf(input.browser, BROWSERS)) return bad("browser");
   if (input.locale !== null && !isStr(input.locale, 35)) return bad("locale");
   if (!oneOf(input.read, READ_MODES)) return bad("read");
@@ -205,20 +212,16 @@ export function validateSectionPayload(input: unknown): Validation<SectionPayloa
     if (pk) return bad(`profile: ${pk}`);
     if (p.name !== null && !isStr(p.name, LIMITS.maxNameChars)) return bad("profile.name");
     if (p.headline !== null && !isStr(p.headline, LIMITS.maxHeadlineChars)) return bad("profile.headline");
-    if (input.section !== "profile" && (p.name !== null || p.headline !== null)) return bad("name and headline belong to the profile section only");
     if (!Array.isArray(p.sections) || p.sections.length > LIMITS.maxProfileSections) return bad("profile.sections");
-    let total = 0;
     for (const s of p.sections as unknown[]) {
       if (!isRecord(s)) return bad("profile.sections item");
       const sk = exactKeys(s, ["label", "text"]);
       if (sk) return bad(`profile.sections: ${sk}`);
-      if (!isStr(s.label, LIMITS.maxLabelChars, 1)) return bad("profile.sections.label");
+      if (!isStr(s.label, LIMITS.maxLabelChars)) return bad("profile.sections.label");
       if (!isStr(s.text, LIMITS.maxProfileSectionChars)) return bad("profile.sections.text");
-      total += s.text.length;
     }
-    if (total > LIMITS.maxProfileChars) return bad("profile text total");
     if (!Array.isArray(p.truncated) || p.truncated.length > LIMITS.maxProfileSections) return bad("profile.truncated");
-    for (const t of p.truncated as unknown[]) if (!isStr(t, LIMITS.maxLabelChars, 1)) return bad("profile.truncated item");
+    for (const t of p.truncated as unknown[]) if (!isStr(t, LIMITS.maxLabelChars)) return bad("profile.truncated item");
     if (input.blocks.length !== 0) return bad("blocks must be empty for this section");
     if (input.blockCount !== p.sections.length) return bad("blockCount does not equal profile.sections.length");
   } else {
@@ -229,8 +232,10 @@ export function validateSectionPayload(input: unknown): Validation<SectionPayloa
       const bk = exactKeys(b, ["text", "urn", "urnTime", "truncated"]);
       if (bk) return bad(`blocks: ${bk}`);
       if (!isStr(b.text, LIMITS.maxBlockChars)) return bad("blocks.text");
-      if (b.urn !== null && !(typeof b.urn === "string" && URN_PATTERN.test(b.urn))) return bad("blocks.urn");
-      if (b.urnTime !== null && !isIso(b.urnTime)) return bad("blocks.urnTime");
+      // An odd urn or urnTime is accepted and treated as absent by the server; the reader only ever
+      // sends a whole activity URN or null.
+      if (b.urn !== null && !(typeof b.urn === "string" && b.urn.length <= 100)) return bad("blocks.urn");
+      if (b.urnTime !== null && !(typeof b.urnTime === "string" && b.urnTime.length <= 40)) return bad("blocks.urnTime");
       if (typeof b.truncated !== "boolean") return bad("blocks.truncated");
     }
     if (input.blockCount !== input.blocks.length) return bad("blockCount does not equal blocks.length");
@@ -243,7 +248,7 @@ export function validateManifest(input: unknown, expected?: readonly SectionName
   const keyProblem = exactKeys(input, ["sections", "stop"]);
   if (keyProblem) return bad(keyProblem);
   if (input.stop !== null && !oneOf(input.stop, STOP_REASONS)) return bad("stop");
-  if (!Array.isArray(input.sections) || input.sections.length > SECTION_NAMES.length) return bad("sections");
+  if (!Array.isArray(input.sections) || input.sections.length < 1 || input.sections.length > SECTION_NAMES.length) return bad("sections");
   const seen = new Set<string>();
   for (const e of input.sections as unknown[]) {
     if (!isRecord(e)) return bad("sections item");
@@ -255,15 +260,12 @@ export function validateManifest(input: unknown, expected?: readonly SectionName
     if (!oneOf(e.state, SECTION_STATES)) return bad("sections.state");
     const reasonOk = e.reason === null || oneOf(e.reason, STOP_REASONS) || oneOf(e.reason, MANIFEST_ONLY_REASONS);
     if (!reasonOk) return bad("sections.reason");
-    if (e.state === "complete" && e.reason !== null) return bad("a complete section has no reason");
     if (e.state !== "complete" && e.reason === null) return bad("reason is required unless complete");
-    if (e.state === "complete" || e.state === "partial") {
-      if (!isInt(e.seq, 1, 1000)) return bad("sections.seq");
-      if (!isInt(e.blockCount, 0, LIMITS.maxBlocks)) return bad("sections.blockCount");
-      if (!(typeof e.sha256 === "string" && SHA256_HEX.test(e.sha256))) return bad("sections.sha256");
-    } else if (e.seq !== null || e.blockCount !== null || e.sha256 !== null) {
-      return bad("seq, blockCount and sha256 must be null unless uploaded");
-    }
+    if (e.seq !== null && !isInt(e.seq, 1, LIMITS.maxSeq)) return bad("sections.seq");
+    if (e.blockCount !== null && !isInt(e.blockCount, 0, LIMITS.maxBlocks)) return bad("sections.blockCount");
+    if (e.sha256 !== null && !(typeof e.sha256 === "string" && SHA256_HEX.test(e.sha256))) return bad("sections.sha256");
+    const uploaded = e.state === "complete" || e.state === "partial";
+    if (uploaded && (e.seq === null || e.blockCount === null || e.sha256 === null)) return bad("seq, blockCount and sha256 are required for an uploaded section");
   }
   if (expected) {
     if (seen.size !== expected.length) return bad("exactly one entry per expected section");

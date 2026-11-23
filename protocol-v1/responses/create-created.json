@@ -1,0 +1,21 @@
+{
+  "captureId": "ccccccccccccccccccccccccccccccccccccccccccc",
+  "uploadToken": "ttttttttttttttttttttttttttttttttttttttttttt",
+  "profileKey": "synthetic-person-0001",
+  "profileUrl": "https://www.linkedin.com/in/synthetic-person-0001/",
+  "expected": [
+    "profile",
+    "experience",
+    "skills",
+    "posts",
+    "comments",
+    "reactions"
+  ],
+  "caps": {
+    "posts": 50,
+    "comments": 50,
+    "reactions": 50
+  },
+  "expiresAt": "2026-11-23T09:20:00.000Z",
+  "serverTime": "2026-11-23T09:00:00.000Z"
+}

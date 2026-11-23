@@ -1,0 +1,53 @@
+{
+  "sections": [
+    {
+      "section": "profile",
+      "state": "complete",
+      "reason": null,
+      "seq": 1,
+      "blockCount": 3,
+      "sha256": "0bcd5dda508016951e9fd90761b02058cfb827d49ae5d0279a9054df65ba79fe"
+    },
+    {
+      "section": "experience",
+      "state": "complete",
+      "reason": null,
+      "seq": 1,
+      "blockCount": 1,
+      "sha256": "2f6c9a51a8aa402aca6551e3a29b38d782e022ae5234d2e5ba7c00305aa49f92"
+    },
+    {
+      "section": "skills",
+      "state": "unavailable",
+      "reason": "no_such_section",
+      "seq": null,
+      "blockCount": null,
+      "sha256": null
+    },
+    {
+      "section": "posts",
+      "state": "partial",
+      "reason": "user_stopped",
+      "seq": 1,
+      "blockCount": 3,
+      "sha256": "b3cad025a7c73bab368f6ff61be3c7a40597f9ffc0111155f2d51bef11f40ece"
+    },
+    {
+      "section": "comments",
+      "state": "skipped",
+      "reason": "user_stopped",
+      "seq": null,
+      "blockCount": null,
+      "sha256": null
+    },
+    {
+      "section": "reactions",
+      "state": "skipped",
+      "reason": "user_stopped",
+      "seq": null,
+      "blockCount": null,
+      "sha256": null
+    }
+  ],
+  "stop": "user_stopped"
+}

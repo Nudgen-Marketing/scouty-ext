@@ -53,7 +53,7 @@ const ui: UiContext = { api, controller, connecting: () => connecting, now: Date
 
 async function workspaceName(): Promise<string> {
   const info = await sessionInfo(ui);
-  return info && "workspace" in info ? info.workspace.name : "";
+  return info && "workspace" in info ? (info.workspace.name ?? "") : "";
 }
 
 async function overlayState(state: CaptureState): Promise<UiState | null> {

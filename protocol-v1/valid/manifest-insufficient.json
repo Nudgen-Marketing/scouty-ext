@@ -1,0 +1,53 @@
+{
+  "sections": [
+    {
+      "section": "profile",
+      "state": "skipped",
+      "reason": "reduced_profile",
+      "seq": null,
+      "blockCount": null,
+      "sha256": null
+    },
+    {
+      "section": "experience",
+      "state": "skipped",
+      "reason": "reduced_profile",
+      "seq": null,
+      "blockCount": null,
+      "sha256": null
+    },
+    {
+      "section": "skills",
+      "state": "skipped",
+      "reason": "reduced_profile",
+      "seq": null,
+      "blockCount": null,
+      "sha256": null
+    },
+    {
+      "section": "posts",
+      "state": "skipped",
+      "reason": "reduced_profile",
+      "seq": null,
+      "blockCount": null,
+      "sha256": null
+    },
+    {
+      "section": "comments",
+      "state": "skipped",
+      "reason": "reduced_profile",
+      "seq": null,
+      "blockCount": null,
+      "sha256": null
+    },
+    {
+      "section": "reactions",
+      "state": "skipped",
+      "reason": "reduced_profile",
+      "seq": null,
+      "blockCount": null,
+      "sha256": null
+    }
+  ],
+  "stop": "reduced_profile"
+}

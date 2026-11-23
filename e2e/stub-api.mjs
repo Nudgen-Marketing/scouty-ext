@@ -7,6 +7,7 @@ import http from "node:http";
 import { profileKeyFromSlug, slugFromPath } from "../src/profile-key.ts";
 import { ACTIVITY_SECTIONS, LIMITS, PROTOCOL_VERSION, SECTION_NAMES, validateManifest, validateSectionPayload } from "../src/protocol.ts";
 
+const IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{8,200}$/;
 const opaque = () => randomBytes(32).toString("base64url");
 const sha256Hex = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const sha256Base64 = (bytes) => createHash("sha256").update(bytes).digest("base64");
@@ -125,9 +126,9 @@ export function createStubApi(options = {}) {
     const bearer = /^Bearer (.+)$/.exec(headers.authorization ?? "")?.[1];
     const entry = bearer ? state.access.get(bearer) : null;
     const grant = entry ? state.grants.get(entry.grantId) : null;
-    if (!entry || !grant || grant.revoked || entry.expiresAt <= state.now()) return { fail: error(401, "Not connected.", "invalid_token") };
+    if (!entry || !grant || grant.revoked || entry.expiresAt <= state.now()) return { fail: error(401, "Connect the Scouty extension again.", "LINKEDIN_AUTH_REQUIRED") };
     const requestOrigin = headers.origin;
-    if (requestOrigin && /^https?:/.test(requestOrigin)) return { fail: error(403, "Origin not allowed.", "LINKEDIN_NOT_AVAILABLE") };
+    if (requestOrigin && /^https?:/.test(requestOrigin)) return { fail: error(403, "Origin not allowed.", "LINKEDIN_ORIGIN_REFUSED") };
     if (!state.available) return { fail: error(403, "LinkedIn capture isn't available for this account.", "LINKEDIN_NOT_AVAILABLE") };
     return { grantId: entry.grantId };
   }
@@ -164,7 +165,8 @@ export function createStubApi(options = {}) {
 
   function countsOf(capture) {
     const count = (section) => capture.sections.get(section)?.blockCount ?? 0;
-    return { profile: capture.sections.has("profile"), posts: count("posts"), comments: count("comments"), reactions: count("reactions") };
+    const profileSections = ["profile", "experience", "skills"].reduce((sum, s) => sum + count(s), 0);
+    return { profileSections, posts: count("posts"), comments: count("comments"), reactions: count("reactions") };
   }
 
   function ownedCapture(captureId, headers) {
@@ -181,7 +183,7 @@ export function createStubApi(options = {}) {
 
   function createCapture(headers, bytes) {
     const key = headers["idempotency-key"];
-    if (!key) return error(400, "Idempotency-Key is required.", "LINKEDIN_INVALID_PAYLOAD");
+    if (!key || !IDEMPOTENCY_KEY.test(key)) return error(400, "Idempotency-Key is required.", "LINKEDIN_INVALID_PAYLOAD");
     const parsed = parseJson(bytes, LIMITS.maxControlBodyBytes);
     if (parsed.fail) return parsed.fail;
     const body = parsed.value;
@@ -190,7 +192,7 @@ export function createStubApi(options = {}) {
     }
     const profileKey = profileKeyOf(body.linkedinUrl);
     if (!profileKey) return error(400, "That is not a LinkedIn profile address.", "LINKEDIN_URL_UNSUPPORTED");
-    if (state.suppressed.has(profileKey)) return error(404, "This profile can't be captured.", "LINKEDIN_CAPTURE_NOT_FOUND");
+    if (state.suppressed.has(profileKey)) return error(404, "This profile can't be captured.", "LINKEDIN_PROFILE_UNAVAILABLE");
     const recent = state.finalizedByKey.get(profileKey);
     if (!body.recapture && recent && state.now() - recent.finalizedAt < state.freshMs) {
       return json(200, { recent: { finalizedAt: new Date(recent.finalizedAt).toISOString(), completeness: recent.completeness, counts: recent.counts } });
@@ -248,18 +250,19 @@ export function createStubApi(options = {}) {
   }
 
   function finalize(capture, headers, bytes) {
-    if (!headers["idempotency-key"]) return error(400, "Idempotency-Key is required.", "LINKEDIN_INVALID_PAYLOAD");
+    if (!IDEMPOTENCY_KEY.test(headers["idempotency-key"] ?? "")) return error(400, "Idempotency-Key is required.", "LINKEDIN_INVALID_PAYLOAD");
     const parsed = parseJson(bytes, LIMITS.maxControlBodyBytes);
     if (parsed.fail) return parsed.fail;
-    const checked = validateManifest(parsed.value, capture.expected);
+    const checked = validateManifest(parsed.value);
     if (!checked.ok) return error(400, checked.message, checked.code);
     const manifest = checked.value;
     const text = JSON.stringify(manifest);
     if (capture.status === "finalized") {
       return capture.manifestText === text ? json(200, capture.result) : error(409, "This capture is already finalized.", "LINKEDIN_CAPTURE_FINALIZED");
     }
-    const missing = [];
-    const mismatched = [];
+    // Every expected section exactly once, and no other.
+    const missing = capture.expected.filter((section) => !manifest.sections.some((e) => e.section === section));
+    const mismatched = manifest.sections.filter((e) => !capture.expected.includes(e.section)).map((e) => e.section);
     for (const entry of manifest.sections) {
       const stored = capture.sections.get(entry.section);
       if (entry.state === "complete" || entry.state === "partial") {
@@ -295,7 +298,7 @@ export function createStubApi(options = {}) {
     if (!path.startsWith("/api/linkedin/ext/")) return error(404, "Not found.");
     const auth = extensionAuth(headers);
     if (auth.fail) return auth.fail;
-    if (method !== "GET" && !/^application\/json\b/.test(headers["content-type"] ?? "")) return error(415, "Content-Type must be application/json.", "LINKEDIN_INVALID_PAYLOAD");
+    if (method !== "GET" && !/^application\/json\b/.test(headers["content-type"] ?? "")) return error(415, "Content-Type must be application/json.", "LINKEDIN_UNSUPPORTED_MEDIA_TYPE");
     if (method === "GET" && path === "/api/linkedin/ext/session") {
       return json(200, { protocol: PROTOCOL_VERSION, user: state.user, workspace: state.workspace, caps: state.caps, limits: { capturesLeftToday: state.capturesLeftToday }, serverTime: new Date(state.now()).toISOString() });
     }
@@ -327,9 +330,9 @@ export function createStubApi(options = {}) {
       fault.times -= 1;
       record.fault = fault.kind;
       if (fault.kind === "drop") return "drop";
-      if (fault.kind === "503") return error(503, "Service unavailable.");
-      if (fault.kind === "429") return error(429, "Slow down.", null, {}, { "Retry-After": "1" });
-      if (fault.kind === "401") return error(401, "Not connected.", "invalid_token");
+      if (fault.kind === "503") return error(503, "Scouty is busy. Try again.", "LINKEDIN_UNAVAILABLE");
+      if (fault.kind === "429") return error(429, "Slow down.", "LINKEDIN_RATE_LIMITED", {}, { "Retry-After": "1" });
+      if (fault.kind === "401") return error(401, "Connect the Scouty extension again.", "LINKEDIN_AUTH_REQUIRED");
     }
     const response = route(method, parsed, headers, body);
     record.status = response.status;

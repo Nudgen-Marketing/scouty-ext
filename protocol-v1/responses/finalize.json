@@ -1,0 +1,11 @@
+{
+  "status": "finalized",
+  "completeness": "complete",
+  "captured": {
+    "profileSections": 4,
+    "posts": 3,
+    "comments": 2,
+    "reactions": 1
+  },
+  "appUrl": "https://scouty.example/dashboard?linkedin=synthetic-person-0001"
+}

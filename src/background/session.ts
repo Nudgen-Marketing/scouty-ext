@@ -658,8 +658,8 @@ export function noticeFor(error: unknown, creating = false): Notice {
       const store = error.body?.storeUrl;
       return { kind: "outdated", storeUrl: typeof store === "string" && store.startsWith("https://") ? store : null };
     }
-    if (error.status === 403 || error.status === 503) return { kind: "notAvailable" };
-    if (error.status === 429) {
+    if (error.status === 403 || error.code === "LINKEDIN_DISABLED") return { kind: "notAvailable" };
+    if (error.code === "LINKEDIN_CAPTURE_LIMIT") {
       const resetAt = error.retryAfterMs !== null ? new Date(Date.now() + error.retryAfterMs).toISOString() : null;
       return { kind: "limit", resetAt };
     }

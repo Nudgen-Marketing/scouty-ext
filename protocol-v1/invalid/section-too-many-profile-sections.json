@@ -1,0 +1,116 @@
+{
+  "note": "More than 20 profile sections.",
+  "kind": "section",
+  "pathSection": "profile",
+  "expect": {
+    "status": 400,
+    "code": "LINKEDIN_INVALID_PAYLOAD"
+  },
+  "body": {
+    "section": "profile",
+    "seq": 1,
+    "pageSlug": "synthetic-person-0001",
+    "capturedAt": "2026-11-23T09:00:00.000Z",
+    "selectorsVersion": 1,
+    "browser": "chrome",
+    "locale": "en",
+    "read": "ok",
+    "expanded": true,
+    "reachedCap": false,
+    "blockCount": 21,
+    "profile": {
+      "name": "Synthetic Person",
+      "headline": "Head of Operations at Example Logistics",
+      "sections": [
+        {
+          "label": "Section 0",
+          "text": "SYNTHETIC"
+        },
+        {
+          "label": "Section 1",
+          "text": "SYNTHETIC"
+        },
+        {
+          "label": "Section 2",
+          "text": "SYNTHETIC"
+        },
+        {
+          "label": "Section 3",
+          "text": "SYNTHETIC"
+        },
+        {
+          "label": "Section 4",
+          "text": "SYNTHETIC"
+        },
+        {
+          "label": "Section 5",
+          "text": "SYNTHETIC"
+        },
+        {
+          "label": "Section 6",
+          "text": "SYNTHETIC"
+        },
+        {
+          "label": "Section 7",
+          "text": "SYNTHETIC"
+        },
+        {
+          "label": "Section 8",
+          "text": "SYNTHETIC"
+        },
+        {
+          "label": "Section 9",
+          "text": "SYNTHETIC"
+        },
+        {
+          "label": "Section 10",
+          "text": "SYNTHETIC"
+        },
+        {
+          "label": "Section 11",
+          "text": "SYNTHETIC"
+        },
+        {
+          "label": "Section 12",
+          "text": "SYNTHETIC"
+        },
+        {
+          "label": "Section 13",
+          "text": "SYNTHETIC"
+        },
+        {
+          "label": "Section 14",
+          "text": "SYNTHETIC"
+        },
+        {
+          "label": "Section 15",
+          "text": "SYNTHETIC"
+        },
+        {
+          "label": "Section 16",
+          "text": "SYNTHETIC"
+        },
+        {
+          "label": "Section 17",
+          "text": "SYNTHETIC"
+        },
+        {
+          "label": "Section 18",
+          "text": "SYNTHETIC"
+        },
+        {
+          "label": "Section 19",
+          "text": "SYNTHETIC"
+        },
+        {
+          "label": "Section 20",
+          "text": "SYNTHETIC"
+        }
+      ],
+      "truncated": [
+        "Experience"
+      ]
+    },
+    "blocks": []
+  }
+}

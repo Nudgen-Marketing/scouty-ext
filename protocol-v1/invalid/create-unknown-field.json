@@ -1,0 +1,14 @@
+{
+  "note": "Unknown keys are rejected.",
+  "kind": "create",
+  "pathSection": null,
+  "expect": {
+    "status": 400,
+    "code": "LINKEDIN_INVALID_PAYLOAD"
+  },
+  "body": {
+    "linkedinUrl": "https://www.linkedin.com/in/synthetic-person-0001/",
+    "recapture": false,
+    "campaignId": "x"
+  }
+}

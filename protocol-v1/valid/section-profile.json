@@ -1,0 +1,35 @@
+{
+  "section": "profile",
+  "seq": 1,
+  "pageSlug": "synthetic-person-0001",
+  "capturedAt": "2026-11-23T09:00:00.000Z",
+  "selectorsVersion": 1,
+  "browser": "chrome",
+  "locale": "en",
+  "read": "ok",
+  "expanded": true,
+  "reachedCap": false,
+  "blockCount": 3,
+  "profile": {
+    "name": "Synthetic Person",
+    "headline": "Head of Operations at Example Logistics",
+    "sections": [
+      {
+        "label": "About",
+        "text": "SYNTHETIC. I run operations for a mid-size logistics company and write about warehouse automation."
+      },
+      {
+        "label": "Experience",
+        "text": "Head of Operations\nExample Logistics\n2021 - Present"
+      },
+      {
+        "label": "Education",
+        "text": "Example University\nBSc Industrial Engineering"
+      }
+    ],
+    "truncated": [
+      "Experience"
+    ]
+  },
+  "blocks": []
+}

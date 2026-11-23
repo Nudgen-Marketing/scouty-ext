@@ -1,0 +1,88 @@
+{
+  "protocol": 1,
+  "about": "Contract examples for the Scouty LinkedIn capture protocol, version 1. Committed byte-identical in scouty (src/lib/linkedin/__fixtures__/protocol-v1) and scouty-ext (protocol-v1). All content is synthetic.",
+  "rules": [
+    "Every file is UTF-8 JSON, two-space indented, with one trailing newline. valid/section-*.json are exact request bodies: the Content-Digest of each is the sha256 recorded for it in valid/manifest-complete.json (hex there, base64 in the header).",
+    "Profile kinds (profile, experience, skills): profile is an object, blocks is [], blockCount equals profile.sections.length. Activity kinds (posts, comments, reactions): profile is null, blockCount equals blocks.length.",
+    "Lengths are counted in Unicode code points. name is at most 300 and headline at most 500 on the wire.",
+    "invalid/*.json wrap the body: { note, kind: section | manifest | create, pathSection, expect: { status, code }, body }.",
+    "responses/*.json are example response bodies. Counts are { profileSections, posts, comments, reactions }."
+  ],
+  "valid": [
+    {
+      "file": "valid/section-profile.json",
+      "kind": "section",
+      "pathSection": "profile",
+      "sha256": "0bcd5dda508016951e9fd90761b02058cfb827d49ae5d0279a9054df65ba79fe"
+    },
+    {
+      "file": "valid/section-experience.json",
+      "kind": "section",
+      "pathSection": "experience",
+      "sha256": "2f6c9a51a8aa402aca6551e3a29b38d782e022ae5234d2e5ba7c00305aa49f92"
+    },
+    {
+      "file": "valid/section-skills.json",
+      "kind": "section",
+      "pathSection": "skills",
+      "sha256": "7287c6577238aae02341fb12cb3f093897f67e806a87aea13edb60008b41744a"
+    },
+    {
+      "file": "valid/section-posts.json",
+      "kind": "section",
+      "pathSection": "posts",
+      "sha256": "b3cad025a7c73bab368f6ff61be3c7a40597f9ffc0111155f2d51bef11f40ece"
+    },
+    {
+      "file": "valid/section-comments.json",
+      "kind": "section",
+      "pathSection": "comments",
+      "sha256": "bfd547ef73cff4df23cd5d989736064f6108e248a824e4d70ab663ac1705b841"
+    },
+    {
+      "file": "valid/section-reactions.json",
+      "kind": "section",
+      "pathSection": "reactions",
+      "sha256": "74ea759e3a34aa362691ba5d48ed514e63c1b0fdf87bdc99814508663560cdb4"
+    },
+    {
+      "file": "valid/manifest-complete.json",
+      "kind": "manifest"
+    },
+    {
+      "file": "valid/manifest-partial.json",
+      "kind": "manifest"
+    },
+    {
+      "file": "valid/manifest-insufficient.json",
+      "kind": "manifest"
+    },
+    {
+      "file": "valid/create-request.json",
+      "kind": "create"
+    }
+  ],
+  "invalid": [
+    "invalid/create-company-url.json",
+    "invalid/create-unknown-field.json",
+    "invalid/manifest-complete-without-digest.json",
+    "invalid/manifest-duplicate-section.json",
+    "invalid/manifest-missing-expected-section.json",
+    "invalid/manifest-missing-reason.json",
+    "invalid/manifest-unknown-field.json",
+    "invalid/manifest-uppercase-digest.json",
+    "invalid/section-activity-with-profile.json",
+    "invalid/section-bad-browser.json",
+    "invalid/section-block-count-mismatch.json",
+    "invalid/section-block-too-long.json",
+    "invalid/section-path-mismatch.json",
+    "invalid/section-profile-count-mismatch.json",
+    "invalid/section-profile-missing.json",
+    "invalid/section-seq-zero.json",
+    "invalid/section-too-many-blocks.json",
+    "invalid/section-too-many-profile-sections.json",
+    "invalid/section-unknown-block-field.json",
+    "invalid/section-unknown-field.json",
+    "invalid/section-wrong-slug.json"
+  ]
+}

@@ -49,7 +49,7 @@ export async function rig(options: Record<string, unknown> = {}): Promise<Rig> {
     },
     sleep: (ms) => new Promise<void>((resolve) => { timers.push({ ms, fire: resolve }); }),
     now: () => wired.clock.now,
-    uuid: () => `uuid-${(n += 1)}`,
+    uuid: () => `uuid-0000-${(n += 1)}`,
     changed: (state) => { states.push(state); },
   });
   const self: Rig = {

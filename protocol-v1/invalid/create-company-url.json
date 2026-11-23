@@ -1,0 +1,13 @@
+{
+  "note": "Only personal profile URLs (/in/<slug>).",
+  "kind": "create",
+  "pathSection": null,
+  "expect": {
+    "status": 400,
+    "code": "LINKEDIN_URL_UNSUPPORTED"
+  },
+  "body": {
+    "linkedinUrl": "https://www.linkedin.com/company/example-logistics/",
+    "recapture": false
+  }
+}

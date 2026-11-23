@@ -1,0 +1,24 @@
+{
+  "note": "A profile section must send a profile object.",
+  "kind": "section",
+  "pathSection": "skills",
+  "expect": {
+    "status": 400,
+    "code": "LINKEDIN_INVALID_PAYLOAD"
+  },
+  "body": {
+    "section": "skills",
+    "seq": 1,
+    "pageSlug": "synthetic-person-0001",
+    "capturedAt": "2026-11-23T09:00:00.000Z",
+    "selectorsVersion": 1,
+    "browser": "chrome",
+    "locale": "en",
+    "read": "ok",
+    "expanded": true,
+    "reachedCap": false,
+    "blockCount": 0,
+    "profile": null,
+    "blocks": []
+  }
+}

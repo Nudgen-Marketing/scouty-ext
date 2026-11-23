@@ -9,7 +9,7 @@ let w: Wired;
 const PROFILE = "https://www.linkedin.com/in/synthetic-person-one/";
 
 async function created(): Promise<CaptureRef> {
-  const answer = (await w.api.createCapture({ linkedinUrl: PROFILE, recapture: false }, "idem-1")) as CreateCreated;
+  const answer = (await w.api.createCapture({ linkedinUrl: PROFILE, recapture: false }, "idem-0001")) as CreateCreated;
   return { captureId: answer.captureId, uploadToken: answer.uploadToken, expiresAt: Date.parse(answer.expiresAt) };
 }
 const upload = (text = "Invented text") => {

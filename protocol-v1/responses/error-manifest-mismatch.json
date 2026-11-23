@@ -1,0 +1,10 @@
+{
+  "error": "The capture is incomplete. Sending the missing parts again.",
+  "code": "LINKEDIN_MANIFEST_MISMATCH",
+  "missing": [
+    "reactions"
+  ],
+  "mismatched": [
+    "posts"
+  ]
+}
