@@ -89,6 +89,26 @@ App plan §15.4. Commits of both repositories, Chrome version, then each scenari
 ## A0 AI eval on real-shaped data
 
 App plan §15.3. Command, model id, pass count, and for each failing assertion the change made.
+Token and cost figures come from Langfuse; copy them also to `docs/linkedin-outreach-coach.md` in
+the `scouty` repository.
+
+- Date: 
+- App commit under test: 
+- Command: 
+- Model id: 
+- Real-shape fixtures used (count, labels only, for example P1, P6): 
+
+| Run | Outcome (all assertions pass / failing assertions) | Cases passed |
+| --- | --- | --- |
+| 1 | | |
+| 2 | | |
+| 3 | | |
+
+| Per lead (from Langfuse) | Value |
+| --- | --- |
+| Input tokens per lead | |
+| Output tokens per lead | |
+| Cost per lead (USD) | |
 
 | Assertion | Pass | Change made |
 | --- | --- | --- |
