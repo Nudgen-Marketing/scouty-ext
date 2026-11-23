@@ -4,9 +4,13 @@ Scouty LinkedIn Capture does one thing: when you press Capture on a LinkedIn pro
 person's profile and their recent posts, comments and reactions from the tab in front of you, and
 sends that content to your Scouty workspace so Scouty can suggest how to approach them.
 
-It only reads. It never follows, likes, comments, connects, messages or changes anything on
-LinkedIn, and it sends nothing to LinkedIn. It does not read your LinkedIn password, cookies,
-messages, contacts or feed, and it does nothing until you press Capture. It reads one person at a
+It only reads. It loads only the chosen person's six profile pages in your tab (the profile, its
+experience and skills detail pages, and the posts, comments and reactions activity pages), as you
+would by clicking, and makes no other request to LinkedIn; it never posts, clicks a button that
+changes anything (it never follows, likes, comments, connects or messages), or sends anything to
+LinkedIn. To read longer posts and lists it presses only inline "see more" and "show more results"
+controls, which LinkedIn's own page answers as it would for you. It does not read your LinkedIn
+password, cookies, messages, contacts or feed, and it does nothing until you press Capture. It reads one person at a
 time and has no background activity.
 
 To send captures to your workspace it signs you in to Scouty through your browser. This is the

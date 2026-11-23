@@ -5,9 +5,13 @@ on a `linkedin.com/in/<slug>` profile, it reads that person's profile and recent
 and reactions from your own signed-in LinkedIn tab, at the pace of a person reading, and sends
 them to your Scouty workspace for analysis.
 
-- **Read-only on LinkedIn.** It never clicks Follow, Like, Comment, Connect or Message, never
-  posts, and sends no request to LinkedIn. The only things it presses are inline "…see more" and
-  "Show more results" controls, decided by a structural allow-list.
+- **Read-only on LinkedIn.** It only loads the lead's six profile pages in your tab (the profile,
+  its experience and skills detail pages, and the posts, comments and reactions activity pages),
+  as you would by clicking, and makes no other request to LinkedIn; it never posts, clicks a
+  button that changes anything (Follow, Like, Comment, Connect, Message), or sends anything to
+  LinkedIn. The only things it presses are inline "…see more" and "Show more results" controls,
+  decided by a structural allow-list; LinkedIn's own page then shows the extra text or items, as
+  it would for you.
 - **No LinkedIn credentials.** It never reads LinkedIn credentials (no LinkedIn cookie, token or
   password) or messages, and never opens the contact-info overlay. The only authentication
   information it handles is its own Scouty access token, kept in the browser's extension storage
