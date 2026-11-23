@@ -169,9 +169,12 @@ describe("repository rules", () => {
   it("no secrets or internal hostnames in tracked files", () => {
     const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8" }).split("\0").filter(Boolean).filter((f) => !/\.(png)$/.test(f) && f !== "package-lock.json");
     const forbidden = /BEGIN [A-Z ]*PRIVATE KEY|client_secret|rk_live|sk-[A-Za-z0-9]{20}|AKIA[0-9A-Z]{16}|staging\.scouty/;
-    // The two tests and the CI scan that name the forbidden patterns are the only files allowed to contain them.
-    const self = ["test/static/static-rules.test.ts", "test/contract/contract.test.ts", ".github/workflows/ci.yml"];
+    // Internal hostnames are never named in this public repository: set PRIVATE_DENY_PATTERNS (a regex) locally or as a CI secret.
+    const extra = process.env.PRIVATE_DENY_PATTERNS ? new RegExp(process.env.PRIVATE_DENY_PATTERNS, "i") : null;
+    // This test and the CI scan that name the generic patterns are the only files allowed to contain them.
+    const self = ["test/static/static-rules.test.ts", ".github/workflows/ci.yml"];
     expect(tracked.filter((f) => !self.includes(f) && existsSync(path.join(root, f)) && forbidden.test(read(f)))).toEqual([]);
+    if (extra) expect(tracked.filter((f) => existsSync(path.join(root, f)) && extra.test(read(f)))).toEqual([]);
     for (const ignored of ["dist/", "release/", ".env.local", "*.pem", "*.zip", "node_modules/"]) expect(read(".gitignore")).toContain(ignored);
   });
 

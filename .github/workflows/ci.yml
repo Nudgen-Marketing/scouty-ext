@@ -33,7 +33,13 @@ jobs:
       # Two builds must give byte-identical output.
       - run: node tools/repro-check.mjs
       - name: No secrets or internal hostnames
+        env:
+          # Extra private patterns (internal hostnames) live in a repository secret, not in this public file.
+          PRIVATE_DENY_PATTERNS: ${{ secrets.PRIVATE_DENY_PATTERNS }}
         run: |
-          if git grep -nE "BEGIN [A-Z ]*PRIVATE KEY|client_secret|rk_live|sk-[A-Za-z0-9]{20}" -- . ':!test/static/static-rules.test.ts' ':!test/contract/contract.test.ts' ':!.github/workflows/ci.yml' ':!RELEASE.md'; then
+          if git grep -nE "BEGIN [A-Z ]*PRIVATE KEY|client_secret|rk_live|sk-[A-Za-z0-9]{20}" -- . ':!test/static/static-rules.test.ts' ':!.github/workflows/ci.yml'; then
             echo "Forbidden pattern found"; exit 1
+          fi
+          if [ -n "$PRIVATE_DENY_PATTERNS" ] && git grep -qiE "$PRIVATE_DENY_PATTERNS" -- .; then
+            echo "Private forbidden pattern found (see the PRIVATE_DENY_PATTERNS secret)"; exit 1
           fi
