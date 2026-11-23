@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
+import * as auth from "../../src/background/auth";
 import * as outbox from "../../src/background/outbox";
 import { serialize, validateManifest, type CreateCreated } from "../../src/protocol";
 import { fake } from "../helpers/fake-ext";
@@ -189,6 +190,116 @@ describe("outbox with the controller", () => {
     expect(await r.phase()).toBe("done");
     const tail = r.stub.state.requests.slice(-3).map((q) => `${q.method} ${q.path.split("/").slice(-2).join("/")} ${q.status}`);
     expect(tail).toEqual([`POST ${capture.id}/finalize 409`, "PUT sections/experience 204", `POST ${capture.id}/finalize 200`]);
+  });
+
+  it("mismatch re-sends an acknowledged section without re-reading LinkedIn", async () => {
+    const r = await rig({ capsBySlug: { "synthetic-person-one": { posts: 0, comments: 0, reactions: 0 } } });
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    await r.read(); // profile
+    await r.read(); // experience
+    const acked = (await outbox.load())!.sections.find((s) => s.section === "experience")!;
+    expect(acked).toMatchObject({ acked: true });
+    const sentBefore = r.stub.state.requests.find((q) => q.method === "PUT" && q.path.endsWith("/sections/experience"))!;
+    const capture = [...r.stub.state.captures.values()][0]!;
+    capture.sections.delete("experience"); // the server lost the acknowledged section
+    const navigations = r.tab.updates.length; // skills, the last page, is already open with its reader
+    const readers = r.injected.filter((f) => f === "reader.js").length;
+    await r.read(); // skills, the last section: finalize → 409 mismatch → re-send experience → finalize
+    expect(await r.phase()).toBe("done");
+    const resent = r.stub.state.requests.filter((q) => q.method === "PUT" && q.path.endsWith("/sections/experience"));
+    expect(resent).toHaveLength(2);
+    expect(resent[1]!.status).toBe(204);
+    expect(sentBefore.headers["content-digest"]).toMatch(/^sha-256=:/);
+    expect(resent[1]!.headers["content-digest"]).toBe(sentBefore.headers["content-digest"]); // the same bytes, from the outbox
+    // LinkedIn was not read again: no page opened and no reader injected for the re-send.
+    expect(r.tab.updates).toHaveLength(navigations);
+    expect(r.injected.filter((f) => f === "reader.js")).toHaveLength(readers);
+  });
+
+  it("invalid_grant mid-capture clears tokens but keeps the outbox while the capture is in flight and unexpired; reconnect resumes and finalizes", async () => {
+    const r = await rig({ capsBySlug: { "synthetic-person-one": { posts: 0, comments: 0, reactions: 0 } } });
+    auth.onConnectionEnded(() => r.controller.connectionEnded()); // as src/background/index.ts wires it
+    try {
+      await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+      await r.read(); // profile sent
+      r.stub.revokeAll(); // the grant is revoked: the next call gets 401, and the refresh invalid_grant
+      await r.read(); // experience is read, its upload is refused
+      const refresh = r.stub.state.requests.filter((q) => q.path === "/oauth/token").at(-1)!;
+      expect(refresh.status).toBe(400);
+      expect(fake.session.data.has("auth.access")).toBe(false);
+      expect(fake.local.data.has("auth.refresh")).toBe(false);
+      expect(await auth.isConnected()).toBe(false);
+      const state = await r.controller.current();
+      expect(state).toMatchObject({ phase: "finalizing", blocked: "auth" });
+      const box = (await outbox.load())!;
+      expect(box.expiresAt).toBeGreaterThan(r.clock.now);
+      expect(outbox.pending(box).map((s) => s.section)).toEqual(["experience"]);
+      expect(await outbox.bodyOf("experience")).not.toBeNull();
+      const navigations = r.tab.updates.length;
+      // Reconnect (a new grant) and resume: only the unsent section goes, then finalize.
+      await auth.connect();
+      await r.controller.resume();
+      expect(await r.controller.current()).toMatchObject({ phase: "done", result: { stop: "signed_out_of_scouty" } });
+      expect(r.stub.state.requests.filter((q) => q.method === "PUT" && q.path.endsWith("/sections/experience") && q.status === 204)).toHaveLength(1);
+      expect(r.stub.state.requests.filter((q) => q.path.endsWith("/finalize")).at(-1)!.status).toBe(200);
+      expect(r.tab.updates).toHaveLength(navigations);
+      expect(await outbox.load()).toBeNull();
+    } finally {
+      auth.onConnectionEnded(() => undefined);
+    }
+  });
+
+  it("invalid_grant with no capture in flight clears the outbox too", async () => {
+    const r = await rig();
+    auth.onConnectionEnded(() => r.controller.connectionEnded());
+    try {
+      await outbox.begin(created()); // a leftover outbox with the controller idle
+      r.stub.revokeAll();
+      r.stub.expireAccessTokens();
+      r.clock.now += 16 * 60_000;
+      expect(await auth.tokenSource.current()).toBeNull();
+      expect(await outbox.load()).toBeNull();
+    } finally {
+      auth.onConnectionEnded(() => undefined);
+    }
+  });
+
+  it("Disconnect always clears the outbox: while reading, while waiting for a reconnect, and while offline", async () => {
+    const caps = { capsBySlug: { "synthetic-person-one": { posts: 0, comments: 0, reactions: 0 } } };
+    const disconnect = async (r: Awaited<ReturnType<typeof rig>>): Promise<void> => {
+      // What src/background/index.ts does on Disconnect.
+      await auth.signOut();
+      await r.controller.reset();
+      expect([...fake.session.data.keys()].filter((k) => k.startsWith("outbox"))).toEqual([]);
+      expect(await r.phase()).toBe("idle");
+    };
+    // while reading
+    let r = await rig(caps);
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    await r.read();
+    expect(await outbox.load()).not.toBeNull();
+    await disconnect(r);
+    // while waiting for a reconnect (the outbox was kept for it)
+    unwire(); fake.session.data.clear(); fake.local.data.clear();
+    r = await rig(caps);
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    await r.read();
+    r.stub.revokeAll();
+    await r.read();
+    expect(await r.controller.current()).toMatchObject({ phase: "finalizing", blocked: "auth" });
+    expect(await outbox.load()).not.toBeNull();
+    await disconnect(r);
+    // while offline, with sections waiting to be sent
+    unwire(); fake.session.data.clear(); fake.local.data.clear();
+    r = await rig(caps);
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    await r.read(); // profile is uploaded
+    r.stub.fail(/^(PUT|POST|GET) \/api\/linkedin\/ext\/captures\//, "drop", 999);
+    await r.readAll();
+    expect(await r.controller.current()).toMatchObject({ phase: "finalizing", blocked: "offline" });
+    expect(await outbox.load()).not.toBeNull();
+    r.stub.clearFaults();
+    await disconnect(r);
   });
 
   it("gives up after one reconcile and clears the outbox", async () => {
