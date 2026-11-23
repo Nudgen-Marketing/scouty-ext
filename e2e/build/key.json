@@ -1,0 +1,5 @@
+{
+  "note": "E2E BUILD ONLY. A public key that fixes the extension id of dist/e2e so the redirect and popup URLs are the same on every run. Its private half was discarded when it was generated; it signs nothing. Never used by a store build.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7xd5RHfSCAptw6QXoBpGBaKkqQqZuWN9L39xY6lKN3C3+TOy+aNfZdzoc5ln0ORyyWVXy67LGfXhzsxJ2cq8VbyAfCsaiynhCgPZpeJ49SE5/XYwcWkq6NL48mbF0l4NzKQNeHI5IonbbRTRTG8Djci5TQbslVu4mgMCIi8IfOPzdW1btV/7a97AxwswRFOx+KeytLXEW2XZ/eHmtbSQJRVCX2PNvYhACB3o91R8kA5uUvEBxe0NEcUdbWdCoDP432X0Pnpm6AlUh73O6XyBAvqWeYSsn7NAyNKcjIvv/F8td+3tmh+Mwrt97IldfqmZNBKppBseSnichKFSwo+JswIDAQAB",
+  "extensionId": "bnlmdjoimcpnokklfpbnmfamoipgfgck"
+}

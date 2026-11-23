@@ -50,14 +50,15 @@ export type TokenSource = {
 };
 
 export type ApiDeps = {
-  fetch: (url: string, init: RequestInit) => Promise<Response>;
+  /** Sends one request. The default is the platform fetch; tests put the API stub here. */
+  transport: (url: string, init: RequestInit) => Promise<Response>;
   sleep: (ms: number) => Promise<void>;
   random: () => number;
   now: () => number;
 };
 
 const defaults: ApiDeps = {
-  fetch: (url, init) => fetch(url, init),
+  transport: (url, init) => fetch(url, init),
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   random: Math.random,
   now: Date.now,
@@ -124,7 +125,7 @@ async function call<T>(c: Call): Promise<T> {
     try {
       const headers: Record<string, string> = { Accept: "application/json", ...versionHeaders(), ...c.headers };
       if (token) headers.Authorization = `Bearer ${token}`;
-      const response = await deps.fetch(url, {
+      const response = await deps.transport(url, {
         method: c.method, headers, body: c.body as BodyInit | undefined,
         credentials: "omit", cache: "no-store", redirect: "error", referrerPolicy: "no-referrer",
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),

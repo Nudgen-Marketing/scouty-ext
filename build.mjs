@@ -1,6 +1,7 @@
 // Builds dist/<target>/ for chrome, edge and firefox (or dist/e2e with --e2e).
 // No minification and no timestamps: the output is readable and reproducible.
 import { build } from "esbuild";
+import { execFileSync } from "node:child_process";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -95,13 +96,18 @@ async function buildTarget(name, { target, apiOrigin, linkedinOrigin, key, swaps
     ["src/background/index.ts", "background.js", "esm"],
     ["src/reader/index.ts", "reader.js", "iife"],
     ["src/overlay/overlay.ts", "overlay.js", "iife"],
-    ["src/popup/popup.ts", "popup.js", "iife"],
   ];
   for (const [entry, file, format] of entries) {
     await build({ ...common, entryPoints: [entry], outfile: path.join(out, file), format, define: define(true) });
   }
-  const css = (await readFile(path.join(root, "src/ui/tokens.css"), "utf8")) + "\n" + (await readFile(path.join(root, "src/ui/components.css"), "utf8"));
-  await writeFile(path.join(out, "popup.css"), css);
+  // The popup is the only bundle with third-party code (React). It is minified; everything that
+  // runs in the background or inside the LinkedIn page stays unminified and framework-free.
+  await build({
+    ...common, entryPoints: ["src/popup/popup.tsx"], outfile: path.join(out, "popup.js"), format: "iife", minify: true, jsx: "automatic",
+    define: { ...define(true), "process.env.NODE_ENV": JSON.stringify("production") },
+  });
+  // Tailwind is compiled to a static stylesheet at build time. No runtime style injection.
+  execFileSync(process.execPath, [path.join(root, "node_modules/@tailwindcss/cli/dist/index.mjs"), "--input", "src/popup/popup.css", "--output", path.join(out, "popup.css"), "--minify"], { cwd: root, stdio: ["ignore", "ignore", quiet ? "ignore" : "ignore"] });
   await cp(path.join(root, "src/popup/popup.html"), path.join(out, "popup.html"));
   await cp(path.join(root, "_locales"), path.join(out, "_locales"), { recursive: true });
   await cp(path.join(root, "icons"), path.join(out, "icons"), { recursive: true });

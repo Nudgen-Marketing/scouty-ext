@@ -2,6 +2,7 @@
 // in front of the user and the capture state.
 import { DEV_BUILD, EXTENSION_VERSION, LINKEDIN_ORIGIN } from "../config";
 import { ext } from "../ext";
+import type { ClickLogEntry } from "../messages";
 import { profileFromUrl } from "../profile-key";
 import { ACTIVITY_SECTIONS, type Caps, type SectionName, type SessionResponse } from "../protocol";
 import type { UiState } from "../ui/state";
@@ -49,7 +50,7 @@ export async function sessionInfo(ctx: UiContext, fresh = false): Promise<Sessio
       const store = error.body?.storeUrl;
       return { kind: "outdated", storeUrl: typeof store === "string" && store.startsWith("https://") ? store : null };
     }
-    if (error instanceof ApiError && (error.status === 403 || error.code === "LINKEDIN_DISABLED")) return { kind: "notAvailable" };
+    if (error instanceof ApiError && (error.code === "LINKEDIN_NOT_AVAILABLE" || error.code === "LINKEDIN_DISABLED")) return { kind: "notAvailable" };
     // Offline or a server fault: show what is known rather than blocking the popup.
     return cached?.data ?? { protocol: 1, user: { name: "", email: "" }, workspace: { id: "", name: "" }, caps: { posts: 50, comments: 50, reactions: 50 }, limits: { capturesLeftToday: -1 }, serverTime: new Date(ctx.now()).toISOString() };
   }
@@ -80,7 +81,7 @@ function noticeState(notice: Notice, workspace: string, now: number): UiState {
 }
 
 /** The screen for a capture that is running, sending or finished; null when there is none. */
-export function captureUi(state: CaptureState, extras: { clickLog: UiClickLog; minutesLeft: number | null }, workspace: string, now: number): UiState | null {
+export function captureUi(state: CaptureState, extras: { clickLog: ClickLogEntry[]; minutesLeft: number | null }, workspace: string, now: number): UiState | null {
   switch (state.phase) {
     case "idle":
       return state.notice ? noticeState(state.notice, workspace, now) : null;
@@ -113,7 +114,6 @@ export function captureUi(state: CaptureState, extras: { clickLog: UiClickLog; m
     }
   }
 }
-type UiClickLog = import("../messages").ClickLogEntry[];
 
 export type PopupQuery = { tabId: number | null; tabUrl: string | null; settings: boolean };
 

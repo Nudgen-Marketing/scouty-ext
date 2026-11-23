@@ -11,8 +11,7 @@ export function wire(options: Record<string, unknown> = {}): Wired {
   const clock = { now: Date.UTC(2026, 10, 23, 9, 0, 0) };
   const stub = createStubApi({ origin: "https://scouty.to", now: () => clock.now, ...options });
   const sleeps: number[] = [];
-  setApiDeps({
-    fetch: (url, init) => stub.fetch(url, init),
+  setApiDeps({ transport: (url, init) => stub.fetch(url, init),
     sleep: async (ms) => { sleeps.push(ms); clock.now += ms; },
     random: () => 0.5,
     now: () => clock.now,

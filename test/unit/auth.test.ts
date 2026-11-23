@@ -18,7 +18,7 @@ beforeEach(() => {
   clock = 1_000_000;
   auth.setAuthClock(() => clock);
   auth.onConnectionEnded(() => undefined);
-  setApiDeps({ fetch: async (url, init) => { const call = { url, init }; calls.push(call); return respond(call); }, sleep: async () => undefined, now: () => clock });
+  setApiDeps({ transport: async (url, init) => { const call = { url, init }; calls.push(call); return respond(call); }, sleep: async () => undefined, now: () => clock });
 });
 afterEach(() => { setApiDeps(null); auth.setAuthClock(null); });
 

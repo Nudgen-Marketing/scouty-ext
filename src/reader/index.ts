@@ -33,17 +33,17 @@ export function uiLanguageSupported(doc: Document): boolean {
 
 export async function readSection(args: ReaderArgs, env: ReaderEnv): Promise<ReaderResult> {
   const doc = env.doc;
-  const location = doc.defaultView?.location ?? doc.location;
+  const address = doc.defaultView?.location ?? doc.location;
   const interactions = createInteractions(doc, { clicksEnabled: uiLanguageSupported(doc), recordClicks: DEBUG_CLICKS });
   const clickLog = interactions.clickLog;
   const ctx: ReadContext = { doc, isVisible: env.isVisible, interactions, now: env.now() };
 
   // Target check: the page must be the profile this capture was created for.
-  const slug = slugFromPath(location?.pathname ?? "");
+  const slug = slugFromPath(address?.pathname ?? "");
   const key = slug ? profileKeyFromSlug(slug) : null;
   if (!slug || !key) return { kind: "stopped", reason: "left_linkedin", address: null, clickLog };
   if (key !== args.profileKey) {
-    return { kind: "stopped", reason: "wrong_profile", address: `${location.origin}/in/${slug}/`, clickLog };
+    return { kind: "stopped", reason: "wrong_profile", address: `${address.origin}/in/${slug}/`, clickLog };
   }
 
   // The application may still be drawing: give an unrecognised page a moment before failing closed.

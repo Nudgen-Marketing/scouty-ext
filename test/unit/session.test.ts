@@ -387,6 +387,32 @@ describe("capture controller", () => {
     expect(noticeFor(new NetworkError("x"))).toEqual({ kind: "failed" });
   });
 
+  // Every code in the server's LINKEDIN_EXT_ERROR_CODES ends in one screen.
+  it.each([
+    [401, "LINKEDIN_AUTH_REQUIRED", false, "failed"], // (a 401 is first answered with a refresh; this is the fallback)
+    [404, "LINKEDIN_PROFILE_UNAVAILABLE", true, "suppressed"],
+    [426, "LINKEDIN_EXTENSION_OUTDATED", false, "outdated"],
+    [403, "LINKEDIN_NOT_AVAILABLE", false, "notAvailable"],
+    [503, "LINKEDIN_DISABLED", false, "notAvailable"],
+    [403, "LINKEDIN_ORIGIN_REFUSED", false, "failed"],
+    [415, "LINKEDIN_UNSUPPORTED_MEDIA_TYPE", false, "failed"],
+    [413, "LINKEDIN_PAYLOAD_TOO_LARGE", false, "failed"],
+    [400, "LINKEDIN_DIGEST_MISMATCH", false, "failed"],
+    [400, "LINKEDIN_INVALID_PAYLOAD", false, "failed"],
+    [400, "LINKEDIN_URL_UNSUPPORTED", true, "failed"],
+    [404, "LINKEDIN_CAPTURE_NOT_FOUND", false, "failed"],
+    [410, "LINKEDIN_CAPTURE_EXPIRED", false, "failed"],
+    [409, "LINKEDIN_CAPTURE_FINALIZED", false, "failed"],
+    [409, "LINKEDIN_CAPTURE_TARGET_MISMATCH", false, "failed"],
+    [409, "LINKEDIN_SECTION_STALE", false, "failed"],
+    [409, "LINKEDIN_MANIFEST_MISMATCH", false, "failed"], // after the one reconcile
+    [429, "LINKEDIN_CAPTURE_LIMIT", true, "limit"],
+    [429, "LINKEDIN_RATE_LIMITED", false, "failed"], // after the bounded retries
+    [503, "LINKEDIN_UNAVAILABLE", false, "failed"], // after the bounded retries
+  ] as const)("%i %s → %s", (status, code, creating, kind) => {
+    expect(noticeFor(new ApiError(status, code, { error: "x", code }, null), creating).kind).toBe(kind);
+  });
+
   it("every stop reason has a screen with a way out", () => {
     const reasons: StopReason[] = ["user_stopped", "tab_closed", "logged_out", "reduced_profile", "checkpoint", "not_found", "wrong_profile", "left_linkedin", "unknown_page", "timeout", "permission_missing", "signed_out_of_scouty"];
     for (const stop of reasons) {

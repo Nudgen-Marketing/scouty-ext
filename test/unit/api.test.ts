@@ -54,7 +54,7 @@ describe("api client", () => {
   it("Content-Digest is the SHA-256 of the exact body bytes, multi-byte text included", async () => {
     const ref = await created();
     const seen: { digest: string; bytes: Uint8Array }[] = [];
-    setApiDeps({ fetch: (url, init) => { seen.push({ digest: (init.headers as Record<string, string>)["Content-Digest"]!, bytes: init.body as Uint8Array }); return w.stub.fetch(url, init); }, sleep: async () => undefined });
+    setApiDeps({ transport: (url, init) => { seen.push({ digest: (init.headers as Record<string, string>)["Content-Digest"]!, bytes: init.body as Uint8Array }); return w.stub.fetch(url, init); }, sleep: async () => undefined });
     const text = "قيد الاختبار 🙂 Tiếng Việt 日本語   \"quoted\"";
     const item = upload(text);
     await expect(w.api.putSection(ref, item)).resolves.toBeNull();
@@ -118,7 +118,7 @@ describe("api client", () => {
     [410, "LINKEDIN_CAPTURE_EXPIRED"], [413, "LINKEDIN_PAYLOAD_TOO_LARGE"], [415, null], [426, "LINKEDIN_EXTENSION_OUTDATED"],
   ])("does not retry %i", async (status, code) => {
     let calls = 0;
-    setApiDeps({ fetch: async () => { calls += 1; return new Response(JSON.stringify({ error: "x", ...(code ? { code } : {}) }), { status }); }, sleep: async () => undefined });
+    setApiDeps({ transport: async () => { calls += 1; return new Response(JSON.stringify({ error: "x", ...(code ? { code } : {}) }), { status }); }, sleep: async () => undefined });
     const error = await w.api.session().catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ApiError);
     expect(error).toMatchObject({ status, code });
@@ -160,7 +160,7 @@ describe("api client", () => {
 
   it("never sends cookies or follows redirects", async () => {
     let init: RequestInit | null = null;
-    setApiDeps({ fetch: async (url, i) => { init = i; return w.stub.fetch(url, i); }, sleep: async () => undefined });
+    setApiDeps({ transport: async (url, i) => { init = i; return w.stub.fetch(url, i); }, sleep: async () => undefined });
     await w.api.session();
     expect(init).toMatchObject({ credentials: "omit", redirect: "error", referrerPolicy: "no-referrer", cache: "no-store" });
   });

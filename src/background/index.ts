@@ -164,7 +164,9 @@ async function act(action: UiAction, tabId: number | null): Promise<void> {
 /** What the overlay in the LinkedIn tab may ask for. Everything else comes from the popup only. */
 const OVERLAY_ACTIONS: readonly UiAction[] = ["stop", "dismiss", "openAnalysis", "retryNow", "captureAgain", "capture", "connect", "openScouty", "openStore"];
 
-async function handle(message: Message, sender: chrome.runtime.MessageSender): Promise<unknown> {
+type Sender = { id?: string; url?: string; tab?: { id?: number } };
+
+async function handle(message: Message, sender: Sender): Promise<unknown> {
   if (sender.id !== ext.runtime.id) return null;
   const fromPage = typeof sender.url === "string" && sender.url.startsWith(ext.runtime.getURL(""));
   const senderTab = sender.tab?.id ?? null;
