@@ -14,8 +14,8 @@ them to your Scouty workspace for analysis.
   it would for you.
 - **No LinkedIn credentials.** It never reads LinkedIn credentials (no LinkedIn cookie, token or
   password) or messages, and never opens the contact-info overlay. The only authentication
-  information it handles is its own Scouty access token, kept in the browser's extension storage
-  and sent only to Scouty (PRIVACY.md).
+  information it handles is its own Scouty access token and the refresh token that renews it,
+  kept in the browser's extension storage and sent only to Scouty (PRIVACY.md).
 - **One network destination.** Requests go only to the Scouty API, from one module.
 - **User-started, one profile at a time.** Nothing runs in the background.
 
