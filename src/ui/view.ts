@@ -157,6 +157,14 @@ function draft(state: UiState): Draft {
     case "offline":
       return { tone: "alert", icon: "alert", title: t("offlineTitle"), body: [t("offlineBody")], primary: action("retryNow", "actionTryNow") };
     case "notAnswering":
+      if (!state.sending) {
+        // The capture could not be started: nothing is kept, so Try now starts it again.
+        return {
+          tone: "alert", icon: "alert", title: t("notAnsweringTitle"),
+          body: [t("notAnsweringStartBody"), state.retryAt ? t("notAnsweringStartRetryAt", clockTime(state.retryAt)) : t("notAnsweringStartLater")],
+          primary: action("capture", "actionTryNow"),
+        };
+      }
       return {
         tone: "alert", icon: "alert", title: t("notAnsweringTitle"),
         body: state.retryAt ? [t("notAnsweringBody"), t("notAnsweringRetryAt", clockTime(state.retryAt))] : [t("notAnsweringBody")],

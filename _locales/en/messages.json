@@ -311,6 +311,15 @@
   "notAnsweringRetryAt": {
     "message": "Scouty asked to wait a little. The next try is at about $1."
   },
+  "notAnsweringStartBody": {
+    "message": "This capture didn't start. Nothing was read or sent."
+  },
+  "notAnsweringStartLater": {
+    "message": "Try again in a moment."
+  },
+  "notAnsweringStartRetryAt": {
+    "message": "Scouty asked to wait a little. Try again after about $1."
+  },
   "actionTryNow": {
     "message": "Try now"
   },

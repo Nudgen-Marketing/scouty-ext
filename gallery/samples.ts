@@ -45,7 +45,7 @@ export const SAMPLES: readonly UiState[] = [
   { kind: "settings", name: "Synthetic Tester", email: "tester@example.invalid", workspace, version: "0.1.0" },
   { kind: "takenOver", workspace },
   // A rate limit: the screen also says roughly when the next try is.
-  { kind: "notAnswering", retryAt: "2026-11-23T10:42:00.000Z", workspace },
+  { kind: "notAnswering", retryAt: "2026-11-23T10:42:00.000Z", sending: true, workspace },
 ];
 
 /** What the in-page overlay shows during and after a capture. */

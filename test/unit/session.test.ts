@@ -453,8 +453,18 @@ describe("capture controller", () => {
     [429, "LINKEDIN_CAPTURE_LIMIT", true, "limit"],
     [429, "LINKEDIN_RATE_LIMITED", false, "failed"], // after the bounded retries
     [503, "LINKEDIN_UNAVAILABLE", false, "failed"], // after the bounded retries
+    // At create, Scouty answered but could not start it: screen 26, not 22.
+    [503, "LINKEDIN_UNAVAILABLE", true, "notAnswering"],
+    [502, null, true, "notAnswering"],
+    [504, null, true, "notAnswering"],
+    [408, null, true, "notAnswering"],
+    [429, "LINKEDIN_RATE_LIMITED", true, "notAnswering"],
+    // Real terminal create errors keep their screens.
+    [503, "LINKEDIN_DISABLED", true, "notAvailable"],
+    [500, null, true, "failed"],
+    [400, "LINKEDIN_INVALID_PAYLOAD", true, "failed"],
   ] as const)("%i %s → %s", (status, code, creating, kind) => {
-    expect(noticeFor(new ApiError(status, code, { error: "x", code }, null), creating).kind).toBe(kind);
+    expect(noticeFor(new ApiError(status, code, { error: "x", code: code ?? undefined }, null), creating).kind).toBe(kind);
   });
 
   it("every stop reason has a screen with a way out", () => {
@@ -492,7 +502,7 @@ describe("waiting on Scouty is not being offline", () => {
     expect(r.stub.state.requests.filter((q) => q.path.endsWith("/finalize"))).toHaveLength(6);
     const state = await r.controller.current();
     expect(state).toMatchObject({ phase: "finalizing", blocked: "server", rateLimited: false, retryAt: r.clock.now + SERVER_RETRY_MS });
-    expect(ui(state)).toEqual({ kind: "notAnswering", retryAt: null, workspace: "W" });
+    expect(ui(state)).toEqual({ kind: "notAnswering", retryAt: null, sending: true, workspace: "W" });
     // It tries again by itself after the wait; nothing of LinkedIn is opened again.
     const timer = r.timers.find((tm) => tm.ms === SERVER_RETRY_MS)!;
     expect(timer).toBeDefined();
@@ -513,7 +523,7 @@ describe("waiting on Scouty is not being offline", () => {
     const blockedAt = r.clock.now;
     const state = await r.controller.current();
     expect(state).toMatchObject({ phase: "finalizing", blocked: "server", rateLimited: true, retryAt: blockedAt + 60_000 });
-    expect(ui(state)).toEqual({ kind: "notAnswering", retryAt: new Date(blockedAt + 60_000).toISOString(), workspace: "W" });
+    expect(ui(state)).toEqual({ kind: "notAnswering", retryAt: new Date(blockedAt + 60_000).toISOString(), sending: true, workspace: "W" });
     expect(r.timers.map((tm) => tm.ms)).toContain(60_000);
     // Asked before the wait is over (the popup polls): nothing is sent.
     const before = r.stub.state.requests.length;
@@ -539,6 +549,41 @@ describe("waiting on Scouty is not being offline", () => {
     expect(r.timers.map((tm) => tm.ms)).not.toContain(SERVER_RETRY_MS);
     await r.controller.retryIfDue();
     expect(await r.controller.current()).toMatchObject({ blocked: "offline" });
+  });
+
+  it("a create that spends its retries on 503: screen 26 with Try now (start again), not 22; a 429 says roughly when", async () => {
+    let r = await rig();
+    r.stub.fail(/POST \/api\/linkedin\/ext\/captures$/, "503", 6);
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    expect(r.stub.state.requests.filter((q) => q.method === "POST" && q.path === "/api/linkedin/ext/captures")).toHaveLength(6);
+    let state = await r.controller.current();
+    expect(state).toEqual({ phase: "idle", notice: { kind: "notAnswering", retryAt: null } });
+    expect(ui(state)).toEqual({ kind: "notAnswering", retryAt: null, sending: false, workspace: "W" });
+    expect(await outbox.load()).toBeNull();
+    expect(r.tab.updates).toEqual([]); // nothing of LinkedIn was read
+    // Try now starts it again.
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    expect(await r.phase()).toBe("running");
+    await r.controller.reset();
+    unwire();
+    r = await rig();
+    r.stub.fail(/POST \/api\/linkedin\/ext\/captures$/, "429-long", 1);
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    state = await r.controller.current();
+    expect(state).toMatchObject({ phase: "idle", notice: { kind: "notAnswering", retryAt: expect.any(String) } });
+    expect(r.sleeps).toEqual([]);
+  });
+
+  it("a create refused for good keeps its screen: 500 → failed, daily limit → limit", async () => {
+    let r = await rig();
+    r.stub.fail(/POST \/api\/linkedin\/ext\/captures$/, "500", 1);
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    expect(await r.controller.current()).toEqual({ phase: "idle", notice: { kind: "failed" } });
+    await r.controller.reset();
+    unwire();
+    r = await rig({ capturesLeftToday: 0 });
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    expect(await r.controller.current()).toMatchObject({ phase: "idle", notice: { kind: "limit" } });
   });
 
   it("a 500 on finalize stays terminal", async () => {

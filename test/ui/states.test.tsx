@@ -127,7 +127,7 @@ describe("the 26 screens", () => {
   });
 
   it("26 \"Scouty isn't answering\" is not 16 \"You're offline\": its own copy, the same Try now", () => {
-    const busy = viewFor({ kind: "notAnswering", retryAt: null, workspace: "W" });
+    const busy = viewFor({ kind: "notAnswering", retryAt: null, sending: true, workspace: "W" });
     const offline = viewFor({ kind: "offline", workspace: "W" });
     expect(busy.n).toBe(26);
     expect(offline.n).toBe(16);
@@ -140,9 +140,25 @@ describe("the 26 screens", () => {
     expect(busy.primary).toMatchObject({ id: "retryNow", label: "Try now" });
     expect(busy.tone).toBe("alert");
     // With a rate limit it says roughly when.
-    const limited = viewFor({ kind: "notAnswering", retryAt: "2026-11-23T10:42:00.000Z", workspace: "W" });
+    const limited = viewFor({ kind: "notAnswering", retryAt: "2026-11-23T10:42:00.000Z", sending: true, workspace: "W" });
     expect(limited.body).toHaveLength(2);
     expect(limited.body[1]).toBe(`Scouty asked to wait a little. The next try is at about ${new Date("2026-11-23T10:42:00.000Z").toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`);
+  });
+
+  it.each(["light", "dark"] as const)("26 at create (%s): nothing kept, Try now starts the capture again; roles and axe", async (theme) => {
+    const view = viewFor({ kind: "notAnswering", retryAt: null, sending: false, workspace: "W" });
+    expect(view.n).toBe(26);
+    expect(view.title).toBe("Scouty isn't answering right now");
+    expect(view.body).toEqual(["This capture didn't start. Nothing was read or sent.", "Try again in a moment."]);
+    expect(view.primary).toMatchObject({ id: "capture", label: "Try now" });
+    expect(view.body.join(" ")).not.toMatch(/offline|kept|keep trying/i);
+    const limited = viewFor({ kind: "notAnswering", retryAt: "2026-11-23T10:42:00.000Z", sending: false, workspace: "W" });
+    expect(limited.body[1]).toBe(`Scouty asked to wait a little. Try again after about ${new Date("2026-11-23T10:42:00.000Z").toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`);
+    const node = mount({ kind: "notAnswering", retryAt: null, sending: false, workspace: "W" }, { theme });
+    expect(node.querySelector("h1")!.textContent).toBe("Scouty isn't answering right now");
+    expect(node.querySelector("[data-primary]")!.textContent).toBe("Try now");
+    expect(node.querySelector("[data-slot='message']")!.getAttribute("role")).toBe("alert");
+    expect(await audit(node)).toEqual([]);
   });
 
   it("the primary action is the first control after the title, and Enter activates it", () => {

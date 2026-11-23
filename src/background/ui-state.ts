@@ -78,6 +78,7 @@ function noticeState(notice: Notice, workspace: string, now: number): UiState {
     case "suppressed": return { kind: "suppressed", workspace };
     case "failed": return { kind: "failed", workspace };
     case "takenOver": return { kind: "takenOver", workspace };
+    case "notAnswering": return { kind: "notAnswering", retryAt: notice.retryAt, sending: false, workspace };
   }
 }
 
@@ -103,7 +104,7 @@ export function captureUi(state: CaptureState, extras: { clickLog: ClickLogEntry
       if (state.blocked === "offline") return { kind: "offline", workspace };
       if (state.blocked === "server") {
         const retryAt = state.rateLimited && typeof state.retryAt === "number" ? new Date(state.retryAt).toISOString() : null;
-        return { kind: "notAnswering", retryAt, workspace };
+        return { kind: "notAnswering", retryAt, sending: true, workspace };
       }
       return { kind: "sending", slow: state.slow, workspace };
     case "done": {

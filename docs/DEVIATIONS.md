@@ -125,7 +125,12 @@ extension follows the app's `src/lib/linkedin/protocol.ts`:
   to a stopped background context is picked up on its next start (`recover`) and whenever the
   popup or the overlay asks for the state. Like 25, this screen is not in plan 12.4 and is
   numbered after it (tested in `test/unit/session.test.ts`, "waiting on Scouty is not being
-  offline", and `test/ui/states.test.tsx`). When creating, either ends in "something went wrong".
+  offline", and `test/ui/states.test.tsx`). When creating, the same failures (after the same
+  retries, or a 429 with a wait over 30 s) also end in screen 26, in its create form: nothing was
+  read or sent, nothing is kept or tried again on its own, and **Try now** starts the capture
+  again; a rate limit says roughly when to try. A network error, a 500 and the other refusals at
+  create keep their own screens ("Scouty couldn't receive this capture", "That's all for today",
+  "Not available yet" and so on).
   The plan names only
   `LINKEDIN_UNAVAILABLE` as retried; the extension also retries a network error, 408 and the
   gateway answers 502 and 504 with the same backoff, because those say the server could not answer

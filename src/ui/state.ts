@@ -32,8 +32,11 @@ export type UiState =
   | { kind: "busy"; workspace: string }
   | { kind: "settings"; name: string; email: string; workspace: string; version: string; devRedirectUrl?: string | null }
   | { kind: "takenOver"; workspace: string }
-  /** Sending waits because Scouty answered but could not take it now; retryAt (ISO) only for a rate limit. */
-  | { kind: "notAnswering"; retryAt: string | null; workspace: string };
+  /**
+   * Scouty answered but could not take it now; retryAt (ISO) only for a rate limit. sending: a
+   * capture is kept and waits to be sent; false when the capture could not be started at all.
+   */
+  | { kind: "notAnswering"; retryAt: string | null; sending: boolean; workspace: string };
 
 export type UiKind = UiState["kind"];
 

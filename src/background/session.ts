@@ -29,7 +29,12 @@ export type Notice =
    * from another browser or device (a newer create of the same profile), or removed in Scouty (by the
    * user, a teammate, or an erasure).
    */
-  | { kind: "takenOver" };
+  | { kind: "takenOver" }
+  /**
+   * Screen 26 at create: Scouty answered but could not start the capture (408, 429, 502, 503, 504
+   * after the retries). retryAt (ISO) only for a rate limit.
+   */
+  | { kind: "notAnswering"; retryAt: string | null };
 
 export type DoneResult = {
   completeness: Completeness; captured: Counts; appUrl: string;
@@ -750,6 +755,11 @@ export function noticeFor(error: unknown, creating = false): Notice {
     if (error.code === "LINKEDIN_CAPTURE_LIMIT") {
       const resetAt = error.retryAfterMs !== null ? new Date(Date.now() + error.retryAfterMs).toISOString() : null;
       return { kind: "limit", resetAt };
+    }
+    // Scouty answered but could not start it now (the retries are spent): not a failure of this capture.
+    if (creating && isRetryableStatus(error)) {
+      const retryAt = error.status === 429 && error.retryAfterMs !== null ? new Date(Date.now() + error.retryAfterMs).toISOString() : null;
+      return { kind: "notAnswering", retryAt };
     }
     // A 404 when creating means the server refuses this profile; it does not say why.
     if (error.status === 404 && creating) return { kind: "suppressed" };
