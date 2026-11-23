@@ -18,8 +18,22 @@ disk and is gone as soon as Scouty confirms it or you close the browser.
 What it collects is about the person whose profile you capture: the text of their profile and
 activity as LinkedIn shows it to you. This is sent only to Scouty, stored in your workspace,
 processed by Scouty's AI provider to write suggestions, and deleted as described in Scouty's
-privacy policy. It is not sold or shared with anyone else. Our use of this data follows the Chrome
-Web Store User Data Policy, including the Limited Use requirements.
+privacy policy.
+
+The same commitments apply in every browser the extension is offered for. The data it collects is:
+
+- used only to provide the extension's single purpose described above, and never for anything
+  else;
+- not sold, and not transferred to anyone except as needed to provide that purpose (Scouty and its
+  AI provider), to comply with the law, or as part of a merger or acquisition with notice to you;
+- not used or transferred for advertising, including personalized or interest-based ads, and not
+  used to decide anyone's creditworthiness or for lending;
+- not read by people at Scouty, except with your permission, when needed for security or to
+  investigate abuse, to comply with the law, or in aggregated and anonymized form for running the
+  service.
+
+The extension follows the Chrome Web Store User Data Policy, including its Limited Use
+requirements, the Microsoft Edge Add-ons policies, and Mozilla's Add-on Policies.
 
 Opening a profile is a profile view the person may see. Using automated tools on LinkedIn is
 against LinkedIn's User Agreement, and LinkedIn may restrict accounts that use them. You use this
