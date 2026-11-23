@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run build
+      # Layers 1 to 4: unit, static guarantees (on src/ and on every built bundle), UI, contract
+      # (including the protocol-v1 checksum).
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      # Layer 5: the browser run against the mock LinkedIn and the capture-API stub.
+      - run: npm run test:e2e
+      - run: npm run test:gallery
+      - run: npm run build
+      - run: npm run lint:firefox
+      # Two builds must give byte-identical output.
+      - run: node tools/repro-check.mjs
+      - name: No secrets or internal hostnames
+        run: |
+          if git grep -nE "BEGIN [A-Z ]*PRIVATE KEY|client_secret|rk_live|sk-[A-Za-z0-9]{20}" -- . ':!test/static/static-rules.test.ts' ':!test/contract/contract.test.ts' ':!.github/workflows/ci.yml' ':!RELEASE.md'; then
+            echo "Forbidden pattern found"; exit 1
+          fi

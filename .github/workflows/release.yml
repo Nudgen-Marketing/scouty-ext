@@ -1,0 +1,47 @@
+name: Release
+
+# Runs only for a v* tag, and builds only if the CI workflow succeeded for that exact commit.
+# It attaches the three packages and the source archive to the workflow run. Uploading to the
+# stores is done by hand, gated by RELEASE.md; no store credential exists here.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require a successful CI run for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          conclusion=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$GITHUB_SHA" --json conclusion --jq '[.[] | select(.conclusion == "success")] | length')
+          if [ "${conclusion:-0}" -lt 1 ]; then
+            echo "CI has not succeeded for $GITHUB_SHA. Refusing to build release artifacts."
+            exit 1
+          fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: The tag must equal the version in package.json
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $version"; exit 1
+          fi
+      - run: npm ci
+      - run: npm run package
+      - run: shasum -a 256 release/*.zip | tee release/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scouty-ext-${{ github.ref_name }}
+          path: release/
+          if-no-files-found: error
