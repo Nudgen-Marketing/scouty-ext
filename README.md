@@ -91,8 +91,10 @@ Built popup size, per target (identical across targets apart from the build cons
 2. Chrome: `chrome://extensions` → Developer mode → **Load unpacked** → `dist/chrome`.
    Edge: `edge://extensions` → Developer mode → **Load unpacked** → `dist/edge`.
    Firefox: `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on** → `dist/firefox/manifest.json`.
-3. The app must know this build: see "Tell the app about these builds" in
-   [validation/VALIDATION.md](validation/VALIDATION.md).
+3. The app must run locally and know this build: follow the app plan's §15.1 "O1 Local setup"
+   (`docs/plans/linkedin-outreach-coach.md` in the `scouty` repository), as summarised, with its
+   safety rules, in "Local setup" of [validation/VALIDATION.md](validation/VALIDATION.md#local-setup).
+   Never run the app or its worker against the database in the app's `.env`.
 
 ## Building from source (for store reviewers)
 
