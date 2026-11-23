@@ -1,4 +1,4 @@
-// Fixed sample data: one UiState per screen (the 24 of plan 12.4 in its order, then "takenOver").
+// Fixed sample data: one UiState per screen (the 24 of plan 12.4 in its order, then "takenOver", "This capture stopped").
 // Used by the state gallery and by the UI tests, so both show exactly the same 25 states. All names are invented.
 import type { UiState } from "../src/ui/state";
 

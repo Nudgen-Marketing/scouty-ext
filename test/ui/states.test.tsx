@@ -39,7 +39,7 @@ const EXPECTED: [string, string | null, string | null][] = [
   ["Scouty couldn't receive this capture", "Capture again", null],
   ["A capture is in progress", "Show it", null],
   ["Settings", null, "Disconnect"],
-  ["This capture continued in another window", "OK", "Capture here"],
+  ["This capture stopped", "OK", "Capture here"],
 ];
 const ERRORS = new Set(["linkedinSignIn", "verification", "unavailable", "addressChanged", "offline", "connectionEnded", "limit", "outdated", "notAvailable", "suppressed", "failed", "busy", "takenOver"]);
 
@@ -119,8 +119,8 @@ describe("the 25 screens", () => {
     expect(text(20)).toContain("Scouty doesn't keep information about this person.");
     expect(text(21)).toContain("Nothing was saved. Press Capture again.");
     expect(text(23)).toContain("Synthetic Tester · tester@example.invalid");
-    expect(text(24)).toContain("This profile was captured again from another window or device, so the capture here stopped. Nothing from this window was kept.");
-    expect(text(24)).toContain("Finish it in the other window. To read the profile from this window instead, press Capture here.");
+    expect(text(24)).toContain("It was started again from another browser or device, or removed in Scouty. Nothing more from this capture will be sent.");
+    expect(text(24)).toContain("To read this profile again from here, press Capture here.");
   });
 
   it("the primary action is the first control after the title, and Enter activates it", () => {

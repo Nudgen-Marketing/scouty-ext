@@ -56,7 +56,7 @@ App plan §15.4. Commits of both repositories, Chrome version, then each scenari
 | S3 Stop | |
 | S4 network cut, resumed without reloading LinkedIn | |
 | S5 connection revoked mid-capture, reconnect finishes it | |
-| S6 taken over by another window (state 25) | |
+| S6 capture stopped: started again from another browser (state 25) | |
 | S7 extension below the minimum version (state 19) | |
 | S8 recent capture reused (state 7) | |
 

@@ -24,7 +24,11 @@ export type Notice =
   | { kind: "limit"; resetAt: string | null }
   | { kind: "suppressed" }
   | { kind: "failed" }
-  /** The server handed this capture to a newer start of the same profile (another window or device). */
+  /**
+   * Screen 25, "This capture stopped": the server no longer knows this capture. It was started again
+   * from another browser or device (a newer create of the same profile), or removed in Scouty (by the
+   * user, a teammate, or an erasure).
+   */
   | { kind: "takenOver" };
 
 export type DoneResult = {
@@ -682,8 +686,9 @@ export function noticeFor(error: unknown, creating = false): Notice {
     }
     // A 404 when creating means the server refuses this profile; it does not say why.
     if (error.status === 404 && creating) return { kind: "suppressed" };
-    // A 404 on a capture this extension holds: a newer create for the same profile (another window
-    // or device) was handed this capture with a new upload token, so ours no longer opens it (plan 5.5).
+    // A 404 on a capture this extension holds: either a newer create of the same profile from another
+    // browser or device was handed this capture with a new upload token (plan 5.5), or the capture was
+    // removed in Scouty. Either way ours no longer opens it.
     if (error.status === 404) return { kind: "takenOver" };
   }
   return { kind: "failed" };

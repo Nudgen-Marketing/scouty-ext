@@ -36,8 +36,9 @@ export type UiState =
 export type UiKind = UiState["kind"];
 
 /**
- * The 25 screens: the 24 of plan 12.4 in its order, then "takenOver" (25), added after review for
- * a capture the server handed to another window or device (docs/DEVIATIONS.md).
+ * The 25 screens: the 24 of plan 12.4 in its order, then "takenOver" (25, "This capture stopped"),
+ * added after review for a capture the server no longer knows: started again from another browser
+ * or device, or removed in Scouty (docs/DEVIATIONS.md).
  */
 export const UI_KINDS: readonly UiKind[] = [
   "permission", "signedOut", "connecting", "notOnProfile", "consent", "ready", "recent", "capturing", "sending",

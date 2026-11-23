@@ -348,13 +348,13 @@
     "message": "Nothing was saved. Press Capture again."
   },
   "takenOverTitle": {
-    "message": "This capture continued in another window"
+    "message": "This capture stopped"
   },
   "takenOverBody": {
-    "message": "This profile was captured again from another window or device, so the capture here stopped. Nothing from this window was kept."
+    "message": "It was started again from another browser or device, or removed in Scouty. Nothing more from this capture will be sent."
   },
   "takenOverNext": {
-    "message": "Finish it in the other window. To read the profile from this window instead, press Capture here."
+    "message": "To read this profile again from here, press Capture here."
   },
   "actionCaptureHere": {
     "message": "Capture here"

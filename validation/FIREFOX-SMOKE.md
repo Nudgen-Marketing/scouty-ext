@@ -62,8 +62,8 @@ agreed, referred to by its label (P1); record no name, URL, text or screenshot o
 11. Optional, needs a second browser (for example Chrome with the extension connected to the same
     Scouty account): in Firefox press **Capture again** on P1 and, while it is still reading,
     start a capture of P1 in the other browser.
-    Expected: the other browser's capture runs; Firefox shows "This capture continued in another
-    window" with **OK** and **Capture here**, and nothing from the Firefox run reaches the app.
+    Expected: the other browser's capture runs; Firefox shows "This capture stopped" with **OK**
+    and **Capture here**, and nothing more from the Firefox run reaches the app.
 12. Popup → settings (gear) → **Disconnect**, then click the icon again.
     Expected: **Connect to Scouty**. In Scouty, Settings → Connected Apps no longer lists an active
     "Scouty LinkedIn Capture (Firefox)" connection.

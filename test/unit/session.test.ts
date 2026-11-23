@@ -369,12 +369,12 @@ describe("capture controller", () => {
     ]);
   });
 
-  it("404 on a held capture (taken over by another window or device): the takenOver screen, and its outbox is cleared", async () => {
+  it("404 on a held capture (started again from another browser or device, or removed in Scouty): the takenOver screen, and its outbox is cleared", async () => {
     const r = await rig();
     await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
     await r.read(); // profile sent with this window's upload token
     const held = (await outbox.load())!;
-    // Another window starts the same profile: the server hands it this capture with a new token.
+    // Another browser starts the same profile: the server hands it this capture with a new token.
     const other = await r.api.createCapture({ linkedinUrl: PROFILE_URL, recapture: false }, "uuid-other-window");
     expect(other).toMatchObject({ captureId: held.captureId });
     expect("uploadToken" in other && other.uploadToken).not.toBe(held.uploadToken);
