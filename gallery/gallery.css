@@ -1,0 +1,8 @@
+/* State gallery stylesheet: the popup's own Tailwind source plus the gallery's layout classes. */
+@import "../src/popup/popup.css";
+@source "./";
+
+body {
+  width: auto;
+  padding: 24px;
+}
