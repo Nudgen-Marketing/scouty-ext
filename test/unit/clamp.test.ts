@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CUT_MARKER, clampHead, clampHeadTail, fitByteBudget, utf8Length } from "../../src/reader/clamp";
+import { CUT_MARKER, clampHead, clampHeadTail, codePointLength, fitByteBudget, utf8Length } from "../../src/reader/clamp";
 
 describe("clamp", () => {
   it("leaves short text alone", () => {
@@ -17,16 +17,35 @@ describe("clamp", () => {
     expect(out.text.indexOf(CUT_MARKER)).toBe(1200);
   });
 
+  it("counts code points: 5,000 emoji clamp to at most 4,000, head kept, original tail kept, no lone surrogates", () => {
+    expect(codePointLength(CUT_MARKER)).toBe(5);
+    const emoji = "🙂".repeat(1200) + "🎉".repeat(3800 - 1) + "🏁"; // 5,000 code points, 10,000 UTF-16 units
+    expect(codePointLength(emoji)).toBe(5000);
+    const out = clampHeadTail(emoji);
+    expect(out.clamped).toBe(true);
+    expect(codePointLength(out.text)).toBeLessThanOrEqual(4000);
+    expect(codePointLength(out.text)).toBe(4000);
+    expect(out.text.startsWith("🙂".repeat(1200) + CUT_MARKER)).toBe(true);
+    const tail = Array.from(emoji).slice(-(4000 - 1200 - 5)).join("");
+    expect(out.text.endsWith(tail)).toBe(true);
+    expect(out.text.endsWith("🏁")).toBe(true);
+    expect(out.text.isWellFormed()).toBe(true);
+    // 4,000 emoji are 8,000 UTF-16 units but within the limit: left alone.
+    expect(clampHeadTail("🙂".repeat(4000))).toEqual({ text: "🙂".repeat(4000), clamped: false });
+  });
+
   it("never splits a surrogate pair and keeps emoji and right-to-left text whole", () => {
-    const text = "🙂".repeat(1500) + "שלום" + "🙂".repeat(1500);
+    const text = "🙂".repeat(2500) + "שלום" + "🙂".repeat(2500);
     const out = clampHeadTail(text, 4000, 1201);
-    expect(out.text.length).toBeLessThanOrEqual(4000);
+    expect(codePointLength(out.text)).toBeLessThanOrEqual(4000);
     expect(out.text.isWellFormed()).toBe(true);
     const rtl = "قيد الاختبار ".repeat(400);
     const clamped = clampHeadTail(rtl);
     expect(clamped.text.isWellFormed()).toBe(true);
     expect(clamped.text.endsWith(rtl.slice(-20))).toBe(true);
-    expect(clampHead("🙂🙂🙂", 3).text).toBe("🙂");
+    expect(clampHead("🙂🙂🙂", 3)).toEqual({ text: "🙂🙂🙂", clamped: false });
+    expect(clampHead("🙂🙂🙂🙂", 3)).toEqual({ text: "🙂🙂🙂", clamped: true });
+    expect(clampHead("a🙂b", 2).text.isWellFormed()).toBe(true);
   });
 
   it("measures the byte budget in UTF-8 bytes", () => {

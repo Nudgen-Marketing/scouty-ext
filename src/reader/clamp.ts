@@ -1,38 +1,37 @@
-// Clamps and the byte budget. Lengths are UTF-16 code units, the unit the server's schema counts,
-// and a cut never splits a surrogate pair.
+// Clamps and the byte budget. Lengths are Unicode code points, the unit the server's schema and
+// the plan count (an emoji counts once), so a cut never splits a surrogate pair.
 
 export const CUT_MARKER = "\n[…]\n";
+const MARKER_POINTS = Array.from(CUT_MARKER).length; // 5
 const encoder = new TextEncoder();
 
-const isHigh = (code: number): boolean => code >= 0xd800 && code <= 0xdbff;
-const isLow = (code: number): boolean => code >= 0xdc00 && code <= 0xdfff;
-
-function headSlice(text: string, length: number): string {
-  let end = Math.min(length, text.length);
-  if (end > 0 && end < text.length && isHigh(text.charCodeAt(end - 1))) end -= 1;
-  return text.slice(0, end);
-}
-function tailSlice(text: string, length: number): string {
-  let start = Math.max(0, text.length - length);
-  if (start > 0 && start < text.length && isLow(text.charCodeAt(start))) start += 1;
-  return text.slice(start);
+/** The length of `text` in Unicode code points. */
+export function codePointLength(text: string): number {
+  let n = 0;
+  for (const _ of text) n += 1;
+  return n;
 }
 
 /**
  * Keeps the head and the tail of a long text with a marker between. On the comments page the
  * lead's own comment comes after the post it answers, so the end must survive.
- * The result never exceeds `max`, marker included.
+ * Counted in code points; the result never exceeds `max`, marker included.
  */
 export function clampHeadTail(text: string, max = 4000, head = 1200): { text: string; clamped: boolean } {
-  if (text.length <= max) return { text, clamped: false };
-  const tail = Math.max(0, max - head - CUT_MARKER.length);
-  return { text: headSlice(text, head) + CUT_MARKER + tailSlice(text, tail), clamped: true };
+  if (text.length <= max) return { text, clamped: false }; // UTF-16 units ≥ code points
+  const points = Array.from(text);
+  if (points.length <= max) return { text, clamped: false };
+  const headPoints = Math.max(0, Math.min(head, max - MARKER_POINTS));
+  const tailPoints = Math.max(0, max - headPoints - MARKER_POINTS);
+  return { text: points.slice(0, headPoints).join("") + CUT_MARKER + points.slice(points.length - tailPoints).join(""), clamped: true };
 }
 
-/** Cuts at `max`, keeping the head only. Used for profile sections, labels, name and headline. */
+/** Cuts at `max` code points, keeping the head only. Used for profile sections, labels, name and headline. */
 export function clampHead(text: string, max: number): { text: string; clamped: boolean } {
   if (text.length <= max) return { text, clamped: false };
-  return { text: headSlice(text, max).trimEnd(), clamped: true };
+  const points = Array.from(text);
+  if (points.length <= max) return { text, clamped: false };
+  return { text: points.slice(0, Math.max(0, max)).join("").trimEnd(), clamped: true };
 }
 
 export function utf8Length(text: string): number {

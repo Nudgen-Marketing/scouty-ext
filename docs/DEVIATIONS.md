@@ -23,8 +23,9 @@ one API client, least-privilege manifests, nothing reduced submitted as complete
    the walker reads an `aria-hidden` element when it has such a sibling and skips it otherwise.
    Unverified until E0.
 5. **Head-and-tail clamp.** The plan keeps the first 1,200 and last 2,800 characters "with a marker
-   between", which would exceed the 4,000 limit. The tail is 2,800 minus the marker, so a block is
-   never longer than 4,000.
+   between", which would exceed the 4,000 limit. The tail is 2,800 minus the 5-code-point marker
+   (2,795), so a block is never longer than 4,000 code points. Every clamp counts Unicode code
+   points, as the server does, and never splits a surrogate pair (`src/reader/clamp.ts`).
 6. **Outbox keeps confirmed bytes until finalize.** The plan removes a section's bytes when it is
    acknowledged but also re-sends "the named sections from its outbox" on a manifest mismatch. A
    confirmed section stops being pending at once; its bytes stay in memory (storage.session) until
@@ -81,7 +82,7 @@ extension follows the app's `src/lib/linkedin/protocol.ts`:
   Manifest `sha256` is lowercase hex; `Content-Digest` is `sha-256=:<base64>:`.
 - `urn` is sent only as a whole `urn:li:activity:<digits>`; `urnTime` only as an ISO time between
   2003 and now. Otherwise null.
-- Lengths are clamped in UTF-16 units, which is never more than the server's code-point bounds;
+- Lengths are clamped in Unicode code points, the unit the server counts (an emoji counts once);
   name ≤ 120 and headline ≤ 220 (the wire allows 300 and 500).
 - `pageSlug` is the raw slug from the tab's address, not normalized.
 - `Counts` is `{ profileSections, posts, comments, reactions }`.

@@ -2,7 +2,7 @@
 import { HARD_LIMITS } from "../config";
 import type { ProfileContent, ReadMode, SectionName } from "../protocol";
 import { expandWithin, hasEmptyState, mainText, stillTruncated, type ReadContext } from "./blocks";
-import { clampHead } from "./clamp";
+import { clampHead, codePointLength } from "./clamp";
 import { queryAll, queryFirst, selectors } from "./selectors";
 import { visibleText } from "./visible-text";
 
@@ -76,7 +76,7 @@ export function readProfile(ctx: ReadContext, section: SectionName): ProfileRead
     const clamped = clampHead(item.text, Math.min(HARD_LIMITS.profileSectionChars, room));
     if (clamped.clamped) cut = true;
     if (clamped.clamped || stillTruncated(item.el, ctx)) mark(label);
-    total += clamped.text.length;
+    total += codePointLength(clamped.text);
     sections.push({ label, text: clamped.text });
   }
 
