@@ -1,0 +1,57 @@
+{
+  "name": "scouty-ext",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Scouty LinkedIn Capture: a read-only browser extension that sends the LinkedIn profile you choose to your Scouty workspace.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "build": "node build.mjs",
+    "build:dev": "node build.mjs --dev",
+    "build:e2e": "node build.mjs --e2e",
+    "test": "npm run test:unit && npm run test:static && npm run test:ui && npm run test:contract",
+    "test:unit": "vitest run --dir test/unit",
+    "test:static": "node build.mjs --quiet && node build.mjs --e2e --quiet && vitest run --dir test/static",
+    "test:ui": "vitest run --dir test/ui",
+    "test:contract": "vitest run --dir test/contract",
+    "test:e2e": "node build.mjs --e2e --quiet && playwright test --config e2e/playwright.config.ts",
+    "gallery": "node gallery/build.mjs",
+    "test:gallery": "node gallery/build.mjs && playwright test --config gallery/playwright.config.ts",
+    "lint:firefox": "web-ext lint --source-dir dist/firefox",
+    "smoke:firefox": "node tools/smoke-firefox.mjs",
+    "package": "node tools/package.mjs",
+    "sanitize": "node tools/sanitize.mjs",
+    "tokens": "node tools/tokens.mjs",
+    "icons": "node tools/icons.mjs",
+    "contract": "node tools/contract.mjs",
+    "check": "npm run typecheck && npm run lint && npm run build && npm test && npm run test:e2e && npm run lint:firefox"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.65.1",
+    "@tailwindcss/cli": "4.3.3",
+    "@types/chrome": "0.3.7",
+    "@types/jsdom": "30.0.0",
+    "@types/node": "24.10.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "axe-core": "4.14.1",
+    "esbuild": "0.28.2",
+    "eslint": "10.15.0",
+    "jsdom": "31.0.1",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.73.0",
+    "vitest": "5.1.1",
+    "web-ext": "10.8.0"
+  },
+  "dependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  }
+}
