@@ -1,0 +1,6 @@
+{
+  "note": "Copied from the Scouty app. Do not edit by hand: change the app, re-export, and copy. `npm run tokens` regenerates tokens.css from this file.",
+  "file": "src/app/globals.css",
+  "commit": "2fc286e",
+  "pills": "src/components/ui/status-pill.tsx, resolved with the Tailwind CSS 4.3.3 default palette"
+}

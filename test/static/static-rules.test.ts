@@ -89,7 +89,7 @@ describe.each(TARGETS)("built bundles: dist/%s", (target) => {
   const bundle = (file: string): string => read(`dist/${target}/${file}`);
 
   it("exists", () => {
-    for (const file of [...OWN_BUNDLES, "popup.js", "popup.css", "popup.html", "manifest.json", "_locales/en/messages.json", "icons/16.png", "icons/48.png", "icons/128.png"]) {
+    for (const file of [...OWN_BUNDLES, "popup.js", "popup.css", "popup.html", "manifest.json", "_locales/en/messages.json", "icons/16.png", "icons/48.png", "icons/128.png", "THIRD_PARTY.md"]) {
       expect(existsSync(path.join(root, "dist", target, file)), file).toBe(true);
     }
   });
@@ -185,14 +185,16 @@ describe("repository rules", () => {
 
 describe("tokens", () => {
   const tokens = JSON.parse(read("src/ui/tokens.json")) as Record<string, unknown>;
+  const source = JSON.parse(read("src/ui/tokens.source.json")) as { file: string; commit: string; pills: string; note: string };
 
   it("tokens.css is exactly what tokens.json generates", () => {
-    expect(read("src/ui/tokens.css")).toBe(tokensCss(tokens));
+    expect(read("src/ui/tokens.css")).toBe(tokensCss(tokens, source));
   });
 
   it("names its source file and app commit", () => {
     expect(read("src/ui/tokens.css")).toMatch(/src\/app\/globals\.css at commit [0-9a-f]{7}/);
-    expect((tokens.source as { file: string }).file).toBe("src/app/globals.css");
+    expect(source.file).toBe("src/app/globals.css");
+    expect(Object.keys(tokens)).toEqual(["radius", "light", "dark", "pill"]); // the app's exported shape, nothing added
   });
 
   it("holds the app's palette: near-black action, soft white background, one blue accent", () => {

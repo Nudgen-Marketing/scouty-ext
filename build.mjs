@@ -111,6 +111,8 @@ async function buildTarget(name, { target, apiOrigin, linkedinOrigin, key, swaps
   await cp(path.join(root, "src/popup/popup.html"), path.join(out, "popup.html"));
   await cp(path.join(root, "_locales"), path.join(out, "_locales"), { recursive: true });
   await cp(path.join(root, "icons"), path.join(out, "icons"), { recursive: true });
+  // The licence notices of the bundled third-party code travel with every copy.
+  await cp(path.join(root, "THIRD_PARTY.md"), path.join(out, "THIRD_PARTY.md"));
   const manifest = await manifestFor(target, { apiOrigin, linkedinOrigin, version: pkg.version, key });
   await writeFile(path.join(out, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
   if (!quiet) console.log(`built dist/${name} (${target}, API ${apiOrigin})`);

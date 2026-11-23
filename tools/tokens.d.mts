@@ -1,1 +1,1 @@
-export function tokensCss(tokens: unknown): string;
+export function tokensCss(tokens: unknown, source: { file: string; commit: string; pills: string }): string;
