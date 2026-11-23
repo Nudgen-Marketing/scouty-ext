@@ -151,6 +151,14 @@
 .btn--outline:hover {
   background: var(--muted);
 }
+/* Disabled reads as inactive but stays legible (WCAG AA text contrast in both themes). */
+.btn:disabled,
+.btn:disabled:hover {
+  border-color: var(--border);
+  background: var(--muted);
+  color: var(--muted-foreground);
+  cursor: default;
+}
 .btn:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;

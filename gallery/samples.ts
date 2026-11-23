@@ -49,6 +49,16 @@ export const SAMPLES: readonly UiState[] = [
   { kind: "expired", workspace },
 ];
 
+/**
+ * Screens with a Capture action, drawn as they look when the popup's tab is not a LinkedIn profile:
+ * the action disabled, with what to do instead (27, 25, 22).
+ */
+export const OFF_PROFILE_SAMPLES: readonly UiState[] = [
+  { kind: "expired", workspace, onProfile: false },
+  { kind: "takenOver", workspace, onProfile: false },
+  { kind: "failed", workspace, onProfile: false },
+];
+
 /** What the in-page overlay shows during and after a capture. */
 export const OVERLAY_SAMPLES: readonly UiState[] = [
   SAMPLES[7]!,

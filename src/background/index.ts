@@ -9,7 +9,7 @@ import { createApi } from "./api";
 import * as auth from "./auth";
 import * as outbox from "./outbox";
 import { CaptureController, type CaptureState } from "./session";
-import { captureUi, forgetSessionInfo, giveConsent, popupUi, sessionInfo, type UiContext } from "./ui-state";
+import { captureTarget, captureUi, forgetSessionInfo, giveConsent, popupUi, sessionInfo, targetIsProfile, type UiContext } from "./ui-state";
 
 const api = createApi(auth.tokenSource);
 let connecting = false;
@@ -56,9 +56,11 @@ async function workspaceName(): Promise<string> {
   return info && "workspace" in info ? (info.workspace.name ?? "") : "";
 }
 
-async function overlayState(state: CaptureState): Promise<UiState | null> {
+/** The overlay's screen in its tab; a capture action there starts in that tab, so it needs a profile too. */
+async function overlayState(state: CaptureState, tabId: number): Promise<UiState | null> {
   const extras = await controller.extras();
-  return captureUi(state, { clickLog: extras.clickLog, minutesLeft: extras.minutesLeft }, await workspaceName(), Date.now());
+  const view = captureUi(state, { clickLog: extras.clickLog, minutesLeft: extras.minutesLeft }, await workspaceName(), Date.now());
+  return view ? { ...view, onProfile: await targetIsProfile(state, tabId, await tabUrl(tabId)) } : null;
 }
 
 /** Tells the popup (if open) and the overlay in the capture tab to redraw. */
@@ -67,7 +69,7 @@ async function broadcast(state: CaptureState): Promise<void> {
   if ("tabId" in state) captureTab = state.tabId;
   else if (state.notice?.kind === "recent") captureTab = null;
   if (captureTab === null) return;
-  const view = await overlayState(state);
+  const view = await overlayState(state, captureTab);
   const message: Message = view ? { type: "overlay:state", state: view, clickLog: null } : { type: "overlay:remove" };
   ext.tabs.sendMessage(captureTab, message).catch(() => undefined);
 }
@@ -115,7 +117,7 @@ async function disconnect(): Promise<void> {
 
 async function capture(tabId: number | null, recapture: boolean): Promise<void> {
   const state = await controller.current();
-  const target = tabId ?? ("tabId" in state ? state.tabId : state.phase === "idle" && state.notice?.kind === "recent" ? state.notice.tabId : null);
+  const target = captureTarget(state, tabId);
   const url = await tabUrl(target);
   if (target === null || !url) return;
   await controller.start({ tabId: target, url, recapture });
@@ -182,7 +184,7 @@ async function handle(message: Message, sender: Sender): Promise<unknown> {
     case "overlay:hello": {
       const state = await controller.current();
       if (fromPage || !("tabId" in state) || state.tabId !== senderTab) return null;
-      return overlayState(state);
+      return overlayState(state, senderTab);
     }
     case "ui:getState":
       if (!fromPage) return null;

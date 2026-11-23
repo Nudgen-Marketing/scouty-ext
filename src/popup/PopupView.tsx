@@ -8,11 +8,14 @@ import { Alert, Button, Icon, Mark, Progress, StatusPill, Working } from "./comp
 
 export type PopupViewProps = { view: View; onAction: (action: UiAction) => void; reducedMotion?: boolean };
 
+const HINT_ID = "action-hint";
+
 function ActionButton({ action, onAction, primary }: { action: ViewAction; onAction: (action: UiAction) => void; primary?: boolean }) {
   // "Opens elsewhere" icons trail the label; the Stop icon leads it.
   const leading = action.id === "stop";
   return (
     <Button variant={action.variant} data-action={action.id} data-primary={primary ? "true" : undefined} onClick={() => onAction(action.id)}
+      disabled={action.disabled} aria-describedby={action.disabled ? HINT_ID : undefined}
       className={action.variant === "link" ? "justify-start text-left" : "w-full"}>
       {action.icon && leading ? <Icon name={action.icon} /> : null}
       <span>{action.label}</span>
@@ -31,7 +34,7 @@ export function PopupView({ view, onAction, reducedMotion = false }: PopupViewPr
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
     const target = event.target as HTMLElement;
-    if (event.key === "Enter" && view.primary && target.tagName !== "BUTTON" && target.tagName !== "A") {
+    if (event.key === "Enter" && view.primary && !view.primary.disabled && target.tagName !== "BUTTON" && target.tagName !== "A") {
       event.preventDefault();
       onAction(view.primary.id);
     }
@@ -102,6 +105,7 @@ export function PopupView({ view, onAction, reducedMotion = false }: PopupViewPr
             {view.secondary ? <ActionButton action={view.secondary} onAction={onAction} /> : null}
           </div>
         ) : null}
+        {view.hint ? <p id={HINT_ID} data-slot="hint" className="text-[13px] break-words text-muted-foreground">{view.hint}</p> : null}
 
         {view.footer ? <p data-slot="footer" className="text-[12px] text-muted-foreground">{view.footer}</p> : null}
         {view.notes.length ? (

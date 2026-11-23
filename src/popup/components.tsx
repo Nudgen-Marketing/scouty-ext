@@ -34,7 +34,9 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonV
 export function Button({ variant = "primary", size = "default", className, type = "button", ...props }: ButtonProps) {
   return (
     <button type={type} data-variant={variant}
-      className={cn(FOCUS, TRANSITION, "inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent text-center text-sm font-medium select-none disabled:pointer-events-none disabled:opacity-50",
+      className={cn(FOCUS, TRANSITION, "inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent text-center text-sm font-medium select-none disabled:pointer-events-none",
+        // Disabled reads as inactive but stays legible (WCAG AA text contrast in both themes).
+        "disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none",
         SIZES[size], VARIANTS[variant], className)}
       {...props} />
   );

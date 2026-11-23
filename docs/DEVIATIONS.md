@@ -154,6 +154,15 @@ extension follows the app's `src/lib/linkedin/protocol.ts`:
   start with no notice and a 410 showed screen 22. Like 25 and 26, it is not in plan 12.4 and is
   numbered after it (tested in `test/unit/session.test.ts`, `test/contract/server-decisions.test.ts`
   and `test/ui/states.test.tsx`).
+- No dead Capture button. A Capture action starts in the tab the popup (or the overlay) is on, so
+  it can only start there on a LinkedIn profile. On every screen with one (7 **Capture again**, 11
+  **Capture again**, 12 **Capture again**, 15 **Capture this page**, 22 **Capture again**, 25
+  **Capture here**, 26 at create **Try now**, 27 **Capture**), when that tab is not a profile the
+  action is shown disabled and the screen says "Open the lead's LinkedIn profile in this tab to
+  capture it again."; the popup re-checks the tab every 1.5 s, so the action turns on once the
+  profile is open. Other actions on the screen stay usable (`onProfile` in `src/ui/state.ts`,
+  `targetIsProfile` in `src/background/ui-state.ts`; tested in `test/ui/states.test.tsx`,
+  `test/unit/ui-state.test.ts` and the gallery's "off a profile" frames).
 
 ## Open points for the owner
 

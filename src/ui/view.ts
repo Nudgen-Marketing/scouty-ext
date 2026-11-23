@@ -9,7 +9,7 @@ import { UI_KINDS, type SectionLine, type StepStatus, type UiKind, type UiState 
 
 export type ButtonVariant = "primary" | "outline" | "ghost" | "link";
 export type PillTone = "good" | "active" | "waiting" | "problem" | "neutral";
-export type ViewAction = { id: UiAction; label: string; variant: ButtonVariant; icon: IconName | null };
+export type ViewAction = { id: UiAction; label: string; variant: ButtonVariant; icon: IconName | null; disabled?: boolean };
 
 export type View = {
   /** 1 to 27: the row of plan 12.4 (1 to 24), 25 for "takenOver", 26 for "notAnswering", 27 for "expired". */
@@ -31,6 +31,8 @@ export type View = {
   primary: ViewAction | null;
   secondary: ViewAction | null;
   links: ViewAction[];
+  /** Why the disabled action cannot be used yet and what to do; shown next to the actions. */
+  hint: string | null;
   footer: string | null;
   workspace: string | null;
   showSettings: boolean;
@@ -219,8 +221,20 @@ function clickLogNotes(log: { name: string; selector: string }[] | null | undefi
   return [t("clickLogTitle", log.length), ...log.map((entry) => `${entry.name} (${entry.selector})`)];
 }
 
+/** The actions that start a capture in the tab the popup (or the overlay) is on. */
+const CAPTURE_ACTIONS: readonly UiAction[] = ["capture", "captureAgain"];
+
+/** Off a profile, a capture action could not start: it is shown disabled, with what to do instead. */
+function blockCapture(d: Draft): Draft {
+  const blocked = (a: ViewAction | null | undefined): ViewAction | null | undefined => (a && CAPTURE_ACTIONS.includes(a.id) ? { ...a, disabled: true } : a);
+  const primary = blocked(d.primary);
+  const secondary = blocked(d.secondary);
+  if (primary === d.primary && secondary === d.secondary) return d;
+  return { ...d, primary, secondary, hint: t("captureNeedsProfile") };
+}
+
 export function viewFor(state: UiState): View {
-  const d = draft(state);
+  const d = state.onProfile === false ? blockCapture(draft(state)) : draft(state);
   const workspace = "workspace" in state && state.workspace ? state.workspace : null;
   return {
     n: UI_KINDS.indexOf(state.kind) + 1,
@@ -239,6 +253,7 @@ export function viewFor(state: UiState): View {
     primary: d.primary ?? null,
     secondary: d.secondary ?? null,
     links: d.links ?? [],
+    hint: d.hint ?? null,
     footer: d.footer ?? null,
     workspace,
     showSettings: workspace !== null && state.kind !== "settings",

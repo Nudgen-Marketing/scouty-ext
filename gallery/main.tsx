@@ -9,7 +9,7 @@ import { PopupView } from "../src/popup/PopupView";
 import { useMessages } from "../src/ui/i18n";
 import tokensCss from "../src/ui/tokens.css?inline";
 import { viewFor } from "../src/ui/view";
-import { OVERLAY_SAMPLES, SAMPLES } from "./samples";
+import { OFF_PROFILE_SAMPLES, OVERLAY_SAMPLES, SAMPLES } from "./samples";
 
 useMessages(messages);
 const THEMES = ["light", "dark"] as const;
@@ -28,6 +28,21 @@ function Gallery() {
             <div className="flex flex-wrap items-start gap-6">
               {THEMES.map((theme) => (
                 <div key={theme} data-theme={theme} data-frame="popup" data-state={state.kind} className="w-[360px] overflow-hidden rounded-lg border border-border bg-background text-foreground">
+                  <PopupView view={viewFor(state)} onAction={() => undefined} />
+                </div>
+              ))}
+            </div>
+          </figure>
+        ))}
+      </section>
+      <section aria-label="Off a profile" className="grid gap-8">
+        <h2 className="text-lg font-semibold">Capture actions when the tab is not a LinkedIn profile</h2>
+        {OFF_PROFILE_SAMPLES.map((state) => (
+          <figure key={state.kind} className="m-0 grid gap-2">
+            <figcaption className="text-sm font-medium">{state.kind}, off a profile</figcaption>
+            <div className="flex flex-wrap items-start gap-6">
+              {THEMES.map((theme) => (
+                <div key={theme} data-theme={theme} data-frame="popup-off-profile" data-state={state.kind} className="w-[360px] overflow-hidden rounded-lg border border-border bg-background text-foreground">
                   <PopupView view={viewFor(state)} onAction={() => undefined} />
                 </div>
               ))}

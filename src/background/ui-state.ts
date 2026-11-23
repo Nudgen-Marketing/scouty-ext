@@ -122,6 +122,29 @@ export function captureUi(state: CaptureState, extras: { clickLog: ClickLogEntry
   }
 }
 
+/**
+ * The tab a Capture or Capture again starts in: the one the popup (or the overlay) is on, else the
+ * capture's own tab, else the tab of a "recent" notice.
+ */
+export function captureTarget(state: CaptureState, tabId: number | null): number | null {
+  return tabId ?? ("tabId" in state ? state.tabId : state.phase === "idle" && state.notice?.kind === "recent" ? state.notice.tabId : null);
+}
+
+/** Whether a capture action on this screen could start: the target tab is a LinkedIn profile. */
+export async function targetIsProfile(state: CaptureState, tabId: number | null, knownUrl: string | null): Promise<boolean> {
+  const target = captureTarget(state, tabId);
+  if (target === null) return false;
+  let url = knownUrl;
+  if (target !== tabId) {
+    try {
+      url = (await ext.tabs.get(target)).url ?? null;
+    } catch {
+      url = null;
+    }
+  }
+  return profileFromUrl(url, LINKEDIN_ORIGIN) !== null;
+}
+
 export type PopupQuery = { tabId: number | null; tabUrl: string | null; settings: boolean };
 
 export async function popupUi(ctx: UiContext, query: PopupQuery): Promise<UiState> {
@@ -148,7 +171,8 @@ export async function popupUi(ctx: UiContext, query: PopupQuery): Promise<UiStat
   const active = state.phase !== "idle" && state.phase !== "done";
   if (active && "tabId" in state && query.tabId !== null && query.tabId !== state.tabId) return { kind: "busy", workspace };
   const capture = captureUi(state, { clickLog: extras.clickLog, minutesLeft: extras.minutesLeft }, workspace, ctx.now());
-  if (capture) return capture;
+  // Off a profile, the screen's Capture action is disabled with what to do instead (no dead button).
+  if (capture) return { ...capture, onProfile: await targetIsProfile(state, query.tabId, query.tabUrl) };
 
   const profile = profileFromUrl(query.tabUrl, LINKEDIN_ORIGIN);
   if (!profile) return { kind: "notOnProfile", workspace };

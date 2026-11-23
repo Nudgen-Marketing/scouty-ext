@@ -43,8 +43,10 @@ export function renderOverlay(view: View, onAction: (action: UiAction) => void):
   }
   const steps = view.steps.length > 0 && el("ol", { class: "steps" }, ...view.steps.map((step) => el("li", { "data-status": step.status, "aria-label": step.description }, step.label)));
   const buttons = [view.primary, view.secondary].filter((a) => a !== null).map((a) => {
-    const button = el("button", { type: "button", class: a.variant === "primary" ? "btn" : "btn btn--outline", "data-action": a.id }, a.label);
-    button.addEventListener("click", () => onAction(a.id));
+    const attrs: Record<string, string> = { type: "button", class: a.variant === "primary" ? "btn" : "btn btn--outline", "data-action": a.id };
+    if (a.disabled) Object.assign(attrs, { disabled: "", "aria-describedby": "action-hint" });
+    const button = el("button", attrs, a.label);
+    if (!a.disabled) button.addEventListener("click", () => onAction(a.id));
     return button;
   });
   return el("div", { class: "card", "data-view": view.kind },
@@ -55,6 +57,7 @@ export function renderOverlay(view: View, onAction: (action: UiAction) => void):
     steps,
     view.estimate && el("p", { class: "text" }, view.estimate),
     buttons.length > 0 && el("div", { class: "actions" }, ...buttons),
+    view.hint !== null && el("p", { class: "text", id: "action-hint" }, view.hint),
     view.notes.length > 0 && el("ul", { class: "lines notes" }, ...view.notes.map((line) => el("li", {}, line))),
   );
 }

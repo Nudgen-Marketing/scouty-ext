@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import * as auth from "../../src/background/auth";
-import { giveConsent, minutesLeft, popupUi, type UiContext } from "../../src/background/ui-state";
+import { EXPIRED } from "../../src/background/session";
+import { captureTarget, giveConsent, minutesLeft, popupUi, targetIsProfile, type UiContext } from "../../src/background/ui-state";
 import { fake, installFakeExt } from "../helpers/fake-ext";
 import { PROFILE_URL, rig, TAB, type Rig } from "../helpers/session";
 import { unwire } from "../helpers/stub";
@@ -71,6 +72,28 @@ describe("popup state", () => {
     grant();
     r.stub.state.available = false;
     expect(await popupUi(ctx(r), on)).toEqual({ kind: "notAvailable" });
+  });
+
+  it("27 expired: Capture can start only when the popup's tab is a LinkedIn profile (no dead button)", async () => {
+    const r = await rig();
+    grant();
+    await giveConsent();
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    await r.read();
+    r.clock.now += 20 * 60_000 + 1;
+    expect(await r.controller.current()).toEqual(EXPIRED);
+    expect(await popupUi(ctx(r), on)).toEqual({ kind: "expired", workspace: "Synthetic Workspace", onProfile: true });
+    expect(await popupUi(ctx(r), { tabId: 3, tabUrl: "https://www.linkedin.com/feed/", settings: false })).toEqual({ kind: "expired", workspace: "Synthetic Workspace", onProfile: false });
+    expect(await popupUi(ctx(r), { tabId: 3, tabUrl: "https://example.com/", settings: false })).toMatchObject({ kind: "expired", onProfile: false });
+  });
+
+  it("the capture target is the popup's tab first, then the capture's, then the recent notice's", async () => {
+    expect(captureTarget(EXPIRED, 5)).toBe(5);
+    expect(captureTarget(EXPIRED, null)).toBeNull();
+    expect(captureTarget({ phase: "idle", notice: { kind: "recent", finalizedAt: "2026-11-23T09:00:00.000Z", tabId: 8, url: PROFILE_URL } }, null)).toBe(8);
+    expect(await targetIsProfile(EXPIRED, null, null)).toBe(false);
+    expect(await targetIsProfile(EXPIRED, 5, PROFILE_URL)).toBe(true);
+    expect(await targetIsProfile(EXPIRED, 5, "https://www.linkedin.com/feed/")).toBe(false);
   });
 
   it("the time estimate comes from the sections left and never counts up", () => {

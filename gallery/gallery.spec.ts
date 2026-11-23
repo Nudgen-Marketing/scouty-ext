@@ -21,6 +21,11 @@ test("shows all 27 states in both themes, plus the overlay", async ({ page }) =>
   expect(new Set(kinds).size).toBe(27);
   expect(await page.locator("[data-frame='overlay']").count()).toBeGreaterThanOrEqual(10);
   await expect(page.locator("[data-frame='popup'][data-state='ready'][data-theme='light'] h1")).toHaveText("Capture this profile");
+  // Capture actions off a profile: disabled, with what to do instead.
+  const off = page.locator("[data-frame='popup-off-profile']");
+  await expect(off).toHaveCount(6);
+  await expect(off.locator("[data-action='captureAgain']:disabled")).toHaveCount(6);
+  await expect(off.locator("[data-slot='hint']")).toHaveText(Array(6).fill("Open the lead's LinkedIn profile in this tab to capture it again."));
   // The two themes really differ: the dark frame has a dark background.
   const backgrounds = await page.evaluate(() => ["light", "dark"].map((theme) => getComputedStyle(document.querySelector(`[data-frame='popup'][data-theme='${theme}']`)!).backgroundColor));
   expect(backgrounds[0]).not.toBe(backgrounds[1]);
@@ -104,11 +109,11 @@ test("every piece of text meets WCAG AA contrast in both themes", async ({ page 
 
 test("no state is larger than the 360 × 560 popup, and no overlay is wider than 320", async ({ page }) => {
   await open(page);
-  const sizes = await page.locator("[data-frame='popup']").evaluateAll((frames) => frames.map((frame) => {
+  const sizes = await page.locator("[data-frame='popup'], [data-frame='popup-off-profile']").evaluateAll((frames) => frames.map((frame) => {
     const view = frame.querySelector("[data-view]") as HTMLElement;
     return { state: `${frame.getAttribute("data-state")} (${frame.getAttribute("data-theme")})`, width: view.getBoundingClientRect().width, content: view.scrollHeight, scrollWidth: view.scrollWidth };
   }));
-  expect(sizes).toHaveLength(54);
+  expect(sizes).toHaveLength(60);
   for (const size of sizes) {
     expect(size.width, size.state).toBe(360);
     expect(size.scrollWidth, size.state).toBeLessThanOrEqual(360);

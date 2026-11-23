@@ -154,6 +154,77 @@ describe("the 27 screens", () => {
     expect(await audit(node)).toEqual([]);
   });
 
+  // No dead ends: every screen with a Capture action. On a profile it is enabled and sends its
+  // action; off a profile it is disabled and says what to do, so pressing it never silently fails.
+  const CAPTURE_SCREENS: [UiState, string, UiAction][] = [
+    [{ kind: "expired", workspace: "W" }, "Capture", "captureAgain"],
+    [{ kind: "takenOver", workspace: "W" }, "Capture here", "captureAgain"],
+    [{ kind: "failed", workspace: "W" }, "Capture again", "captureAgain"],
+    [SAMPLES[6]!, "Capture again", "captureAgain"],
+    [SAMPLES[10]!, "Capture again", "captureAgain"],
+    [{ kind: "linkedinSignIn", workspace: "W" }, "Capture again", "captureAgain"],
+    [SAMPLES[14]!, "Capture this page", "capture"],
+    [{ kind: "notAnswering", retryAt: null, sending: false, workspace: "W" }, "Try now", "capture"],
+  ];
+  const HINT = "Open the lead's LinkedIn profile in this tab to capture it again.";
+
+  describe.each(["light", "dark"] as const)("capture actions (%s)", (theme) => {
+    it.each(CAPTURE_SCREENS.map(([state, label, id]) => [state.kind, label, id, state] as const))("%s on a profile: %s is enabled and sends %s; axe", async (_kind, label, id, state) => {
+      const onAction = vi.fn();
+      const node = mount({ ...state, onProfile: true }, { theme, onAction });
+      const button = node.querySelector<HTMLButtonElement>(`[data-action='${id}']`)!;
+      expect(button.textContent).toBe(label);
+      expect(button.disabled).toBe(false);
+      expect(button.hasAttribute("aria-describedby")).toBe(false);
+      expect(node.querySelector("[data-slot='hint']")).toBeNull();
+      act(() => button.click());
+      expect(onAction).toHaveBeenCalledWith(id);
+      expect(await audit(node)).toEqual([]);
+    });
+
+    it.each(CAPTURE_SCREENS.map(([state, label, id]) => [state.kind, label, id, state] as const))("%s off a profile: %s is disabled with the explanation; axe", async (_kind, label, id, state) => {
+      const onAction = vi.fn();
+      const node = mount({ ...state, onProfile: false }, { theme, onAction });
+      const button = node.querySelector<HTMLButtonElement>(`[data-action='${id}']`)!;
+      expect(button.textContent).toBe(label);
+      expect(button.disabled).toBe(true);
+      const hint = node.querySelector("[data-slot='hint']")!;
+      expect(hint.textContent).toBe(HINT);
+      expect(button.getAttribute("aria-describedby")).toBe(hint.id);
+      act(() => button.click());
+      act(() => { node.querySelector("h1")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); });
+      expect(onAction).not.toHaveBeenCalledWith(id);
+      // The other actions stay usable.
+      for (const other of node.querySelectorAll<HTMLButtonElement>("[data-slot='actions'] button")) if (other !== button) expect(other.disabled).toBe(false);
+      expect(await audit(node)).toEqual([]);
+    });
+  });
+
+  it("off a profile, only capture actions are disabled: other screens are unchanged", () => {
+    for (const state of SAMPLES) {
+      const view = viewFor({ ...state, onProfile: false });
+      const capture = [view.primary, view.secondary].some((a) => a && (a.id === "capture" || a.id === "captureAgain"));
+      if (!capture) expect(view).toEqual(viewFor(state));
+      else expect(view.hint).toBe(HINT);
+    }
+    // Without the field (the overlay's tab, or a sample), nothing is disabled.
+    expect(viewFor({ kind: "expired", workspace: "W" }).primary!.disabled).toBeUndefined();
+    expect(viewFor({ kind: "expired", workspace: "W" }).hint).toBeNull();
+  });
+
+  it("the overlay shows the same disabled action and explanation off a profile; axe", async () => {
+    const onAction = vi.fn();
+    const card = renderOverlay(viewFor({ kind: "expired", workspace: "W", onProfile: false }), onAction);
+    document.body.append(card);
+    const button = card.querySelector<HTMLButtonElement>("[data-action='captureAgain']")!;
+    expect(button.disabled).toBe(true);
+    expect(card.querySelector(`#${button.getAttribute("aria-describedby")}`)!.textContent).toBe(HINT);
+    button.click();
+    expect(onAction).not.toHaveBeenCalled();
+    expect(await audit(card)).toEqual([]);
+    card.remove();
+  });
+
   it("26 \"Scouty isn't answering\" is not 16 \"You're offline\": its own copy, the same Try now", () => {
     const busy = viewFor({ kind: "notAnswering", retryAt: null, sending: true, workspace: "W" });
     const offline = viewFor({ kind: "offline", workspace: "W" });

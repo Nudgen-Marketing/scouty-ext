@@ -6,7 +6,13 @@ import type { Counts, ManifestReason, SectionName, SectionState } from "../proto
 export type SectionLine = { section: SectionName; state: SectionState; reason: ManifestReason | null; count: number | null; degraded?: boolean };
 export type StepStatus = "done" | "current" | "waiting";
 
-export type UiState =
+/**
+ * onProfile: false when the tab a capture action would start in is not a LinkedIn profile; the
+ * screen then shows its Capture action disabled, with what to do instead. Absent means it can start.
+ */
+export type UiState = UiScreen & { onProfile?: boolean };
+
+type UiScreen =
   | { kind: "permission" }
   | { kind: "signedOut"; devRedirectUrl?: string | null }
   | { kind: "connecting" }
@@ -40,7 +46,7 @@ export type UiState =
   /** The capture's 20 minutes ran out before it was sent (this browser's clock, or Scouty's 410). */
   | { kind: "expired"; workspace: string };
 
-export type UiKind = UiState["kind"];
+export type UiKind = UiScreen["kind"];
 
 /**
  * The 27 screens: the 24 of plan 12.4 in its order, then three added after review (docs/DEVIATIONS.md):
