@@ -8,8 +8,10 @@ them to your Scouty workspace for analysis.
 - **Read-only on LinkedIn.** It never clicks Follow, Like, Comment, Connect or Message, never
   posts, and sends no request to LinkedIn. The only things it presses are inline "…see more" and
   "Show more results" controls, decided by a structural allow-list.
-- **No LinkedIn credentials.** It reads no cookie, token, password or message, and never opens the
-  contact-info overlay.
+- **No LinkedIn credentials.** It never reads LinkedIn credentials (no LinkedIn cookie, token or
+  password) or messages, and never opens the contact-info overlay. The only authentication
+  information it handles is its own Scouty access token, kept in the browser's extension storage
+  and sent only to Scouty (PRIVACY.md).
 - **One network destination.** Requests go only to the Scouty API, from one module.
 - **User-started, one profile at a time.** Nothing runs in the background.
 
