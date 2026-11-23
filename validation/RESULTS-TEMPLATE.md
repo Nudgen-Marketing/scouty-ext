@@ -19,12 +19,38 @@ Copy to `RESULTS-<version>.md`. **No names, URLs, text or screenshots of LinkedI
 
 ## Runs
 
-| Label | Browser | Sections complete | Blocks found / visible (posts, comments, reactions) | With URN | Permalinks 3/3 | Dates 3/3 | Truncated / expanded | Duration | Click log clean | LinkedIn warning | Pass |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| P1 | Chrome | | | | | | | | | | |
-| P1 | Edge | | | | | | | | | | |
-| P1 | Firefox | | | | | | | | | | |
-| P2 | Chrome | | | | | | | | | | |
+Every check and threshold is in the app plan's §13.4 (R1–R10), copied in `VALIDATION.md`. R2
+applies to the active profiles (P2, P6); R8 and R9 to P1 and P2 in each browser; write "n/a"
+elsewhere. A row passes only when every check that applies meets its threshold.
+
+**Mandatory rows.** P1, P2, P5 and P6 in Chrome are release gate M2 (app plan §14.2). The same four
+in Edge and in Firefox are part of that browser's store packet (gate M4) and must pass before it is
+submitted there; a browser not being submitted in this release may say "not submitted".
+
+| Label | Browser | Sections complete | Blocks found / visible (posts, comments, reactions) (R1) | With URN (R2) | Permalinks 3/3 (R3) | Dates 3/3 (R3) | Truncated / expanded | Duration (R10) | Click log clean (R4) | LinkedIn warning (R5) | Finalize and summary (R6) | Analysis and plan (R7) | Network cut resumes (R8, P1 and P2) | Browser closed mid-upload (R9, P1 and P2) | Pass |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| P1 | Chrome | | | | | | | | | | | | | | |
+| P2 | Chrome | | | | | | | | | | | | | | |
+| P5 | Chrome | | | | | | | | | | | | | | |
+| P6 | Chrome | | | | | | | | | | | | | | |
+| P1 | Edge | | | | | | | | | | | | | | |
+| P2 | Edge | | | | | | | | | | | | | | |
+| P5 | Edge | | | | | | | | | | | | | | |
+| P6 | Edge | | | | | | | | | | | | | | |
+| P1 | Firefox | | | | | | | | | | | | | | |
+| P2 | Firefox | | | | | | | | | | | | | | |
+| P5 | Firefox | | | | | | | | | | | | | | |
+| P6 | Firefox | | | | | | | | | | | | | | |
+
+**Optional rows** (P3, P4, P7, P8 in Chrome, or any repeat). Add rows as needed.
+
+| Label | Browser | Sections complete | Blocks found / visible (posts, comments, reactions) (R1) | With URN (R2) | Permalinks 3/3 (R3) | Dates 3/3 (R3) | Truncated / expanded | Duration (R10) | Click log clean (R4) | LinkedIn warning (R5) | Finalize and summary (R6) | Analysis and plan (R7) | Network cut resumes (R8, P1 and P2) | Browser closed mid-upload (R9, P1 and P2) | Pass |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| P3 | Chrome | | | | | | | | | | | | | | |
+| P4 | Chrome | | | | | | | | | | | | | | |
+| P7 | Chrome | | | | | | | | | | | | | | |
+| P8 | Chrome | | | | | | | | | | | | | | |
+|  |  | | | | | | | | | | | | | | |
 
 ## Click logs
 
@@ -71,3 +97,10 @@ App plan §15.3. Command, model id, pass count, and for each failing assertion t
 ## Gallery review
 
 App plan §15.7. Reviewer's initials, date, and any state that needs a change.
+
+## Owner sign-off
+
+Every mandatory row above passes, the click logs are clean, and the sections above are complete.
+
+- Owner (name or initials): 
+- Date: 
