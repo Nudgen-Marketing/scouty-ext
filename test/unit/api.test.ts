@@ -79,7 +79,7 @@ describe("api client", () => {
     expect(backoffMs(3, () => 0.5)).toBe(2000);
   });
 
-  it("retries network errors and 5xx at most 6 times, then gives up", async () => {
+  it("retries network errors and 503 at most 6 times, then gives up", async () => {
     w.stub.fail(/GET \/api\/linkedin\/ext\/session/, "503", 99);
     await expect(w.api.session()).rejects.toMatchObject({ status: 503 });
     expect(w.stub.state.requests).toHaveLength(6);
@@ -89,6 +89,20 @@ describe("api client", () => {
     w.stub.fail(/GET \/api\/linkedin\/ext\/session/, "drop", 99);
     await expect(w.api.session()).rejects.toBeInstanceOf(NetworkError);
     expect(w.stub.state.requests).toHaveLength(6);
+  });
+
+  it.each(["502", "503", "504"] as const)("retries %s with the backoff, and recovers when the server comes back", async (kind) => {
+    w.stub.fail(/GET \/api\/linkedin\/ext\/session/, kind, 2);
+    await expect(w.api.session()).resolves.toMatchObject({ protocol: 1 });
+    expect(w.stub.state.requests).toHaveLength(3);
+    expect(w.sleeps).toEqual([500, 1000]);
+  });
+
+  it.each([500, 501, 505, 507, 511, 599])("does not retry %i: a server fault is an answer", async (status) => {
+    let calls = 0;
+    setApiDeps({ transport: async () => { calls += 1; return new Response(JSON.stringify({ error: "x" }), { status }); }, sleep: async () => undefined });
+    await expect(w.api.session()).rejects.toMatchObject({ status, code: null });
+    expect(calls).toBe(1);
   });
 
   it("recovers when the server comes back (503 twice, then success)", async () => {

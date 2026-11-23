@@ -103,6 +103,35 @@ describe("error codes end in a sensible screen", () => {
     expect(await outbox.load()).toBeNull();
   });
 
+  it("a 500 during an upload is terminal: not retried, not deferred, ends in failed with Capture again", async () => {
+    const r = await rig();
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    r.stub.fail(/PUT .*sections\/profile/, "500", 99);
+    await r.read();
+    expect(r.stub.state.requests.filter((q) => q.method === "PUT")).toHaveLength(1);
+    expect(r.sleeps).toEqual([]);
+    expect(await r.controller.current()).toEqual({ phase: "idle", notice: { kind: "failed" } });
+    expect(await outbox.load()).toBeNull();
+  });
+
+  it("a 500 on finalize is terminal; a 502 or 504 on finalize is retried and the capture finishes", async () => {
+    let r = await rig({ capsBySlug: NO_NETWORK_SECTIONS });
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    r.stub.fail(/POST .*\/finalize$/, "500", 99);
+    await r.readAll();
+    expect(r.stub.state.requests.filter((q) => q.path.endsWith("/finalize"))).toHaveLength(1);
+    expect(await r.controller.current()).toEqual({ phase: "idle", notice: { kind: "failed" } });
+    for (const kind of ["502", "504"] as const) {
+      unwire();
+      r = await rig({ capsBySlug: NO_NETWORK_SECTIONS });
+      await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+      r.stub.fail(/POST .*\/finalize$/, kind, 2);
+      await r.readAll();
+      expect(r.stub.state.requests.filter((q) => q.path.endsWith("/finalize")), kind).toHaveLength(3);
+      expect(await r.phase(), kind).toBe("done");
+    }
+  });
+
   it("LINKEDIN_RATE_LIMITED and LINKEDIN_UNAVAILABLE during an upload are waited out with Retry-After, then the capture finishes", async () => {
     const r = await rig({ capsBySlug: NO_NETWORK_SECTIONS });
     await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });

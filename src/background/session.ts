@@ -14,7 +14,7 @@ import {
 } from "../protocol";
 import { sectionPaths } from "../reader/selectors";
 import type { SectionLine } from "../ui/state";
-import { ApiError, NetworkError, SignedOutError, type Api, type CaptureRef } from "./api";
+import { ApiError, NetworkError, SignedOutError, isRetryableStatus, type Api, type CaptureRef } from "./api";
 import * as outbox from "./outbox";
 
 export type Notice =
@@ -665,11 +665,14 @@ function samePage(actual: string, expected: string): boolean {
   }
 }
 
-function isTransient(error: unknown): boolean {
+/**
+ * An error the capture waits out ("You're offline" with Try now) instead of ending: a network error,
+ * or a status the API client retries (408, 429, 502, 503, 504; not LINKEDIN_DISABLED). A 500 or any
+ * other 5xx is terminal and ends in "failed".
+ */
+export function isTransient(error: unknown): boolean {
   if (error instanceof NetworkError) return true;
-  // The feature switched off is an answer, not an outage: it is not waited out.
-  if (error instanceof ApiError && error.code === "LINKEDIN_DISABLED") return false;
-  return error instanceof ApiError && (error.status === 408 || error.status === 429 || error.status >= 500);
+  return error instanceof ApiError && isRetryableStatus(error);
 }
 
 /** One clear sentence per terminal error (plan 5.5, 12.4). */

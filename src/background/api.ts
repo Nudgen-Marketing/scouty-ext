@@ -69,10 +69,19 @@ export function setApiDeps(over: Partial<ApiDeps> | null): void {
 }
 
 const REQUEST_TIMEOUT_MS = 25_000;
-const RETRYABLE = new Set([408, 429]);
-/** Codes that answer a 5xx but are not outages: the feature is switched off. Never retried. */
+/**
+ * The retry policy, in one place. Waited out with the backoff (or Retry-After): a network error or
+ * timeout (408), 429, and the gateway answers 502, 503 (LINKEDIN_UNAVAILABLE) and 504, which say the
+ * server could not answer right now. Every other status is an answer and is not repeated: a 500 or
+ * any other 5xx is a server fault that the same request would most likely hit again, so it ends the
+ * capture in "Scouty couldn't receive this capture" and the user chooses to try again.
+ */
+const RETRYABLE_STATUSES: ReadonlySet<number> = new Set([408, 429, 502, 503, 504]);
+/** Codes that answer a retryable status but are not outages: the feature is switched off. Never retried. */
 const FINAL_CODES = new Set(["LINKEDIN_DISABLED"]);
-const retryable = (error: ApiError): boolean => (RETRYABLE.has(error.status) || error.status >= 500) && !(error.code !== null && FINAL_CODES.has(error.code));
+/** True when the same request may succeed after a wait (see RETRYABLE_STATUSES). */
+export const isRetryableStatus = (error: ApiError): boolean => RETRYABLE_STATUSES.has(error.status) && !(error.code !== null && FINAL_CODES.has(error.code));
+const retryable = isRetryableStatus;
 const versionHeaders = (): Record<string, string> => ({
   "X-Scouty-Extension-Version": EXTENSION_VERSION,
   "X-Scouty-Protocol": String(PROTOCOL_VERSION),

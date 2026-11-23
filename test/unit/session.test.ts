@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import * as auth from "../../src/background/auth";
 import * as outbox from "../../src/background/outbox";
 import {
-  EVENT_TYPES, IDLE, PAGE_STATE_STOPS, PHASES, noticeFor, transition,
+  EVENT_TYPES, IDLE, PAGE_STATE_STOPS, PHASES, isTransient, noticeFor, transition,
   type CaptureEvent, type CaptureState, type DoneResult, type EventType, type Phase,
 } from "../../src/background/session";
 import { ApiError, NetworkError } from "../../src/background/api";
@@ -410,6 +410,15 @@ describe("capture controller", () => {
     expect(await r.controller.current()).toEqual({ phase: "idle", notice: { kind: "suppressed" } });
   });
 
+  it("waits out network errors, 408, 429, 502, 503 and 504; 500 and every other 5xx are terminal", () => {
+    expect(isTransient(new NetworkError("x"))).toBe(true);
+    for (const status of [408, 429, 502, 503, 504]) expect(isTransient(new ApiError(status, null, null, null)), String(status)).toBe(true);
+    expect(isTransient(new ApiError(503, "LINKEDIN_UNAVAILABLE", null, null))).toBe(true);
+    expect(isTransient(new ApiError(503, "LINKEDIN_DISABLED", null, null))).toBe(false);
+    for (const status of [500, 501, 505, 507, 599, 400, 404, 409, 410]) expect(isTransient(new ApiError(status, null, null, null)), String(status)).toBe(false);
+    expect(isTransient(new Error("x"))).toBe(false);
+  });
+
   it("maps errors to one notice each", () => {
     expect(noticeFor(new ApiError(410, "LINKEDIN_CAPTURE_EXPIRED", null, null))).toEqual({ kind: "failed" });
     expect(noticeFor(new ApiError(404, "LINKEDIN_CAPTURE_NOT_FOUND", null, null))).toEqual({ kind: "takenOver" });
@@ -418,6 +427,8 @@ describe("capture controller", () => {
     expect(noticeFor(new ApiError(404, "LINKEDIN_PROFILE_UNAVAILABLE", null, null), true)).toEqual({ kind: "suppressed" });
     expect(noticeFor(new ApiError(426, null, { error: "x", storeUrl: "javascript:alert(1)" }, null))).toEqual({ kind: "outdated", storeUrl: null });
     expect(noticeFor(new NetworkError("x"))).toEqual({ kind: "failed" });
+    expect(noticeFor(new ApiError(500, null, { error: "x" }, null))).toEqual({ kind: "failed" });
+    expect(noticeFor(new ApiError(501, null, { error: "x" }, null))).toEqual({ kind: "failed" });
   });
 
   // Every code in the server's LINKEDIN_EXT_ERROR_CODES ends in one screen.

@@ -44,7 +44,7 @@ export function createStubApi(options = {}) {
     codes: new Map(), access: new Map(), refresh: new Map(), grants: new Map(),
     captures: new Map(), finalizedByKey: new Map(),
     requests: [],
-    /** Fault switches: { match: RegExp, times, kind: "503" | "drop" | "429" | "401" } */
+    /** Fault switches: { match: RegExp, times, kind: "503" | "500" | "502" | "504" | "drop" | "429" | "401" | "disabled" | "lose-answer" } */
     faults: [],
   };
 
@@ -342,6 +342,8 @@ export function createStubApi(options = {}) {
       record.fault = fault.kind;
       if (fault.kind === "drop") return "drop";
       if (fault.kind === "503") return error(503, "Scouty is busy. Try again.", "LINKEDIN_UNAVAILABLE");
+      // A server fault (500) and gateway answers (502, 504), without a LINKEDIN_ code.
+      if (fault.kind === "500" || fault.kind === "502" || fault.kind === "504") return error(Number(fault.kind), "Something went wrong.");
       if (fault.kind === "429") return error(429, "Slow down.", "LINKEDIN_RATE_LIMITED", {}, { "Retry-After": "1" });
       if (fault.kind === "disabled") return error(503, "The LinkedIn coach is not available yet.", "LINKEDIN_DISABLED");
       if (fault.kind === "lose-answer") {

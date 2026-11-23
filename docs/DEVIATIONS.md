@@ -112,7 +112,12 @@ extension follows the app's `src/lib/linkedin/protocol.ts`:
 - `LINKEDIN_DISABLED` (503) is not retried and not treated as an outage: it ends in "not
   available". `LINKEDIN_UNAVAILABLE` (503) and `LINKEDIN_RATE_LIMITED` (429) are retried with
   `Retry-After` (a wait longer than 30 s is an answer), then shown as "offline" with **Try now**
-  during upload, or "something went wrong" when creating. `LINKEDIN_AUTH_REQUIRED` gets one
+  during upload, or "something went wrong" when creating. The plan names only
+  `LINKEDIN_UNAVAILABLE` as retried; the extension also retries a network error, 408 and the
+  gateway answers 502 and 504 with the same backoff, because those say the server could not answer
+  right now. A 500 and any other 5xx are terminal: never repeated, they end in "Scouty couldn't
+  receive this capture" with **Capture again** (`RETRYABLE_STATUSES` in `src/background/api.ts`,
+  `isTransient` in `src/background/session.ts`). `LINKEDIN_AUTH_REQUIRED` gets one
   refresh and retry, then "Connect to Scouty again". Expired (410), stale (409), origin refused
   (403), unsupported media type (415) and a finalized capture refusing a different manifest (409)
   end in "Something went wrong" with the outbox cleared. Each mapping is tested in
