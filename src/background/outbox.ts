@@ -129,6 +129,13 @@ export function ack(section: SectionName, sha256: string): Promise<Outbox | null
   });
 }
 
+/** The server already finalized this capture (a lost answer): nothing it holds is sent again. */
+export function ackAll(): Promise<Outbox | null> {
+  return update((outbox) => {
+    for (const entry of outbox.sections) entry.acked = true;
+  });
+}
+
 /** Marks a section as needing to be sent again. Returns false when its bytes are no longer held. */
 export async function unack(section: SectionName): Promise<boolean> {
   let possible = false;

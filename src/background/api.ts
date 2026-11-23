@@ -70,6 +70,9 @@ export function setApiDeps(over: Partial<ApiDeps> | null): void {
 
 const REQUEST_TIMEOUT_MS = 25_000;
 const RETRYABLE = new Set([408, 429]);
+/** Codes that answer a 5xx but are not outages: the feature is switched off. Never retried. */
+const FINAL_CODES = new Set(["LINKEDIN_DISABLED"]);
+const retryable = (error: ApiError): boolean => (RETRYABLE.has(error.status) || error.status >= 500) && !(error.code !== null && FINAL_CODES.has(error.code));
 const versionHeaders = (): Record<string, string> => ({
   "X-Scouty-Extension-Version": EXTENSION_VERSION,
   "X-Scouty-Protocol": String(PROTOCOL_VERSION),
@@ -142,12 +145,12 @@ async function call<T>(c: Call): Promise<T> {
         continue;
       }
       if (response.status === 401 && c.tokens) throw new SignedOutError("The connection to Scouty ended.");
-      failure = await errorFrom(response);
-      const retryable = RETRYABLE.has(response.status) || response.status >= 500;
-      if (!retryable) throw failure;
+      const answer = await errorFrom(response);
+      failure = answer;
+      if (!retryable(answer)) throw answer;
     } catch (error) {
       if (error instanceof ApiError || error instanceof SignedOutError) {
-        if (!(error instanceof ApiError) || !(RETRYABLE.has(error.status) || error.status >= 500)) throw error;
+        if (!(error instanceof ApiError) || !retryable(error)) throw error;
         failure = error;
       } else {
         failure = new NetworkError(error instanceof Error ? error.message : "network error");

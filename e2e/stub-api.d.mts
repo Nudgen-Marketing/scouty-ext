@@ -4,7 +4,7 @@ export type StubResponse = { status: number; headers: Record<string, string>; bo
 export type StubCapture = {
   id: string; profileKey: string; status: "open" | "finalized" | "expired"; expected: string[]; expiresAt: number;
   sections: Map<string, { seq: number; sha256: string; blockCount: number; byteLength: number; payload: import("../src/protocol").SectionPayload }>;
-  manifest?: import("../src/protocol").Manifest; result: import("../src/protocol").FinalizeResponse | null;
+  manifest?: import("../src/protocol").Manifest; finalizedAt?: number; result: import("../src/protocol").FinalizeResponse | null;
 };
 export type StubApi = {
   state: {
@@ -18,7 +18,7 @@ export type StubApi = {
   listen(port?: number): Promise<import("node:http").Server>;
   expireAccessTokens(): void;
   revokeAll(): void;
-  fail(match: RegExp, kind: "503" | "drop" | "429" | "401", times?: number): void;
+  fail(match: RegExp, kind: "503" | "drop" | "429" | "401" | "disabled" | "lose-answer", times?: number): void;
   clearFaults(): void;
   fetch(url: string, init?: RequestInit): Promise<Response>;
 };

@@ -193,11 +193,20 @@ export function createStubApi(options = {}) {
     const profileKey = profileKeyOf(body.linkedinUrl);
     if (!profileKey) return error(400, "That is not a LinkedIn profile address.", "LINKEDIN_URL_UNSUPPORTED");
     if (state.suppressed.has(profileKey)) return error(404, "This profile can't be captured.", "LINKEDIN_PROFILE_UNAVAILABLE");
+    // A caller that lost the first answer repeats the create with the same key (as the app does).
+    const sameKey = [...state.captures.values()].find((c) => c.idempotencyKey === key);
+    if (sameKey && sameKey.profileKey !== profileKey) return error(400, "This request was already used for another profile.", "LINKEDIN_INVALID_PAYLOAD");
+    if (sameKey?.status === "finalized") {
+      if (sameKey.result.completeness === "insufficient") return error(409, "This capture is already finalized.", "LINKEDIN_CAPTURE_FINALIZED");
+      return json(200, { recent: { finalizedAt: new Date(sameKey.finalizedAt).toISOString(), completeness: sameKey.result.completeness, counts: sameKey.result.captured } });
+    }
+    if (sameKey && (sameKey.status !== "open" || sameKey.expiresAt <= state.now())) return error(410, "This capture has expired.", "LINKEDIN_CAPTURE_EXPIRED");
     const recent = state.finalizedByKey.get(profileKey);
-    if (!body.recapture && recent && state.now() - recent.finalizedAt < state.freshMs) {
+    if (!sameKey && !body.recapture && recent && state.now() - recent.finalizedAt < state.freshMs) {
       return json(200, { recent: { finalizedAt: new Date(recent.finalizedAt).toISOString(), completeness: recent.completeness, counts: recent.counts } });
     }
-    let capture = [...state.captures.values()].find((c) => c.status === "open" && (c.idempotencyKey === key || c.profileKey === profileKey));
+    // At most one open capture per profile: handed back with a new token and nothing staged.
+    let capture = sameKey ?? [...state.captures.values()].find((c) => c.status === "open" && c.profileKey === profileKey && c.expiresAt > state.now());
     if (!capture) {
       if (state.capturesLeftToday <= 0) return error(429, "Your workspace has used today's captures.", "LINKEDIN_CAPTURE_LIMIT", {}, { "Retry-After": "3600" });
       state.capturesLeftToday -= 1;
@@ -276,6 +285,7 @@ export function createStubApi(options = {}) {
     for (const entry of manifest.sections) if (entry.state === "skipped") capture.sections.delete(entry.section);
     const completeness = completenessOf(capture, manifest);
     capture.status = "finalized";
+    capture.finalizedAt = state.now();
     capture.manifestText = text;
     capture.manifest = manifest;
     capture.result = {
@@ -311,7 +321,8 @@ export function createStubApi(options = {}) {
     if (method === "GET" && !match[2]) {
       return json(200, {
         status: capture.status,
-        received: [...capture.sections.entries()].map(([section, s]) => ({ section, seq: s.seq, sha256: s.sha256, blockCount: s.blockCount })),
+        // As the app: a finalized capture lists nothing as received (its staging is gone).
+        received: capture.status === "finalized" ? [] : [...capture.sections.entries()].map(([section, s]) => ({ section, seq: s.seq, sha256: s.sha256, blockCount: s.blockCount })),
         expiresAt: new Date(capture.expiresAt).toISOString(),
       });
     }
@@ -332,6 +343,12 @@ export function createStubApi(options = {}) {
       if (fault.kind === "drop") return "drop";
       if (fault.kind === "503") return error(503, "Scouty is busy. Try again.", "LINKEDIN_UNAVAILABLE");
       if (fault.kind === "429") return error(429, "Slow down.", "LINKEDIN_RATE_LIMITED", {}, { "Retry-After": "1" });
+      if (fault.kind === "disabled") return error(503, "The LinkedIn coach is not available yet.", "LINKEDIN_DISABLED");
+      if (fault.kind === "lose-answer") {
+        // The request is processed, but its answer never arrives.
+        route(method, parsed, headers, body);
+        return "drop";
+      }
       if (fault.kind === "401") return error(401, "Connect the Scouty extension again.", "LINKEDIN_AUTH_REQUIRED");
     }
     const response = route(method, parsed, headers, body);

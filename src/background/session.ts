@@ -502,7 +502,17 @@ export class CaptureController {
             await outbox.unack(entry.section);
             continue;
           }
-          await this.deps.api.putSection(ref, { section: entry.section, body, digestBase64: entry.digestBase64 }, onRetry);
+          try {
+            await this.deps.api.putSection(ref, { section: entry.section, body, digestBase64: entry.digestBase64 }, onRetry);
+          } catch (error) {
+            // The server finalized this capture already (our finalize got through, its answer did not):
+            // send nothing more; the same finalize again returns the same answer (plan 5.5).
+            if (error instanceof ApiError && error.code === "LINKEDIN_CAPTURE_FINALIZED") {
+              await outbox.ackAll();
+              break;
+            }
+            throw error;
+          }
           await outbox.ack(entry.section, entry.sha256);
         }
         this.aux.deferred = false;
@@ -559,7 +569,10 @@ export class CaptureController {
       if (!ref || !box) return this.fail({ kind: "failed" });
       try {
         const status = await this.deps.api.status(ref);
-        for (const entry of box.sections) {
+        // Finalized already: the server lists nothing as received any more, and re-sending a section
+        // would be refused. The same finalize again (same key, same manifest) returns the answer.
+        if (status.status === "finalized") await outbox.ackAll();
+        else for (const entry of box.sections) {
           const held = status.received.find((r) => r.section === entry.section);
           if (held && held.seq === entry.seq && held.sha256 === entry.sha256) await outbox.ack(entry.section, entry.sha256);
           else await outbox.unack(entry.section);
@@ -648,6 +661,8 @@ function samePage(actual: string, expected: string): boolean {
 
 function isTransient(error: unknown): boolean {
   if (error instanceof NetworkError) return true;
+  // The feature switched off is an answer, not an outage: it is not waited out.
+  if (error instanceof ApiError && error.code === "LINKEDIN_DISABLED") return false;
   return error instanceof ApiError && (error.status === 408 || error.status === 429 || error.status >= 500);
 }
 
