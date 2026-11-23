@@ -108,7 +108,7 @@ test("no state is larger than the 360 × 560 popup, and no overlay is wider than
     const view = frame.querySelector("[data-view]") as HTMLElement;
     return { state: `${frame.getAttribute("data-state")} (${frame.getAttribute("data-theme")})`, width: view.getBoundingClientRect().width, content: view.scrollHeight, scrollWidth: view.scrollWidth };
   }));
-  expect(sizes).toHaveLength(50);
+  expect(sizes).toHaveLength(52);
   for (const size of sizes) {
     expect(size.width, size.state).toBe(360);
     expect(size.scrollWidth, size.state).toBeLessThanOrEqual(360);
