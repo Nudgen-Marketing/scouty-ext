@@ -12,7 +12,7 @@ export type PillTone = "good" | "active" | "waiting" | "problem" | "neutral";
 export type ViewAction = { id: UiAction; label: string; variant: ButtonVariant; icon: IconName | null };
 
 export type View = {
-  /** 1 to 26: the row of plan 12.4 (1 to 24), 25 for "takenOver", 26 for "notAnswering". */
+  /** 1 to 27: the row of plan 12.4 (1 to 24), 25 for "takenOver", 26 for "notAnswering", 27 for "expired". */
   n: number;
   kind: UiKind;
   /** "alert" for errors (role="alert"), "status" otherwise (a polite live region). */
@@ -203,6 +203,12 @@ function draft(state: UiState): Draft {
       return {
         tone: "alert", icon: "alert", title: t("takenOverTitle"), body: [t("takenOverBody"), t("takenOverNext")],
         primary: action("dismiss", "actionOk"), secondary: action("captureAgain", "actionCaptureHere", "outline"),
+      };
+    case "expired":
+      // Capture starts a new capture of the profile in the tab the popup is on, as Capture here does on 25.
+      return {
+        tone: "alert", icon: "alert", title: t("expiredTitle"), body: [t("expiredBody"), t("expiredNext")],
+        primary: action("captureAgain", "actionCaptureShort"), secondary: action("dismiss", "actionOk", "outline"),
       };
   }
 }

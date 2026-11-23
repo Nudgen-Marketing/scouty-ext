@@ -41,8 +41,9 @@ const EXPECTED: [string, string | null, string | null][] = [
   ["Settings", null, "Disconnect"],
   ["This capture stopped", "OK", "Capture here"],
   ["Scouty isn't answering right now", "Try now", null],
+  ["This capture ran out of time", "Capture", "OK"],
 ];
-const ERRORS = new Set(["linkedinSignIn", "verification", "unavailable", "addressChanged", "offline", "connectionEnded", "limit", "outdated", "notAvailable", "suppressed", "failed", "busy", "takenOver", "notAnswering"]);
+const ERRORS = new Set(["linkedinSignIn", "verification", "unavailable", "addressChanged", "offline", "connectionEnded", "limit", "outdated", "notAvailable", "suppressed", "failed", "busy", "takenOver", "notAnswering", "expired"]);
 
 let root: Root | null = null;
 let container: HTMLElement | null = null;
@@ -67,11 +68,11 @@ afterEach(() => {
 const audit = async (node: Element): Promise<string[]> =>
   (await axe.run(node, { rules: { "color-contrast": { enabled: false }, region: { enabled: false } } })).violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.html).join(" | ")}`);
 
-describe("the 26 screens", () => {
+describe("the 27 screens", () => {
   it("there is one sample per screen, in the plan's order", () => {
     expect(SAMPLES.map((s) => s.kind)).toEqual(UI_KINDS);
-    expect(SAMPLES).toHaveLength(26);
-    expect(SAMPLES.map((s) => viewFor(s).n)).toEqual(Array.from({ length: 26 }, (_, i) => i + 1));
+    expect(SAMPLES).toHaveLength(27);
+    expect(SAMPLES.map((s) => viewFor(s).n)).toEqual(Array.from({ length: 27 }, (_, i) => i + 1));
   });
 
   describe.each(["light", "dark"] as const)("%s theme", (theme) => {
@@ -124,6 +125,33 @@ describe("the 26 screens", () => {
     expect(text(24)).toContain("To read this profile again from here, press Capture here.");
     expect(text(25)).toContain("Your capture is kept in this browser. Scouty will keep trying to send it while this browser is open.");
     expect(text(25)).toContain(`The next try is at about ${new Date("2026-11-23T10:42:00.000Z").toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`);
+    expect(text(26)).toContain("A capture has to be sent to Scouty within 20 minutes. Nothing from it was saved.");
+    expect(text(26)).toContain("Press Capture to read this profile again.");
+  });
+
+  it.each(["light", "dark"] as const)("27 \"This capture ran out of time\" (%s): its own copy, not 22's; Capture starts again, OK dismisses; roles and axe", async (theme) => {
+    const view = viewFor({ kind: "expired", workspace: "W" });
+    const failed = viewFor({ kind: "failed", workspace: "W" });
+    expect(view.n).toBe(27);
+    expect(view.title).toBe("This capture ran out of time");
+    expect(view.title).not.toBe(failed.title);
+    expect(view.body).toEqual(["A capture has to be sent to Scouty within 20 minutes. Nothing from it was saved.", "Press Capture to read this profile again."]);
+    expect(view.primary).toMatchObject({ id: "captureAgain", label: "Capture", variant: "primary" });
+    expect(view.secondary).toMatchObject({ id: "dismiss", label: "OK" });
+    // The same start-again action as 25's Capture here.
+    expect(view.primary!.id).toBe(viewFor({ kind: "takenOver", workspace: "W" }).secondary!.id);
+    expect(view.tone).toBe("alert");
+    const onAction = vi.fn();
+    const node = mount({ kind: "expired", workspace: "W" }, { theme, onAction });
+    expect(node.querySelector("h1")!.textContent).toBe("This capture ran out of time");
+    expect(node.querySelector("[data-slot='message']")!.getAttribute("role")).toBe("alert");
+    const primary = node.querySelector<HTMLButtonElement>("[data-primary]")!;
+    expect(primary.textContent).toBe("Capture");
+    act(() => primary.click());
+    const ok = [...node.querySelectorAll<HTMLButtonElement>("[data-slot='actions'] button:not([data-primary])")].find((b) => b.textContent === "OK")!;
+    act(() => ok.click());
+    expect(onAction.mock.calls.map((c) => c[0])).toEqual(["captureAgain", "dismiss"]);
+    expect(await audit(node)).toEqual([]);
   });
 
   it("26 \"Scouty isn't answering\" is not 16 \"You're offline\": its own copy, the same Try now", () => {

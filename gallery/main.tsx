@@ -19,7 +19,7 @@ function Gallery() {
     <div className="grid gap-10">
       <header className="grid gap-1">
         <h1 className="text-xl font-semibold">Scouty LinkedIn Capture: state gallery</h1>
-        <p className="text-sm text-muted-foreground">All 26 popup states and the in-page overlay, in light and dark, from fixed sample data. Sample names are invented.</p>
+        <p className="text-sm text-muted-foreground">All 27 popup states and the in-page overlay, in light and dark, from fixed sample data. Sample names are invented.</p>
       </header>
       <section aria-label="Popup states" className="grid gap-8">
         {SAMPLES.map((state, i) => (

@@ -36,20 +36,23 @@ export type UiState =
    * Scouty answered but could not take it now; retryAt (ISO) only for a rate limit. sending: a
    * capture is kept and waits to be sent; false when the capture could not be started at all.
    */
-  | { kind: "notAnswering"; retryAt: string | null; sending: boolean; workspace: string };
+  | { kind: "notAnswering"; retryAt: string | null; sending: boolean; workspace: string }
+  /** The capture's 20 minutes ran out before it was sent (this browser's clock, or Scouty's 410). */
+  | { kind: "expired"; workspace: string };
 
 export type UiKind = UiState["kind"];
 
 /**
- * The 26 screens: the 24 of plan 12.4 in its order, then two added after review (docs/DEVIATIONS.md):
+ * The 27 screens: the 24 of plan 12.4 in its order, then three added after review (docs/DEVIATIONS.md):
  * "takenOver" (25, "This capture stopped") for a capture the server no longer knows, started again
- * from another browser or device or removed in Scouty; and "notAnswering" (26, "Scouty isn't
+ * from another browser or device or removed in Scouty; "notAnswering" (26, "Scouty isn't
  * answering right now") when Scouty is reachable but failing or rate-limiting, as opposed to 16,
- * "You're offline", which is only for a network failure.
+ * "You're offline", which is only for a network failure; and "expired" (27, "This capture ran out
+ * of time") when a capture's 20 minutes ran out before it was sent.
  */
 export const UI_KINDS: readonly UiKind[] = [
   "permission", "signedOut", "connecting", "notOnProfile", "consent", "ready", "recent", "capturing", "sending",
   "doneComplete", "donePartial", "linkedinSignIn", "verification", "unavailable", "addressChanged", "offline",
   "connectionEnded", "limit", "outdated", "notAvailable", "suppressed", "failed", "busy", "settings", "takenOver",
-  "notAnswering",
+  "notAnswering", "expired",
 ];

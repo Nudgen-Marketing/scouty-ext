@@ -377,6 +377,18 @@
   "actionCaptureHere": {
     "message": "Capture here"
   },
+  "expiredTitle": {
+    "message": "This capture ran out of time"
+  },
+  "expiredBody": {
+    "message": "A capture has to be sent to Scouty within 20 minutes. Nothing from it was saved."
+  },
+  "expiredNext": {
+    "message": "Press Capture to read this profile again."
+  },
+  "actionCaptureShort": {
+    "message": "Capture"
+  },
   "busyTitle": {
     "message": "A capture is in progress"
   },

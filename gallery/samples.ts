@@ -1,6 +1,6 @@
 // Fixed sample data: one UiState per screen (the 24 of plan 12.4 in its order, then "takenOver", "This capture stopped",
-// and "notAnswering", "Scouty isn't answering right now"). Used by the state gallery and by the UI tests, so both
-// show exactly the same 26 states. All names are invented.
+// "notAnswering", "Scouty isn't answering right now", and "expired", "This capture ran out of time"). Used by the
+// state gallery and by the UI tests, so both show exactly the same 27 states. All names are invented.
 import type { UiState } from "../src/ui/state";
 
 const workspace = "Example Workspace";
@@ -46,6 +46,7 @@ export const SAMPLES: readonly UiState[] = [
   { kind: "takenOver", workspace },
   // A rate limit: the screen also says roughly when the next try is.
   { kind: "notAnswering", retryAt: "2026-11-23T10:42:00.000Z", sending: true, workspace },
+  { kind: "expired", workspace },
 ];
 
 /** What the in-page overlay shows during and after a capture. */

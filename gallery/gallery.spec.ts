@@ -13,12 +13,12 @@ async function open(page: Page): Promise<void> {
   await page.addScriptTag({ path: path.join(root, "node_modules", "axe-core", "axe.min.js") });
 }
 
-test("shows all 26 states in both themes, plus the overlay", async ({ page }) => {
+test("shows all 27 states in both themes, plus the overlay", async ({ page }) => {
   await open(page);
-  await expect(page.locator("[data-frame='popup']")).toHaveCount(52);
-  await expect(page.locator("[data-frame='popup'][data-theme='dark']")).toHaveCount(26);
+  await expect(page.locator("[data-frame='popup']")).toHaveCount(54);
+  await expect(page.locator("[data-frame='popup'][data-theme='dark']")).toHaveCount(27);
   const kinds = await page.locator("[data-frame='popup'][data-theme='light']").evaluateAll((els) => els.map((el) => el.getAttribute("data-state")));
-  expect(new Set(kinds).size).toBe(26);
+  expect(new Set(kinds).size).toBe(27);
   expect(await page.locator("[data-frame='overlay']").count()).toBeGreaterThanOrEqual(10);
   await expect(page.locator("[data-frame='popup'][data-state='ready'][data-theme='light'] h1")).toHaveText("Capture this profile");
   // The two themes really differ: the dark frame has a dark background.
@@ -108,7 +108,7 @@ test("no state is larger than the 360 × 560 popup, and no overlay is wider than
     const view = frame.querySelector("[data-view]") as HTMLElement;
     return { state: `${frame.getAttribute("data-state")} (${frame.getAttribute("data-theme")})`, width: view.getBoundingClientRect().width, content: view.scrollHeight, scrollWidth: view.scrollWidth };
   }));
-  expect(sizes).toHaveLength(52);
+  expect(sizes).toHaveLength(54);
   for (const size of sizes) {
     expect(size.width, size.state).toBe(360);
     expect(size.scrollWidth, size.state).toBeLessThanOrEqual(360);
