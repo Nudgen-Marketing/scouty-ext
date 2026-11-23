@@ -12,7 +12,7 @@ export type PillTone = "good" | "active" | "waiting" | "problem" | "neutral";
 export type ViewAction = { id: UiAction; label: string; variant: ButtonVariant; icon: IconName | null };
 
 export type View = {
-  /** 1 to 24, the row of plan 12.4. */
+  /** 1 to 25: the row of plan 12.4 (1 to 24), or 25 for "takenOver". */
   n: number;
   kind: UiKind;
   /** "alert" for errors (role="alert"), "status" otherwise (a polite live region). */
@@ -184,6 +184,11 @@ function draft(state: UiState): Draft {
         links: [action("switchWorkspace", "actionSwitchWorkspace", "link"), action("whatItReads", "actionWhatScoutyReads", "link", "external")],
         secondary: action("disconnect", "actionDisconnect", "outline"),
         notes: state.devRedirectUrl ? [t("devRedirectUrl", state.devRedirectUrl)] : [],
+      };
+    case "takenOver":
+      return {
+        tone: "alert", icon: "alert", title: t("takenOverTitle"), body: [t("takenOverBody"), t("takenOverNext")],
+        primary: action("dismiss", "actionOk"), secondary: action("captureAgain", "actionCaptureHere", "outline"),
       };
   }
 }

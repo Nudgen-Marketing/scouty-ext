@@ -39,8 +39,9 @@ const EXPECTED: [string, string | null, string | null][] = [
   ["Scouty couldn't receive this capture", "Capture again", null],
   ["A capture is in progress", "Show it", null],
   ["Settings", null, "Disconnect"],
+  ["This capture continued in another window", "OK", "Capture here"],
 ];
-const ERRORS = new Set(["linkedinSignIn", "verification", "unavailable", "addressChanged", "offline", "connectionEnded", "limit", "outdated", "notAvailable", "suppressed", "failed", "busy"]);
+const ERRORS = new Set(["linkedinSignIn", "verification", "unavailable", "addressChanged", "offline", "connectionEnded", "limit", "outdated", "notAvailable", "suppressed", "failed", "busy", "takenOver"]);
 
 let root: Root | null = null;
 let container: HTMLElement | null = null;
@@ -65,11 +66,11 @@ afterEach(() => {
 const audit = async (node: Element): Promise<string[]> =>
   (await axe.run(node, { rules: { "color-contrast": { enabled: false }, region: { enabled: false } } })).violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.html).join(" | ")}`);
 
-describe("the 24 screens", () => {
+describe("the 25 screens", () => {
   it("there is one sample per screen, in the plan's order", () => {
     expect(SAMPLES.map((s) => s.kind)).toEqual(UI_KINDS);
-    expect(SAMPLES).toHaveLength(24);
-    expect(SAMPLES.map((s) => viewFor(s).n)).toEqual(Array.from({ length: 24 }, (_, i) => i + 1));
+    expect(SAMPLES).toHaveLength(25);
+    expect(SAMPLES.map((s) => viewFor(s).n)).toEqual(Array.from({ length: 25 }, (_, i) => i + 1));
   });
 
   describe.each(["light", "dark"] as const)("%s theme", (theme) => {
@@ -118,6 +119,8 @@ describe("the 24 screens", () => {
     expect(text(20)).toContain("Scouty doesn't keep information about this person.");
     expect(text(21)).toContain("Nothing was saved. Press Capture again.");
     expect(text(23)).toContain("Synthetic Tester · tester@example.invalid");
+    expect(text(24)).toContain("This profile was captured again from another window or device, so the capture here stopped. Nothing from this window was kept.");
+    expect(text(24)).toContain("Finish it in the other window. To read the profile from this window instead, press Capture here.");
   });
 
   it("the primary action is the first control after the title, and Enter activates it", () => {

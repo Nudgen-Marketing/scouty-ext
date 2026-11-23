@@ -30,13 +30,17 @@ export type UiState =
   | { kind: "suppressed"; workspace: string }
   | { kind: "failed"; workspace: string }
   | { kind: "busy"; workspace: string }
-  | { kind: "settings"; name: string; email: string; workspace: string; version: string; devRedirectUrl?: string | null };
+  | { kind: "settings"; name: string; email: string; workspace: string; version: string; devRedirectUrl?: string | null }
+  | { kind: "takenOver"; workspace: string };
 
 export type UiKind = UiState["kind"];
 
-/** The 24 screens of plan 12.4, in its order. */
+/**
+ * The 25 screens: the 24 of plan 12.4 in its order, then "takenOver" (25), added after review for
+ * a capture the server handed to another window or device (docs/DEVIATIONS.md).
+ */
 export const UI_KINDS: readonly UiKind[] = [
   "permission", "signedOut", "connecting", "notOnProfile", "consent", "ready", "recent", "capturing", "sending",
   "doneComplete", "donePartial", "linkedinSignIn", "verification", "unavailable", "addressChanged", "offline",
-  "connectionEnded", "limit", "outdated", "notAvailable", "suppressed", "failed", "busy", "settings",
+  "connectionEnded", "limit", "outdated", "notAvailable", "suppressed", "failed", "busy", "settings", "takenOver",
 ];

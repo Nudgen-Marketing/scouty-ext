@@ -23,7 +23,9 @@ export type Notice =
   | { kind: "notAvailable" }
   | { kind: "limit"; resetAt: string | null }
   | { kind: "suppressed" }
-  | { kind: "failed" };
+  | { kind: "failed" }
+  /** The server handed this capture to a newer start of the same profile (another window or device). */
+  | { kind: "takenOver" };
 
 export type DoneResult = {
   completeness: Completeness; captured: Counts; appUrl: string;
@@ -680,6 +682,9 @@ export function noticeFor(error: unknown, creating = false): Notice {
     }
     // A 404 when creating means the server refuses this profile; it does not say why.
     if (error.status === 404 && creating) return { kind: "suppressed" };
+    // A 404 on a capture this extension holds: a newer create for the same profile (another window
+    // or device) was handed this capture with a new upload token, so ours no longer opens it (plan 5.5).
+    if (error.status === 404) return { kind: "takenOver" };
   }
   return { kind: "failed" };
 }

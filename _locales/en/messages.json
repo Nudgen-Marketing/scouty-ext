@@ -347,6 +347,18 @@
   "failedBody": {
     "message": "Nothing was saved. Press Capture again."
   },
+  "takenOverTitle": {
+    "message": "This capture continued in another window"
+  },
+  "takenOverBody": {
+    "message": "This profile was captured again from another window or device, so the capture here stopped. Nothing from this window was kept."
+  },
+  "takenOverNext": {
+    "message": "Finish it in the other window. To read the profile from this window instead, press Capture here."
+  },
+  "actionCaptureHere": {
+    "message": "Capture here"
+  },
   "busyTitle": {
     "message": "A capture is in progress"
   },

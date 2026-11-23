@@ -369,6 +369,25 @@ describe("capture controller", () => {
     ]);
   });
 
+  it("404 on a held capture (taken over by another window or device): the takenOver screen, and its outbox is cleared", async () => {
+    const r = await rig();
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    await r.read(); // profile sent with this window's upload token
+    const held = (await outbox.load())!;
+    // Another window starts the same profile: the server hands it this capture with a new token.
+    const other = await r.api.createCapture({ linkedinUrl: PROFILE_URL, recapture: false }, "uuid-other-window");
+    expect(other).toMatchObject({ captureId: held.captureId });
+    expect("uploadToken" in other && other.uploadToken).not.toBe(held.uploadToken);
+    await r.read(); // experience: PUT with the old token → 404 LINKEDIN_CAPTURE_NOT_FOUND
+    const put = r.stub.state.requests.filter((q) => q.method === "PUT").at(-1)!;
+    expect(put.status).toBe(404);
+    const state = await r.controller.current();
+    expect(state).toEqual({ phase: "idle", notice: { kind: "takenOver" } });
+    expect(captureUi(state, { clickLog: [], minutesLeft: null }, "W", 0)).toEqual({ kind: "takenOver", workspace: "W" });
+    expect(await outbox.load()).toBeNull();
+    expect(r.tab.updates).toHaveLength(1); // nothing more of LinkedIn was opened
+  });
+
   it("426 ends in the outdated state; 403, 429 and a refused profile have their own", async () => {
     let r = await rig({ minVersion: "9.0.0" });
     await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
@@ -393,7 +412,7 @@ describe("capture controller", () => {
 
   it("maps errors to one notice each", () => {
     expect(noticeFor(new ApiError(410, "LINKEDIN_CAPTURE_EXPIRED", null, null))).toEqual({ kind: "failed" });
-    expect(noticeFor(new ApiError(404, "LINKEDIN_CAPTURE_NOT_FOUND", null, null))).toEqual({ kind: "failed" });
+    expect(noticeFor(new ApiError(404, "LINKEDIN_CAPTURE_NOT_FOUND", null, null))).toEqual({ kind: "takenOver" });
     expect(noticeFor(new ApiError(503, "LINKEDIN_DISABLED", null, null))).toEqual({ kind: "notAvailable" });
     expect(noticeFor(new ApiError(503, "LINKEDIN_UNAVAILABLE", null, null))).toEqual({ kind: "failed" });
     expect(noticeFor(new ApiError(404, "LINKEDIN_PROFILE_UNAVAILABLE", null, null), true)).toEqual({ kind: "suppressed" });
@@ -414,7 +433,7 @@ describe("capture controller", () => {
     [400, "LINKEDIN_DIGEST_MISMATCH", false, "failed"],
     [400, "LINKEDIN_INVALID_PAYLOAD", false, "failed"],
     [400, "LINKEDIN_URL_UNSUPPORTED", true, "failed"],
-    [404, "LINKEDIN_CAPTURE_NOT_FOUND", false, "failed"],
+    [404, "LINKEDIN_CAPTURE_NOT_FOUND", false, "takenOver"],
     [410, "LINKEDIN_CAPTURE_EXPIRED", false, "failed"],
     [409, "LINKEDIN_CAPTURE_FINALIZED", false, "failed"],
     [409, "LINKEDIN_CAPTURE_TARGET_MISMATCH", false, "failed"],

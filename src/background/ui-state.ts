@@ -77,6 +77,7 @@ function noticeState(notice: Notice, workspace: string, now: number): UiState {
     case "limit": return { kind: "limit", resetAt: notice.resetAt, workspace };
     case "suppressed": return { kind: "suppressed", workspace };
     case "failed": return { kind: "failed", workspace };
+    case "takenOver": return { kind: "takenOver", workspace };
   }
 }
 

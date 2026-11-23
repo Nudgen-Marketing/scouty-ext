@@ -100,7 +100,12 @@ extension follows the app's `src/lib/linkedin/protocol.ts`:
   `PUT` answered `LINKEDIN_CAPTURE_FINALIZED` is treated the same way.
 - A create while this user already has an open capture of the profile gets the same capture back
   with a new upload token and nothing staged; the extension starts a fresh outbox for it and sends
-  every section again. A repeated create key on a finalized, analyzable capture answers
+  every section again. The other side of the same rule: the window or device that held the
+  capture before now gets `404 LINKEDIN_CAPTURE_NOT_FOUND` on its next section, finalize or status
+  call. Any 404 on a capture the extension holds (not on create) ends in screen 25, "This capture
+  continued in another window" (`takenOver`: **OK**, or **Capture here** to take it back), and that
+  capture's outbox is cleared. This screen is not in plan 12.4; it is numbered 25 so rows 1 to 24
+  keep the plan's numbers. A repeated create key on a finalized, analyzable capture answers
   `{ recent }`, which shows the "captured recently" screen.
 - `LINKEDIN_DISABLED` (503) is not retried and not treated as an outage: it ends in "not
   available". `LINKEDIN_UNAVAILABLE` (503) and `LINKEDIN_RATE_LIMITED` (429) are retried with

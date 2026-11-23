@@ -1,5 +1,5 @@
-// Fixed sample data: one UiState per screen of plan 12.4, in its order. Used by the state gallery
-// and by the UI tests, so both show exactly the same 24 states. All names are invented.
+// Fixed sample data: one UiState per screen (the 24 of plan 12.4 in its order, then "takenOver").
+// Used by the state gallery and by the UI tests, so both show exactly the same 25 states. All names are invented.
 import type { UiState } from "../src/ui/state";
 
 const workspace = "Example Workspace";
@@ -42,6 +42,7 @@ export const SAMPLES: readonly UiState[] = [
   { kind: "failed", workspace },
   { kind: "busy", workspace },
   { kind: "settings", name: "Synthetic Tester", email: "tester@example.invalid", workspace, version: "0.1.0" },
+  { kind: "takenOver", workspace },
 ];
 
 /** What the in-page overlay shows during and after a capture. */
