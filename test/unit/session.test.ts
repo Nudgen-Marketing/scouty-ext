@@ -210,7 +210,7 @@ describe("capture controller", () => {
     const r = await rig();
     await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
     await r.read(); await r.read(); await r.read();
-    await r.read(() => ({ kind: "stopped", reason, address: reason === "wrong_profile" ? "https://www.linkedin.com/in/renamed/" : null, clickLog: [] }));
+    await r.read(() => ({ kind: "stopped", reason, address: reason === "wrong_profile" ? "https://www.linkedin.com/in/synthetic-person-renamed/" : null, clickLog: [] }));
     const state = await r.controller.current();
     expect(state).toMatchObject({ phase: "done", result: { stop: reason, completeness: "partial" } });
     expect(r.stub.state.requests.some((q) => q.method === "PUT" && q.path.endsWith("/posts"))).toBe(false);

@@ -28,7 +28,7 @@ describe("api client", () => {
       "//evil.example/oauth/token", "https://evil.example/oauth/token", "/oauth/token?x=1", "/api/linkedin/ext/captures/abcdefgh/sections/posts/extra", "",
     ]) expect(() => apiUrl(path), path).toThrow(/Refused/);
     for (const url of [
-      "https://www.linkedin.com/in/someone/", "https://scouty.to.evil.example/oauth/token", "http://scouty.to/oauth/token", "https://scouty.to:8443/oauth/token",
+      "https://www.linkedin.com/in/synthetic-person-two/", "https://scouty.to.evil.example/oauth/token", "http://scouty.to/oauth/token", "https://scouty.to:8443/oauth/token",
       "https://user@scouty.to/oauth/token", "https://scouty.to/oauth/token#x", "https://scouty.to/api/other",
     ]) expect(() => assertAllowedUrl(url), url).toThrow(/Refused/);
     expect(() => assertAllowedUrl("https://scouty.to/oauth/revoke")).not.toThrow();
