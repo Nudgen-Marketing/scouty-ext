@@ -1,19 +1,24 @@
 // Firefox start-up smoke check: web-ext starts Firefox with dist/firefox installed as a temporary
 // add-on; the check passes when the add-on is installed and no manifest or background error is
 // reported within the time limit. A start-up check, not a driven test (Playwright does not
-// support extensions in Firefox).
+// support extensions in Firefox). Firefox runs with -headless, so no display is needed; CI runs it
+// under xvfb-run as well, as a safety net for anything that still wants an X display.
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
-const candidates = [process.env.FIREFOX_BIN, "/Applications/Firefox.app/Contents/MacOS/firefox", "/usr/bin/firefox", "/snap/bin/firefox"].filter(Boolean);
+// FIREFOX_BIN first (CI sets it from the setup step), then the usual install places, then PATH.
+const onPath = (process.env.PATH ?? "").split(path.delimiter).filter(Boolean).map((dir) => path.join(dir, "firefox"));
+const candidates = [process.env.FIREFOX_BIN, "/Applications/Firefox.app/Contents/MacOS/firefox", "/usr/bin/firefox", "/snap/bin/firefox", ...onPath].filter(Boolean);
 const firefox = candidates.find((file) => existsSync(file));
 if (!firefox) {
+  // Exit code 2 means "could not run", not "failed"; in CI either fails the job.
   console.error("smoke:firefox could not run: Firefox is not installed (set FIREFOX_BIN to its binary).");
   process.exit(2);
 }
+console.log(`smoke:firefox: using ${firefox}`);
 if (!existsSync(path.join(root, "dist/firefox/manifest.json"))) {
   console.error("smoke:firefox: run `npm run build` first.");
   process.exit(2);

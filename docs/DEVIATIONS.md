@@ -121,4 +121,6 @@ extension follows the app's `src/lib/linkedin/protocol.ts`:
 - Run E0 (live LinkedIn) and replace the best-guess selectors.
 - Decide the licence; confirm whether the Scouty mark may replace the letter tile.
 - Rebuild on Node 24 on a clean machine and record the hashes in BUILD.md.
-- Run `npm run smoke:firefox` on a machine with Firefox, and the Edge smoke steps.
+- CI now runs `npm run smoke:firefox` (Firefox installed by `browser-actions/setup-firefox`, under
+  `xvfb-run`); it has not yet been seen to pass on GitHub. Run the manual steps of
+  `validation/FIREFOX-SMOKE.md` and of `validation/EDGE-SMOKE.md`.

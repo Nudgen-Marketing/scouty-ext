@@ -30,6 +30,21 @@ jobs:
       - run: npm run test:gallery
       - run: npm run build
       - run: npm run lint:firefox
+      # Firefox start-up smoke: web-ext installs dist/firefox as a temporary add-on in a real Firefox
+      # and fails on a manifest or background error (release gate 8).
+      - name: Install Firefox
+        id: firefox
+        uses: browser-actions/setup-firefox@0bc507ddf224827e3b1af68e014d5e42ab93e795 # v1.7.2
+        with:
+          firefox-version: latest
+      - name: Install xvfb
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb
+      - name: Firefox start-up smoke
+        env:
+          FIREFOX_BIN: ${{ steps.firefox.outputs.firefox-path }}
+        run: |
+          "$FIREFOX_BIN" --version
+          xvfb-run --auto-servernum npm run smoke:firefox
       # Two builds must give byte-identical output.
       - run: node tools/repro-check.mjs
       - name: No secrets or internal hostnames

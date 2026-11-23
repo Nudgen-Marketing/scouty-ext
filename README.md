@@ -77,7 +77,7 @@ Built popup size, per target (identical across targets apart from the build cons
 | `npm test` | Unit, static, UI and contract layers |
 | `npm run test:e2e` | Builds `dist/e2e`, then the Playwright suite in Chromium against a mock LinkedIn and a stub of the capture API |
 | `npm run gallery` / `npm run test:gallery` | Builds `gallery/index.html` (open it in a browser for design review; it is git-ignored); checks it with axe, measured contrast and the 360 × 560 limit |
-| `npm run lint:firefox` / `npm run smoke:firefox` | `web-ext lint` on `dist/firefox`; a Firefox start-up check (needs Firefox) |
+| `npm run lint:firefox` / `npm run smoke:firefox` | `web-ext lint` on `dist/firefox`; a Firefox start-up check (needs Firefox; CI runs it under `xvfb-run`, manual steps in `validation/FIREFOX-SMOKE.md`) |
 | `npm run package` | `release/scouty-ext-<version>-{chrome,edge,firefox}.zip` and the source archive |
 | `npm run check` | typecheck, lint, build, test, test:e2e, lint:firefox |
 | `npm run sanitize -- <saved.html> <out.html>` | The allow-list sanitizer for saved pages (owner task E0 only) |

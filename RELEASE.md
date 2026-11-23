@@ -10,14 +10,14 @@ is the control. Store uploads are done by hand; no store credential exists in CI
 
 | # | Gate | Evidence | Done by / date |
 | --- | --- | --- | --- |
-| 1 | CI green on the tagged commit: typecheck, lint, unit, static, UI, contract, browser e2e, gallery, Firefox lint, double-build hash equality | The CI run | |
+| 1 | CI green on the tagged commit: typecheck, lint, unit, static, UI, contract, browser e2e, gallery, Firefox lint, Firefox start-up smoke, double-build hash equality | The CI run | |
 | 2 | The app's gates green on the commit to be deployed (`yarn lint && yarn typecheck && yarn test`, MCP, LinkedIn, integration, e2e, build) | The app's CI run | |
 | 3 | Contract in sync: `diff -r protocol-v1 ../scouty/src/lib/linkedin/__fixtures__/protocol-v1` is empty, and `cmp src/ui/tokens.json ../scouty/src/lib/linkedin/__fixtures__/extension-tokens.json` reports no difference | Command output pasted | |
 | 4 | The Playwright suite also passes against a real local app: `E2E_API=http://localhost:3000 npm run test:e2e` | Run log | |
 | 5 | State gallery (`npm run gallery`, open `gallery/index.html`) reviewed in light and dark and signed off | Owner's initials and date | |
 | 6 | Real-LinkedIn validation complete for this version's selectors: every row passes, click logs clean | `validation/RESULTS-<version>.md` | |
 | 7 | Live AI eval passes on real-shaped data (app task A0) | Run log | |
-| 8 | Firefox: `npm run smoke:firefox` passes, and the source archive rebuilds to an identical package following BUILD.md on a clean machine with Node 24 | Hashes pasted | |
+| 8 | Firefox: `npm run smoke:firefox` passes (CI) and `validation/FIREFOX-SMOKE.md` is completed, and the source archive rebuilds to an identical package following BUILD.md on a clean machine with Node 24 | CI run link, tester's initials, hashes pasted | |
 | 9 | Edge: the Edge build loaded in Edge completes `validation/EDGE-SMOKE.md` | Tester's initials | |
 | 10 | Privacy text, consent text and store disclosures match PRIVACY.md and have legal sign-off | Reference to the approval | |
 | 11 | Server configured: `SCOUTY_EXTENSION_CLIENTS` has the three ids; `SCOUTY_EXTENSION_MIN_VERSION` set; migration applied; feature limited to administrators | Owner's confirmation | |
