@@ -10,6 +10,7 @@ export type StubApi = {
   state: {
     origin: string; now: () => number; minVersion: string; storeUrl: string; available: boolean; capturesLeftToday: number;
     caps: { posts: number; comments: number; reactions: number }; capsBySlug: Record<string, Partial<{ posts: number; comments: number; reactions: number }>>;
+    appPath: (profileKey: string) => string; recentAppUrl: boolean;
     accessTtlMs: number; captureTtlMs: number; suppressed: Set<string>; requests: StubRequest[]; captures: Map<string, StubCapture>;
     finalizedByKey: Map<string, unknown>; access: Map<string, { grantId: string; expiresAt: number }>; grants: Map<string, { revoked: boolean }>;
     workspace: { id: string; name: string }; user: { name: string; email: string };

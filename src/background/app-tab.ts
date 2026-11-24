@@ -3,8 +3,24 @@
 // fill in `tab.url` for (and filter `tabs.query({ url })` to) tabs on that origin only. Without it
 // (Firefox lets the user withhold it) `tab.url` is missing, so no tab is reused and a new one opens.
 // Only a tab whose address is on the Scouty origin is ever navigated; a LinkedIn tab never is.
-import { API_ORIGIN, HOST_PATTERNS } from "../config";
+import { API_ORIGIN, HOST_PATTERNS, LINKEDIN_ORIGIN } from "../config";
 import { ext } from "../ext";
+import { profileFromUrl } from "../profile-key";
+
+/** A Scouty app address the server named, or the app's home when it names none or another site. */
+export function appUrl(candidate: string | null | undefined): string {
+  return typeof candidate === "string" && candidate.startsWith(`${API_ORIGIN}/`) ? candidate : `${API_ORIGIN}/`;
+}
+
+/**
+ * "Open in Scouty" after a recent capture: the server's `recent.appUrl` when it is on the Scouty
+ * origin, else that profile on the dashboard (servers before `appUrl` was added).
+ */
+export function recentAppUrl(notice: { url: string; appUrl?: string }): string {
+  if (typeof notice.appUrl === "string" && notice.appUrl.startsWith(`${API_ORIGIN}/`)) return notice.appUrl;
+  const profile = profileFromUrl(notice.url, LINKEDIN_ORIGIN);
+  return profile ? `${API_ORIGIN}/dashboard?linkedin=${encodeURIComponent(profile.key)}` : appUrl(null);
+}
 
 type TabLike = { id?: number; url?: string; windowId?: number; openerTabId?: number; lastAccessed?: number };
 

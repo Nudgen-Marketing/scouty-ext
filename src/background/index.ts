@@ -1,12 +1,12 @@
 // Background entry: listeners only, all registered at top level so a restarted service worker
 // (Chromium) or event page (Firefox) is woken by the next event and picks up where it was.
-import { API_ORIGIN, LINKEDIN_ORIGIN, PRIVACY_URL } from "../config";
+import { LINKEDIN_ORIGIN, PRIVACY_URL } from "../config";
 import { ext } from "../ext";
 import type { Message, UiAction } from "../messages";
 import { profileFromUrl } from "../profile-key";
 import type { UiState } from "../ui/state";
 import { createApi } from "./api";
-import { openAppPage } from "./app-tab";
+import { appUrl, openAppPage, recentAppUrl } from "./app-tab";
 import * as auth from "./auth";
 import { devRequest, recordCapture } from "./dev-log";
 import * as outbox from "./outbox";
@@ -81,6 +81,7 @@ async function broadcast(state: CaptureState): Promise<void> {
   ext.tabs.sendMessage(captureTab, message).catch(() => undefined);
 }
 
+/** Only pages of the Scouty app are ever opened (appUrl in app-tab.ts), plus the store page the server names. */
 function open(url: string): void {
   void ext.tabs.create({ url });
 }
@@ -88,11 +89,6 @@ function open(url: string): void {
 /** An app page: back in the Scouty tab the user came from when there is one (src/background/app-tab.ts). */
 function openApp(url: string, linkedinTabId: number | null): void {
   void openAppPage(url, linkedinTabId);
-}
-
-/** Only pages of the Scouty app are ever opened, plus the store page the server names. */
-function appUrl(candidate: string | null | undefined): string {
-  return candidate && candidate.startsWith(`${API_ORIGIN}/`) ? candidate : `${API_ORIGIN}/`;
 }
 
 async function tabUrl(tabId: number | null): Promise<string | null> {
@@ -153,10 +149,7 @@ async function act(action: UiAction, tabId: number | null): Promise<void> {
     case "openAnalysis": {
       const linkedinTab = "tabId" in state ? state.tabId : tabId;
       if (state.phase === "done") return openApp(appUrl(state.result.appUrl), linkedinTab);
-      if (state.phase === "idle" && state.notice?.kind === "recent") {
-        const profile = profileFromUrl(state.notice.url, LINKEDIN_ORIGIN);
-        return openApp(profile ? `${API_ORIGIN}/dashboard?linkedin=${encodeURIComponent(profile.key)}` : appUrl(null), linkedinTab);
-      }
+      if (state.phase === "idle" && state.notice?.kind === "recent") return openApp(recentAppUrl(state.notice), linkedinTab);
       return openApp(appUrl(null), linkedinTab);
     }
     case "openScouty": return openApp(appUrl(null), "tabId" in state ? state.tabId : tabId);

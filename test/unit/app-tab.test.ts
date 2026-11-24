@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { chooseAppTab, openAppPage } from "../../src/background/app-tab";
+import { appUrl, chooseAppTab, openAppPage, recentAppUrl } from "../../src/background/app-tab";
 import { fake, type FakeTab } from "../helpers/fake-ext";
 
 const SCOUTY = "https://scouty.to/*";
@@ -114,5 +114,36 @@ describe("returning to the Scouty app tab", () => {
     linkedinTab({ openerTabId: 4 });
     await openAppPage("https://store.example.org/scouty", LINKEDIN_TAB);
     expect(outcome()).toEqual({ updated: [], focused: [], created: ["https://store.example.org/scouty"] });
+  });
+
+  it("a campaign page the server names is shown in the reused tab with its full query", async () => {
+    const campaign = "https://scouty.to/dashboard/proj_1/campaigns/camp_1?linkedin=synthetic-person-one&person=person_1";
+    tab({ id: 4, url: "https://scouty.to/dashboard/proj_1/campaigns/camp_1?view=leads&page=2", windowId: 1, lastAccessed: 80 });
+    linkedinTab({ openerTabId: 4 });
+    await openAppPage(appUrl(campaign), LINKEDIN_TAB);
+    expect(outcome()).toEqual({ updated: [[4, campaign, true]], focused: [1], created: [] });
+    expect(fake.tabList.find((t) => t.id === 4)!.url).toBe(campaign);
+  });
+});
+
+describe("the app page to open", () => {
+  const PROFILE = "https://www.linkedin.com/in/synthetic-person-one/";
+  const CAMPAIGN = "https://scouty.to/dashboard/proj_1/campaigns/camp_1?linkedin=synthetic-person-one&person=person_1";
+
+  it("after finalize: the server's appUrl on the Scouty origin, else the app's home", () => {
+    expect(appUrl(CAMPAIGN)).toBe(CAMPAIGN);
+    expect(appUrl("https://scouty.to/dashboard?linkedin=synthetic-person-one")).toBe("https://scouty.to/dashboard?linkedin=synthetic-person-one");
+    for (const off of ["https://scouty.to.example.org/dashboard", "http://scouty.to/dashboard", "https://example.org/", "https://scouty.to", "", null, undefined]) expect(appUrl(off)).toBe("https://scouty.to/");
+  });
+
+  it("after a recent capture: recent.appUrl when on the Scouty origin", () => {
+    expect(recentAppUrl({ url: PROFILE, appUrl: CAMPAIGN })).toBe(CAMPAIGN);
+  });
+
+  it("after a recent capture without recent.appUrl, or with one off the Scouty origin: the dashboard for that profile", () => {
+    const fallback = "https://scouty.to/dashboard?linkedin=synthetic-person-one";
+    expect(recentAppUrl({ url: PROFILE })).toBe(fallback);
+    expect(recentAppUrl({ url: PROFILE, appUrl: "https://example.org/dashboard/p/campaigns/c" })).toBe(fallback);
+    expect(recentAppUrl({ url: "https://example.org/not-a-profile" })).toBe("https://scouty.to/");
   });
 });

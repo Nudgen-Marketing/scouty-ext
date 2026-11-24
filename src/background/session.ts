@@ -18,7 +18,7 @@ import { ApiError, NetworkError, SignedOutError, isRetryableStatus, type Api, ty
 import * as outbox from "./outbox";
 
 export type Notice =
-  | { kind: "recent"; finalizedAt: string; tabId: number; url: string }
+  | { kind: "recent"; finalizedAt: string; tabId: number; url: string; appUrl?: string }
   | { kind: "outdated"; storeUrl: string | null }
   | { kind: "notAvailable" }
   | { kind: "limit"; resetAt: string | null }
@@ -308,7 +308,8 @@ export class CaptureController {
       try {
         const answer = await this.deps.api.createCapture({ linkedinUrl: profile.url, recapture: input.recapture }, this.deps.uuid());
         if ("recent" in answer) {
-          await this.dispatch({ type: "recent", notice: { kind: "recent", finalizedAt: answer.recent.finalizedAt, tabId: input.tabId, url: input.url } });
+          const appUrl = typeof answer.recent.appUrl === "string" ? { appUrl: answer.recent.appUrl } : {};
+          await this.dispatch({ type: "recent", notice: { kind: "recent", finalizedAt: answer.recent.finalizedAt, tabId: input.tabId, url: input.url, ...appUrl } });
           return "started";
         }
         if (answer.profileKey !== profile.key || answer.expected.length === 0) {

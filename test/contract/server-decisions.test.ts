@@ -204,7 +204,7 @@ describe("create, finalize and resume", () => {
     const create = r.stub.state.requests.find((q) => q.method === "POST" && q.path === "/api/linkedin/ext/captures")!;
     const again = r.stub.handle({ method: "POST", url: "/api/linkedin/ext/captures", headers: create.headers, body: new TextEncoder().encode(JSON.stringify({ linkedinUrl: PROFILE_URL, recapture: true })) });
     expect(again !== "drop" && again.status).toBe(200);
-    expect(again !== "drop" && JSON.parse(again.body!)).toEqual({ recent: { finalizedAt: expect.any(String), completeness: "complete", counts: { profileSections: 3, posts: 0, comments: 0, reactions: 0 } } });
+    expect(again !== "drop" && JSON.parse(again.body!)).toEqual({ recent: { finalizedAt: expect.any(String), completeness: "complete", counts: { profileSections: 3, posts: 0, comments: 0, reactions: 0 }, appUrl: expect.stringMatching(/^https:\/\/scouty\.to\/dashboard\?linkedin=/) } });
     expect(r.stub.state.captures.size).toBe(1);
   });
 

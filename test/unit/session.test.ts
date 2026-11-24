@@ -171,6 +171,21 @@ describe("capture controller", () => {
     expect(await r.phase()).toBe("running");
   });
 
+  it("a recent capture keeps the app page the server names, and none when the server names none", async () => {
+    const campaign = (key: string) => `/dashboard/proj_1/campaigns/camp_1?linkedin=${key}&person=person_1`;
+    const r = await rig({ appPath: campaign });
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    await r.readAll();
+    await r.controller.dismiss();
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    expect(await r.controller.current()).toMatchObject({ phase: "idle", notice: { kind: "recent", appUrl: `https://scouty.to${campaign("synthetic-person-one")}` } });
+    await r.controller.dismiss();
+    r.stub.state.recentAppUrl = false;
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    const state = await r.controller.current();
+    expect(state.phase === "idle" && state.notice?.kind === "recent" && "appUrl" in state.notice).toBe(false);
+  });
+
   it("the reader gets its arguments only in the capture tab while running", async () => {
     const r = await rig({ caps: { posts: 30, comments: 0, reactions: 500 } });
     await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });

@@ -99,7 +99,8 @@ export type CreateCreated = {
   captureId: string; uploadToken: string; profileKey: string; profileUrl: string;
   expected: SectionName[]; caps: Caps; expiresAt: string; serverTime: string;
 };
-export type CreateRecent = { recent: { finalizedAt: string; completeness: "complete" | "partial"; counts: Counts } };
+/** `appUrl` (optional; servers before it was added leave it out) is the app page for this profile, as after finalize. */
+export type CreateRecent = { recent: { finalizedAt: string; completeness: "complete" | "partial"; counts: Counts; appUrl?: string } };
 export type FinalizeResponse = { status: "finalized"; completeness: Completeness; captured: Counts; appUrl: string };
 export type StatusResponse = {
   status: "open" | "finalized";

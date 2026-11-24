@@ -37,6 +37,10 @@ export function createStubApi(options = {}) {
     accessTtlMs: options.accessTtlMs ?? 15 * 60_000,
     captureTtlMs: options.captureTtlMs ?? 20 * 60_000,
     freshMs: 7 * 24 * 3600_000,
+    // The app page named for a profile (path and query), after finalize and in a { recent } answer.
+    appPath: options.appPath ?? ((profileKey) => `/dashboard?linkedin=${encodeURIComponent(profileKey)}`),
+    // Servers before `recent.appUrl` was added leave it out.
+    recentAppUrl: options.recentAppUrl ?? true,
     user: { name: "Synthetic Tester", email: "tester@example.invalid" },
     workspace: { id: "ws_synthetic", name: "Synthetic Workspace" },
     available: true,
@@ -52,6 +56,8 @@ export function createStubApi(options = {}) {
     status, body: JSON.stringify(body),
     headers: { "Content-Type": "application/json", "Cache-Control": "no-store", Vary: "Authorization", ...headers },
   });
+  const appUrlOf = (profileKey) => `${origin}${state.appPath(profileKey)}`;
+  const recentAppUrl = (profileKey) => (state.recentAppUrl ? { appUrl: appUrlOf(profileKey) } : {});
   const error = (status, message, code, extra = {}, headers = {}) => json(status, { error: message, ...(code ? { code } : {}), ...extra }, headers);
 
   // ---- OAuth ----
@@ -198,12 +204,12 @@ export function createStubApi(options = {}) {
     if (sameKey && sameKey.profileKey !== profileKey) return error(400, "This request was already used for another profile.", "LINKEDIN_INVALID_PAYLOAD");
     if (sameKey?.status === "finalized") {
       if (sameKey.result.completeness === "insufficient") return error(409, "This capture is already finalized.", "LINKEDIN_CAPTURE_FINALIZED");
-      return json(200, { recent: { finalizedAt: new Date(sameKey.finalizedAt).toISOString(), completeness: sameKey.result.completeness, counts: sameKey.result.captured } });
+      return json(200, { recent: { finalizedAt: new Date(sameKey.finalizedAt).toISOString(), completeness: sameKey.result.completeness, counts: sameKey.result.captured, ...recentAppUrl(profileKey) } });
     }
     if (sameKey && (sameKey.status !== "open" || sameKey.expiresAt <= state.now())) return error(410, "This capture has expired.", "LINKEDIN_CAPTURE_EXPIRED");
     const recent = state.finalizedByKey.get(profileKey);
     if (!sameKey && !body.recapture && recent && state.now() - recent.finalizedAt < state.freshMs) {
-      return json(200, { recent: { finalizedAt: new Date(recent.finalizedAt).toISOString(), completeness: recent.completeness, counts: recent.counts } });
+      return json(200, { recent: { finalizedAt: new Date(recent.finalizedAt).toISOString(), completeness: recent.completeness, counts: recent.counts, ...recentAppUrl(profileKey) } });
     }
     // At most one open capture per profile: handed back with a new token and nothing staged.
     let capture = sameKey ?? [...state.captures.values()].find((c) => c.status === "open" && c.profileKey === profileKey && c.expiresAt > state.now());
@@ -290,7 +296,7 @@ export function createStubApi(options = {}) {
     capture.manifest = manifest;
     capture.result = {
       status: "finalized", completeness, captured: countsOf(capture),
-      appUrl: `${origin}/dashboard?linkedin=${encodeURIComponent(capture.profileKey)}`,
+      appUrl: appUrlOf(capture.profileKey),
     };
     if (completeness !== "insufficient") state.finalizedByKey.set(capture.profileKey, { finalizedAt: state.now(), completeness, counts: capture.result.captured });
     return json(200, capture.result);
@@ -302,7 +308,7 @@ export function createStubApi(options = {}) {
     if (method === "GET" && path === "/oauth/authorize") return authorize(url);
     if (method === "POST" && path === "/oauth/token") return token(form());
     if (method === "POST" && path === "/oauth/revoke") return revoke(form());
-    if (method === "GET" && (path === "/" || path === "/dashboard" || path === "/privacy")) {
+    if (method === "GET" && (path === "/" || path === "/dashboard" || path.startsWith("/dashboard/") || path === "/privacy")) {
       return { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" }, body: "<!doctype html><title>Stub Scouty</title><h1>Stub Scouty app</h1>" };
     }
     if (!path.startsWith("/api/linkedin/ext/")) return error(404, "Not found.");
