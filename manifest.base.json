@@ -3,6 +3,7 @@
   "default_locale": "en",
   "name": "__MSG_extName__",
   "description": "__MSG_extDescription__",
+  "homepage_url": "https://scouty.to/linkedin-extension",
   "permissions": ["scripting", "storage", "identity"],
   "host_permissions": ["<LINKEDIN_PATTERN>", "<API_PATTERN>"],
   "action": { "default_title": "Scouty LinkedIn Capture", "default_popup": "popup.html" },
