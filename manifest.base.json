@@ -3,7 +3,7 @@
   "default_locale": "en",
   "name": "__MSG_extName__",
   "description": "__MSG_extDescription__",
-  "homepage_url": "https://scouty.to/linkedin-extension",
+  "homepage_url": "https://scouty.to/scouty-extension",
   "permissions": ["scripting", "storage", "identity"],
   "host_permissions": ["<LINKEDIN_PATTERN>", "<API_PATTERN>"],
   "action": { "default_title": "Scouty Extension", "default_popup": "popup.html" },

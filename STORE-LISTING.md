@@ -13,12 +13,12 @@ other browser.
 | Short description / summary (≤ 132) | Captures the LinkedIn profile you choose, when you press Capture, and sends it to your Scouty workspace. Never acts on LinkedIn. (128, `extDescription`) |
 | Category | Chrome: **Productivity → Workflow & Planning**; Edge: **Productivity**; Firefox: **Social & Communication** |
 | Language | English |
-| Homepage / website | `https://scouty.to/linkedin-extension` (also the manifest's `homepage_url`) |
-| Support URL / site | `https://scouty.to/linkedin-extension#help` |
+| Homepage / website | `https://scouty.to/scouty-extension` (also the manifest's `homepage_url`) |
+| Support URL / site | `https://scouty.to/scouty-extension#help` |
 | Support email | `contact@scouty.to` |
 | Privacy policy URL | `https://scouty.to/privacy` (its section `#linkedin-extension` covers the extension) |
 | Icon | `icons/128.png` |
-| Screenshots (1280 × 800) | In the app repository, `output/store-screenshots/` (not committed): `1-capture`, `2-plan`, `3-only-reads`. Synthetic data only ("Synthetic Person", "Example Workspace"); never a real profile. Regenerate from the app's `public/linkedin-extension/` images and the extension gallery |
+| Screenshots (1280 × 800) | In the app repository, `output/store-screenshots/` (not committed): `1-capture`, `2-plan`, `3-only-reads`. Synthetic data only ("Synthetic Person", "Example Workspace"); never a real profile. Regenerate from the app's `public/scouty-extension/` images and the extension gallery |
 
 ## Description (all three stores, about 1,000 characters)
 

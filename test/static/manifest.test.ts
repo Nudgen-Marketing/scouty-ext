@@ -17,7 +17,7 @@ const SHARED = {
   name: "__MSG_extName__",
   description: "__MSG_extDescription__",
   // The public page every store listing also names as homepage and support (app plan linkedin-extension-page.md).
-  homepage_url: "https://scouty.to/linkedin-extension",
+  homepage_url: "https://scouty.to/scouty-extension",
   permissions: ["scripting", "storage", "identity"],
   host_permissions: ["https://www.linkedin.com/in/*", "https://scouty.to/*"],
   action: { default_title: "Scouty Extension", default_popup: "popup.html" },

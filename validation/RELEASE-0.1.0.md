@@ -15,10 +15,10 @@ green.
 | 7 | Live AI eval (app task A0) | **Open (costs API credit; owner's approval)** | |
 | 8 | Firefox: smoke, walk-through, source rebuild on a clean machine (Node 24) | **Open** | |
 | 9 | Edge walk-through | **Open** | |
-| 10 | Privacy, consent, store disclosures and public pages have legal sign-off | `PRIVACY.md`, `STORE-LISTING.md`, the app's `/privacy#linkedin-extension`, `/terms`, `/linkedin-extension` and the homepage section and FAQ items. **Open (M3)** | |
+| 10 | Privacy, consent, store disclosures and public pages have legal sign-off | `PRIVACY.md`, `STORE-LISTING.md`, the app's `/privacy#linkedin-extension`, `/terms`, `/scouty-extension` and the homepage section and FAQ items. **Open (M3)** | |
 | 11 | Server configured | **Open:** production migrations `20261204000000_linkedin_coach`, `20261205000000_linkedin_open_intents`, `20261206000000_linkedin_plan_outcomes` (backup first); `SCOUTY_EXTENSION_CLIENTS` with the three store ids (no `storeUrl` until approval); `SCOUTY_EXTENSION_MIN_VERSION=0.1.0`; `LINKEDIN_COACH_ENABLED=true`; `LINKEDIN_COACH_AUDIENCE=all` before the first submission (app plan §15.9) | |
 | 12 | Exit criteria of the rollout stage | **Open** | |
 | 13 | Store approvals | **Open** | |
 
-Package contents for this version: manifests carry `homepage_url: https://scouty.to/linkedin-extension`.
+Package contents for this version: manifests carry `homepage_url: https://scouty.to/scouty-extension`.
 Listing text, URLs and reviewer notes: `STORE-LISTING.md`.
