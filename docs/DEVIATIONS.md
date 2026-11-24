@@ -75,6 +75,66 @@ one API client, least-privilege manifests, nothing reduced submitted as complete
     code: `profileFromUrl` in the background before every injection, and the slug check in the
     reader. A LinkedIn page outside `/in/` stops the capture with `left_linkedin`.
 
+17. **LinkedIn SDUI markup (2026-11-24).** The first live run stopped with "This profile can't be
+    read": LinkedIn now serves profiles and activity pages with its server-driven UI, whose class
+    names are generated and meaningless, and none of the best-guess selectors matched. Selectors
+    version 2 (`src/reader/selectors.ts`, `SELECTORS_VERSION = 2`) uses no class at all:
+    - **Page state.** "ok" only when `main#workspace` exists **and** an element's
+      `data-sdui-screen` is the screen of the section being read (`…profile.Profile`,
+      `…ProfileExperienceDetails`, `…ProfileSkillDetails`, `…ProfileRecentActivityAll`,
+      `…ProfileRecentActivityComments`, `…ProfileRecentActivityReactions`). The addresses
+      `/uas/login`, `/authwall`, `/login` (logged out) and `/checkpoint/` (checkpoint) stop the read
+      before the slug check; the legacy sign-in, checkpoint, unavailable and reduced-profile markers
+      still stop it. Everything else, the legacy signed-in markup included, is "unknown" (fail
+      closed). `detectPageState` now takes the section.
+    - **Activity pages.** A block is a `[role=listitem]` of the `[role=list][data-component-type=
+      LazyColumn]` list in `main#workspace`. Its text is the header line that names what the lead
+      did ("… reposted this", "… likes this", "… liked a comment on this", "… commented on this";
+      English only), the relative date label from a "1w •" line ("1w", "2mo", …), then every
+      `expandable-text-box` of the item in order (the post, then the lead's comment, kept by the
+      head-and-tail clamp); an item with no text box is read as its visible text. Action controls
+      (named by `aria-label` or text: reactions, Like, Comment, Repost, Send, control menu,
+      Follow, document paging) and "Feed post" are never read. The URN comes from a link inside
+      the item: `/feed/update/<urn>/` or `/analytics/post-summary/<urn>/`, activity first. The
+      exact time still comes only from an activity URN; the date label stays in the text.
+      Infinite scroll: while `[data-testid=loader]` shows, a step waits up to three more pauses
+      (within the section's time budget) before it counts as idle.
+    - **Expand.** The only expand control is `button[data-testid=expandable-text-button]` inside an
+      `expandable-text-box` inside an activity item, a detail page root, or a profile section whose
+      h2 is one of the profile's own sections, within `main#workspace`. LinkedIn marks it
+      `aria-hidden="true"`: the allow-list refuses every aria-hidden or inert control except this
+      one, and only when no ancestor is aria-hidden. A text box that holds any other control
+      disqualifies its "… more" too. Every other rule stays (button, not submit, no link, form,
+      menu, tab list, dialog, toolbar, header or nav around it, no `aria-pressed` /
+      `aria-haspopup`, no action attribute or action name, the deny words, now also "menu",
+      "page", "navigate", "add a", "ad options"; nothing clicked unless `<html lang>` is en or vi).
+    - **Profile.** Name and headline come from the top card (the element whose id starts with
+      `com.linkedin.sdui.profile.card.` and ends with `Topcard`): its heading, then the first line
+      after it (a pronoun line is passed over; links such as Contact info are never read). Only
+      sections whose h2 is on an allow-list are read (About, Experience, Education, Skills,
+      Licenses & certifications, Languages, Recommendations, Featured, Volunteering, Projects,
+      Honors & awards, Courses, and Giới thiệu, Kinh nghiệm, Học vấn, Kỹ năng, Giấy phép & chứng
+      chỉ, Ngôn ngữ, Dự án, Khóa học); owner-only, recommendation and ad sections, the Activity
+      teaser, a section without an h2 and the contact section are skipped. Detail pages: the
+      entries under `[data-testid^=profile_ExperienceDetailsSection_]` /
+      `[data-testid^=profile_SkillDetails_]`, each entry's paragraphs and text boxes as lines,
+      entries separated by a blank line, as one section labelled Experience or Skills; a root
+      that shows nothing is LinkedIn's empty page.
+    - **Single alternatives.** Plan 6.6 asks for two or three alternatives per selector. The SDUI
+      hooks have no meaningful fallbacks, so most selectors now have one; the legacy class
+      selectors remain only where they can stop a read or never match (load-more, empty states).
+    - **Protocol v1 carries activity URNs only.** A share or ugcPost URN is used to drop
+      duplicates but is sent as `urn: null` (no permalink, no time); on the comments and reactions
+      pages most items carry no post link at all.
+    - **Sanitizer.** `tools/sanitize.mjs` also keeps `id="workspace"`, `data-sdui-screen` and
+      `data-component-type` values, the `componentkey` name, the `expandable-text-*` and `loader`
+      test ids, the detail-root test ids with the slug replaced by `x`, the top-card id as
+      `com.linkedin.sdui.profile.card.xTopcard`, and post links with made-up URNs.
+    - **Unverified:** how LinkedIn shows an empty activity list or empty detail page (read as
+      "empty" when the list or root is there with nothing in it), the Vietnamese header-line and
+      section wording beyond the labels above, and whether the screen names change across UI
+      languages.
+
 ## Contract decisions (to reconcile with the app)
 
 `protocol-v1/` is the app's directory, copied byte for byte. Where the plan left a shape open, the
@@ -166,7 +226,7 @@ extension follows the app's `src/lib/linkedin/protocol.ts`:
 
 ## Open points for the owner
 
-- Run E0 (live LinkedIn) and replace the best-guess selectors.
+- Run E0 (live LinkedIn) again with selectors version 2 (deviation 17) and record the click log.
 - Decide the licence; confirm whether the Scouty mark may replace the letter tile.
 - Rebuild on Node 24 on a clean machine and record the hashes in BUILD.md.
 - CI now runs `npm run smoke:firefox` (Firefox installed by `browser-actions/setup-firefox`, under

@@ -56,7 +56,9 @@ threshold.
 - [ ] **R2** Posts-page blocks carrying a URN (active profiles P2, P6): ≥ 90%.
 - [ ] **R3** 3 sampled permalinks open the right post; 3 sampled decoded dates match: 3/3 and 3/3
   (dates within 1 day).
-- [ ] **R4** Development click log: only "see more" and "show more results" controls. **Any other
+- [ ] **R4** Development click log: only the inline "… more" control
+  (`expandText: button[data-testid='expandable-text-button']`, inside a post or a profile entry's
+  text) and, on legacy pages, "show more results". **Any other
   click blocks release.**
 - [ ] **R5** LinkedIn warning, verification or "unusual activity" during or within 1 hour: none.
 - [ ] **R6** Finalize result and the app's summary: as expected (complete, or partial with the
