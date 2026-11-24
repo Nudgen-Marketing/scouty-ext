@@ -24,7 +24,7 @@ test("happy path: connect, consent, six pages read, finalize, open the analysis"
   expect(await page.evaluate(() => document.querySelector("scouty-capture-overlay")?.getAttribute("aria-label"))).toBe("Scouty capture");
 
   await expect(heading(popup)).toHaveText("Captured");
-  await expect(popup.getByText("Profile, 3 posts, 1 comment, 2 reactions.")).toBeVisible();
+  await expect(popup.getByText("Profile, 3 posts, 2 comments, 2 reactions.")).toBeVisible();
   await expect.poll(() => rig.overlayText(page)).toContain("Captured");
 
   const capture = [...rig.stub.state.captures.values()][0]!;
@@ -36,7 +36,16 @@ test("happy path: connect, consent, six pages read, finalize, open the analysis"
   expect(posts.pageSlug).toBe(SLUG);
   expect(posts.blocks[0]).toMatchObject({ urn: "urn:li:activity:7130316800000000000", urnTime: "2023-11-14T22:13:20.000Z" });
   expect(posts.blocks[1]!.text).toContain("THE-TAIL-OF-POST-TWO"); // expanded with the allowed control
-  expect(JSON.stringify(capture.sections.get("profile")!.payload)).not.toContain("THIS-MUST-NEVER-BE-READ");
+  expect(posts.blocks[2]).toMatchObject({ urn: null, urnTime: null }); // a ugcPost link: no activity URN to send
+  expect(posts.blocks[2]!.text.startsWith(`Synthetic Person One reposted this\n3d\n`)).toBe(true);
+  const comments = capture.sections.get("comments")!.payload;
+  expect(comments.blocks[0]!.urn).toBe("urn:li:activity:7127722905600000000");
+  expect(comments.blocks[0]!.text.endsWith("THE-LEAD-COMMENT: an invented reply that must survive clamping.")).toBe(true);
+  const profile = capture.sections.get("profile")!.payload;
+  expect(profile.profile).toMatchObject({ name: "Synthetic Person One", headline: "Head of Placeholder Operations at Example Fabrication Co" });
+  expect(profile.profile!.sections.map((s) => s.label)).toEqual(["About", "Experience", "Education", "Skills", "Licenses & certifications", "Languages"]);
+  expect(JSON.stringify(profile)).not.toMatch(/THIS-MUST-NEVER-BE-READ|OWNER-ONLY|STRANGER|AD-TEXT|NO-HEADING|PROFILE-ACTIVITY-SNIPPET/);
+  expect(JSON.stringify(capture.sections.get("experience")!.payload)).not.toContain("AD-TEXT");
   // Every capture call carried the version headers and none carried a cookie.
   for (const request of rig.stub.state.requests.filter((r) => r.path.startsWith("/api/"))) {
     expect(request.headers["x-scouty-protocol"]).toBe("1");
@@ -46,7 +55,8 @@ test("happy path: connect, consent, six pages read, finalize, open the analysis"
   expect(rig.linkedin.requests.filter((r) => r.path.startsWith("/in/")).map((r) => r.path)).toEqual(rig.linkedin.pagesOf(SLUG));
   expectReadOnly(rig, [SLUG]);
   expectOnlyExpandClicks(await rig.clicks(page));
-  expect((await rig.clicks(page)).length).toBeGreaterThan(0);
+  // About, the experience description and the long post: each "… more" pressed once; nothing else.
+  expect((await rig.clicks(page)).map((c) => c.path)).toEqual([`/in/${SLUG}/`, `/in/${SLUG}/details/experience/`, `/in/${SLUG}/recent-activity/all/`]);
 
   // "Open analysis in Scouty" opens the app page the server named.
   const opened = rig.context.waitForEvent("page");

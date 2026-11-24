@@ -10,13 +10,24 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const fixture = (name) => readFile(path.join(here, "..", "fixtures", "synthetic", `${name}.html`), "utf8");
 
+// The SDUI fixtures (LinkedIn's server-driven markup, selectors version 2).
 const SECTIONS = {
-  "": "profile",
-  "details/experience/": "details-experience",
-  "details/skills/": "details-skills",
-  "recent-activity/all/": "activity-posts",
-  "recent-activity/comments/": "activity-comments",
-  "recent-activity/reactions/": "activity-reactions",
+  "": "sdui-profile",
+  "details/experience/": "sdui-details-experience",
+  "details/skills/": "sdui-details-skills",
+  "recent-activity/all/": "sdui-activity-posts",
+  "recent-activity/comments/": "sdui-activity-comments",
+  "recent-activity/reactions/": "sdui-activity-reactions",
+};
+
+/** The screen LinkedIn names on each page; a fixture served at another path is given that page's screen. */
+const SCREENS = {
+  "": "com.linkedin.sdui.flagshipnav.profile.Profile",
+  "details/experience/": "com.linkedin.sdui.flagshipnav.profile.ProfileExperienceDetails",
+  "details/skills/": "com.linkedin.sdui.flagshipnav.profile.ProfileSkillDetails",
+  "recent-activity/all/": "com.linkedin.sdui.flagshipnav.profile.ProfileRecentActivityAll",
+  "recent-activity/comments/": "com.linkedin.sdui.flagshipnav.profile.ProfileRecentActivityComments",
+  "recent-activity/reactions/": "com.linkedin.sdui.flagshipnav.profile.ProfileRecentActivityReactions",
 };
 
 /** Behaviour switches, by slug. */
@@ -34,11 +45,11 @@ export const SLUGS = {
   // A long list, slow enough for the user to press Stop.
   "slow-person": { body: { "recent-activity/all/": 'data-lazy-total="60" data-lazy-step="1"' } },
   // No activity at all.
-  "no-activity-person": { pages: { "recent-activity/all/": "activity-empty", "recent-activity/comments/": "activity-empty", "recent-activity/reactions/": "activity-empty" } },
+  "no-activity-person": { pages: { "recent-activity/all/": "sdui-activity-empty", "recent-activity/comments/": "sdui-activity-empty", "recent-activity/reactions/": "sdui-activity-empty" } },
 };
 
-function page(html, slug, bodyAttributes) {
-  return html
+function page(html, slug, bodyAttributes, screen) {
+  return (screen ? html.replace(/data-sdui-screen="[^"]*"/, `data-sdui-screen="${screen}"`) : html)
     .split("synthetic-person-one").join(slug)
     // Tall enough to scroll, as a real profile is.
     .replace("</head>", "<style>body{min-height:30000px;font-family:sans-serif}[hidden]{display:none}</style></head>")
@@ -66,7 +77,7 @@ export function createMockLinkedin() {
       if (!config || !(rest in SECTIONS)) return send(404, "text/html", page(await fixture("not-found"), slug, ""));
       if (config.redirect) return send(302, "text/plain", "", { Location: `/in/${config.redirect}/${rest}` });
       const name = config.all ?? config.pages?.[rest] ?? SECTIONS[rest];
-      return send(200, "text/html; charset=utf-8", page(await fixture(name), slug, config.body?.[rest] ?? ""));
+      return send(200, "text/html; charset=utf-8", page(await fixture(name), slug, config.body?.[rest] ?? "", config.pages?.[rest] ? SCREENS[rest] : null));
     } catch (error) {
       return send(500, "text/plain", String(error));
     }

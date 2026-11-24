@@ -11,7 +11,7 @@ const dist = path.join(root, "dist", "e2e");
 export const LINKEDIN = "http://linkedin.test";
 export const SCOUTY = "http://scouty.test";
 
-export type Click = { tag: string; cls: string; text: string; path: string; trusted: boolean };
+export type Click = { tag: string; cls: string; testid: string; hidden: string; inBox: boolean; text: string; path: string; trusted: boolean };
 export type Rig = {
   context: BrowserContext;
   extensionId: string;
@@ -132,12 +132,19 @@ export function expectReadOnly(rig: Rig, slugs: string[]): void {
   expect(rig.linkedin.requests.some((r) => /contact-info|overlay|messaging|feed/.test(r.path))).toBe(false);
 }
 
-/** The pages saw clicks only on the expand and load-more controls, never from a person (no test clicks there either). */
+/**
+ * The pages saw clicks only on the one allowed control, never from a person (no test clicks there
+ * either): the aria-hidden "… more" button with data-testid="expandable-text-button" inside an
+ * expandable-text-box. (The SDUI pages have no load-more control.)
+ */
 export function expectOnlyExpandClicks(clicks: Click[]): void {
   for (const click of clicks) {
     expect(click.tag, JSON.stringify(click)).toBe("button");
-    expect(click.cls, JSON.stringify(click)).toMatch(/see-more-less-toggle|inline-show-more-text__button|scaffold-finite-scroll__load-button/);
-    expect(click.text, JSON.stringify(click)).toMatch(/^(…see more|Show more results)$/);
+    expect(click.testid, JSON.stringify(click)).toBe("expandable-text-button");
+    expect(click.hidden, JSON.stringify(click)).toBe("true");
+    expect(click.inBox, JSON.stringify(click)).toBe(true);
+    expect(click.text, JSON.stringify(click)).toBe("… more");
+    expect(click.trusted, JSON.stringify(click)).toBe(false);
   }
 }
 
