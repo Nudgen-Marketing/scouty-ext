@@ -128,7 +128,7 @@ describe("the 27 screens", () => {
     expect(text(10)).toContain("You stopped early, so some parts are missing.");
     expect(text(11)).toContain("Sign in on linkedin.com, then try again.");
     expect(text(14)).toContain("Capture it from its new page.");
-    expect(text(16)).toContain("Do it in the next few minutes to finish this capture.");
+    expect(text(16)).toContain("Do it in the next few minutes to save what was already read.");
     expect(text(20)).toContain("Scouty doesn't keep data about this person.");
     expect(text(21)).toContain("Nothing was saved.");
     expect(text(23)).toContain("Synthetic Tester · tester@example.invalid");
@@ -399,6 +399,9 @@ describe("view model", () => {
     expect(viewFor({ ...partial, notExpanded: true }).body).toEqual(["Profile · 23 posts", "You stopped early, so some parts are missing."]);
     const timedOut = partial.sections.map((line) => (line.state === "skipped" ? { ...line, reason: "timeout" as const } : line.state === "partial" ? { ...line, reason: "timeout" as const } : line));
     expect(viewFor({ ...partial, sections: timedOut }).body[1]).toBe("Some parts couldn't be read.");
+    // Signed out mid-capture: reconnecting saved what was read; the line says why the rest is missing.
+    const signedOut = partial.sections.map((line) => (line.state === "skipped" || line.state === "partial" ? { ...line, reason: "signed_out_of_scouty" as const } : line));
+    expect(viewFor({ ...partial, sections: signedOut }).body[1]).toBe("The connection ended, so some parts are missing.");
     const whole = partial.sections.map((line) => ({ ...line, state: "complete" as const, reason: null, count: line.count ?? 3 }));
     expect(viewFor({ ...partial, sections: whole, notExpanded: true }).body).toEqual(["Profile · 23 posts · 3 comments · 3 reactions", "Some long posts weren't opened in full."]);
     // The development click log is never part of a screen, in any build (it lives in the background console and Settings → Developer).

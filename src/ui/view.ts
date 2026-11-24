@@ -80,6 +80,7 @@ function partialCountsLine(sections: SectionLine[]): string {
 function partialReason(sections: SectionLine[], notExpanded: boolean): string {
   const gaps = sections.filter((line) => line.state === "skipped" || line.state === "partial");
   if (gaps.some((line) => line.reason === "user_stopped")) return t("partialStopped");
+  if (gaps.some((line) => line.reason === "signed_out_of_scouty")) return t("partialSignedOut");
   if (gaps.length === 0 && notExpanded) return t("partialShortened");
   return t("partialMissing");
 }

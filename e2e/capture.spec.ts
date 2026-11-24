@@ -202,16 +202,17 @@ test("access token expired mid-capture: one refresh, then the capture completes"
   expectOnlyExpandClicks(await rig.clicks(page));
 });
 
-test("connection revoked mid-capture: reading stops; reconnecting finishes sending what was read", async ({ rig }) => {
+test("connection revoked mid-capture: reading stops; reconnecting saves what was read", async ({ rig }) => {
   const { page, popup } = await startCapture(rig, SLUG);
   await expect.poll(() => rig.stub.state.captures.size).toBe(1);
   rig.stub.revokeAll();
   await expect(heading(popup)).toHaveText("Connect to Scouty again");
-  await expect(popup.getByText("Do it in the next few minutes to finish this capture.")).toBeVisible();
+  await expect(popup.getByText("Do it in the next few minutes to save what was already read.")).toBeVisible();
   const loads = rig.linkedin.requests.filter((r) => r.path.startsWith("/in/")).length;
   expect([...rig.stub.state.captures.values()][0]!.status).toBe("open");
   await popup.getByRole("button", { name: "Connect", exact: true }).click();
   await expect(heading(popup)).toHaveText("Partly done");
+  await expect(popup.getByText("The connection ended, so some parts are missing.")).toBeVisible();
   const capture = [...rig.stub.state.captures.values()][0]!;
   expect(capture.status).toBe("finalized");
   expect(capture.manifest!.stop).toBe("signed_out_of_scouty");

@@ -219,6 +219,11 @@ one API client, least-privilege manifests, nothing reduced submitted as complete
     The nesting is in `fixtures/synthetic/sdui-profile-nested.html`, modelled on the live survey;
     tests in `test/unit/profile.test.ts` and `test/unit/reader.test.ts`. Verified on staging: a
     capture started from the activity page now carries the name, the headline and About.
+    - **Connection ended wording.** After a revoke, reconnecting saves what was read and does not
+      read on (by design: a revoke withdraws consent). "Do it in the next few minutes to finish this
+      capture." read as a promise to finish reading; it is now "… to save what was already read.",
+      and the partial result says "The connection ended, so some parts are missing." (tested in
+      `test/ui/states.test.tsx` and the revoke run of `e2e/capture.spec.ts`).
 
 ## Contract decisions (to reconcile with the app)
 

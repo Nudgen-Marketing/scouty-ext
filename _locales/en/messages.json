@@ -188,6 +188,9 @@
   "partialStopped": {
     "message": "You stopped early, so some parts are missing."
   },
+  "partialSignedOut": {
+    "message": "The connection ended, so some parts are missing."
+  },
   "partialMissing": {
     "message": "Some parts couldn't be read."
   },
@@ -255,7 +258,7 @@
     "message": "Connect to Scouty again"
   },
   "connectionEndedBody": {
-    "message": "Do it in the next few minutes to finish this capture."
+    "message": "Do it in the next few minutes to save what was already read."
   },
   "limitTitle": {
     "message": "That's all for today"
