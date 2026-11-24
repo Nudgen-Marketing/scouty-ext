@@ -28,6 +28,7 @@
     "sanitize": "node tools/sanitize.mjs",
     "tokens": "node tools/tokens.mjs",
     "icons": "node tools/icons.mjs",
+    "brand": "node tools/brand.mjs",
     "check": "npm run typecheck && npm run lint && npm run build && npm test && npm run test:e2e && npm run lint:firefox"
   },
   "devDependencies": {
