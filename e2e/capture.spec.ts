@@ -1,12 +1,12 @@
 import type { Page } from "@playwright/test";
-import { expect, expectOnlyExpandClicks, expectReadOnly, heading, test } from "./harness";
+import { expect, expectOnlyExpandClicks, expectReadOnly, heading, test, type Browser } from "./harness";
 
 const SLUG = "synthetic-person-one";
 /** The app page the server names for a lead in a campaign (the app's round trip). */
 const campaignPath = (key: string): string => `/dashboard/proj_1/campaigns/camp_1?linkedin=${encodeURIComponent(key)}&person=person_1`;
 
 /** Connect, accept the first-run consent and start a capture of the tab. */
-async function startCapture(rig: Parameters<Parameters<typeof test>[2]>[0]["rig"], slug: string, from?: Page) {
+async function startCapture(rig: Browser, slug: string, from?: Page) {
   const { page, tabId } = await rig.openProfile(slug, "", from);
   const popup = await rig.openPopup(tabId);
   await expect(heading(popup)).toHaveText("Connect to Scouty");
@@ -220,6 +220,30 @@ test("connection revoked mid-capture: reading stops; reconnecting saves what was
   expect(rig.linkedin.requests.filter((r) => r.path.startsWith("/in/")).length).toBe(loads);
   expectReadOnly(rig, [SLUG]);
   expectOnlyExpandClicks(await rig.clicks(page));
+});
+
+test("the same profile started in a second browser profile takes the capture over; the first stops", async ({ rig }) => {
+  const first = await startCapture(rig, SLUG);
+  await expect(heading(first.popup)).toHaveText(/^Reading /);
+  await expect.poll(() => rig.stub.state.captures.size).toBe(1);
+  // The same Scouty user, in another Chrome profile with its own extension, starts the same profile.
+  const other = await rig.secondProfile();
+  const second = await startCapture(other, SLUG);
+  await expect(heading(first.popup)).toHaveText("This capture stopped", { timeout: 200_000 });
+  await expect(first.popup.getByText("It was restarted elsewhere or removed in Scouty.")).toBeVisible();
+  await expect(heading(second.popup)).toHaveText("Done", { timeout: 200_000 });
+  // One capture row, handed to the second profile and finalized by it; nothing from the first counts.
+  expect(rig.stub.state.captures.size).toBe(1);
+  const capture = [...rig.stub.state.captures.values()][0]!;
+  expect(capture.status).toBe("finalized");
+  expect(capture.result).toMatchObject({ completeness: "complete" });
+  // The first profile stopped reading: its LinkedIn tab stays on the page it was on.
+  const stoppedAt = first.page.url();
+  await first.page.waitForTimeout(3000);
+  expect(first.page.url()).toBe(stoppedAt);
+  expectReadOnly(rig, [SLUG]);
+  expectOnlyExpandClicks(await rig.clicks(first.page));
+  expectOnlyExpandClicks(await other.clicks(second.page));
 });
 
 test("extension below the minimum version: told to update, nothing is read", async ({ rig }) => {

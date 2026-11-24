@@ -12,12 +12,11 @@ export const LINKEDIN = "http://linkedin.test";
 export const SCOUTY = "http://scouty.test";
 
 export type Click = { tag: string; cls: string; testid: string; hidden: string; inBox: boolean; text: string; path: string; trusted: boolean };
-export type Rig = {
+/** One Chrome profile with the extension loaded: what a person has in one browser. */
+export type Browser = {
   context: BrowserContext;
   extensionId: string;
   worker: () => Promise<Worker>;
-  stub: StubApi;
-  linkedin: ReturnType<typeof createMockLinkedin>;
   /** Console errors and CSP violations seen on extension pages. */
   problems: string[];
   /**
@@ -37,6 +36,107 @@ export type Rig = {
   overlayText(page: Page): Promise<string>;
 };
 
+export type Rig = Browser & {
+  stub: StubApi;
+  linkedin: ReturnType<typeof createMockLinkedin>;
+  /** A second, separate Chrome profile with its own extension, on the same mock LinkedIn and stub Scouty. */
+  secondProfile(): Promise<Browser>;
+};
+
+type Launched = Browser & { close(): Promise<void> };
+
+async function launch(extensionId: string, linkedinPort: number, stubPort: number): Promise<Launched> {
+  const profile = await mkdtemp(path.join(os.tmpdir(), "scouty-ext-e2e-"));
+  const context = await chromium.launchPersistentContext(profile, {
+    channel: "chromium",
+    headless: true,
+    args: [
+      `--disable-extensions-except=${dist}`,
+      `--load-extension=${dist}`,
+      `--host-resolver-rules=MAP linkedin.test 127.0.0.1:${linkedinPort}, MAP scouty.test 127.0.0.1:${stubPort}`,
+    ],
+  });
+  const worker = async (): Promise<Worker> => context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
+  expect((await worker()).url()).toBe(`chrome-extension://${extensionId}/background.js`);
+  const problems: string[] = [];
+  const watch = (page: Page): void => {
+    page.on("console", (message) => {
+      if (message.type() === "error" && page.url().startsWith("chrome-extension://")) problems.push(`${page.url()}: ${message.text()}`);
+    });
+    page.on("pageerror", (error) => problems.push(`${page.url()}: ${error.message}`));
+  };
+  context.on("page", watch);
+
+  return {
+    context, extensionId, worker, problems,
+    async openProfile(slug, rest = "", from) {
+      const url = `${LINKEDIN}/in/${slug}/${rest}`;
+      let page: Page;
+      if (from) {
+        // The user clicks in the app tab they are looking at.
+        await from.bringToFront();
+        const opened = context.waitForEvent("page");
+        await from.evaluate((href) => {
+          const link = Object.assign(document.createElement("a"), { href, target: "_blank", rel: "noopener noreferrer", textContent: "LinkedIn" });
+          document.body.append(link);
+          link.click();
+        }, url);
+        page = await opened;
+        await page.waitForLoadState();
+      } else {
+        page = await context.newPage();
+        await page.goto(url);
+      }
+      const sw = await worker();
+      const tabId = await sw.evaluate(async (needle) => {
+        const tabs = await chrome.tabs.query({});
+        return tabs.find((tab) => (tab.url ?? "").includes(needle))?.id ?? null;
+      }, `/in/`);
+      if (tabId === null) throw new Error("the extension cannot see the LinkedIn tab");
+      return { page, tabId };
+    },
+    async openApp(path) {
+      const page = await context.newPage();
+      await page.goto(`${SCOUTY}${path}`);
+      return page;
+    },
+    async openPopup(tabId) {
+      const popup = await context.newPage();
+      await popup.addInitScript(() => {
+        document.addEventListener("securitypolicyviolation", (event) => console.error(`CSP violation: ${event.violatedDirective} ${event.blockedURI}`));
+      });
+      await popup.goto(`chrome-extension://${extensionId}/popup.html${tabId === null ? "" : `?tabId=${tabId}`}`);
+      return popup;
+    },
+    async connect(popup) {
+      await popup.getByRole("button", { name: "Connect", exact: true }).click();
+      await expect(popup.getByRole("heading", { level: 1 })).not.toHaveText(/^(Connect to Scouty|Connecting…)$/, { timeout: 30_000 });
+    },
+    async clicks(page) {
+      return page.evaluate(() => JSON.parse(sessionStorage.getItem("__mock_clicks") ?? "[]") as Click[]);
+    },
+    async overlayText(page) {
+      const session = await context.newCDPSession(page);
+      const { root: document } = await session.send("DOM.getDocument", { depth: -1, pierce: true });
+      type Node = { nodeName: string; nodeValue?: string; children?: Node[]; shadowRoots?: Node[] };
+      const texts: string[] = [];
+      const visit = (node: Node, inside: boolean): void => {
+        const here = inside || node.nodeName === "SCOUTY-CAPTURE-OVERLAY";
+        if (here && node.nodeName === "#text" && node.nodeValue) texts.push(node.nodeValue);
+        if (node.nodeName === "STYLE") return;
+        for (const child of [...(node.children ?? []), ...(node.shadowRoots ?? [])]) visit(child, here);
+      };
+      visit(document as Node, false);
+      await session.detach();
+      return texts.join(" | ");
+    },
+    async close() {
+      await context.close();
+      await rm(profile, { recursive: true, force: true });
+    },
+  };
+}
+
 export const test = base.extend<{ rig: Rig }>({
   // eslint-disable-next-line no-empty-pattern
   rig: async ({}, use) => {
@@ -52,96 +152,20 @@ export const test = base.extend<{ rig: Rig }>({
     });
     const stubServer = (await stub.listen()) as Server;
     const port = (server: Server): number => (server.address() as { port: number }).port;
-    const profile = await mkdtemp(path.join(os.tmpdir(), "scouty-ext-e2e-"));
-    const context = await chromium.launchPersistentContext(profile, {
-      channel: "chromium",
-      headless: true,
-      args: [
-        `--disable-extensions-except=${dist}`,
-        `--load-extension=${dist}`,
-        `--host-resolver-rules=MAP linkedin.test 127.0.0.1:${port(linkedinServer)}, MAP scouty.test 127.0.0.1:${port(stubServer)}`,
-      ],
-    });
-    const worker = async (): Promise<Worker> => context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
-    expect((await worker()).url()).toBe(`chrome-extension://${extensionId}/background.js`);
-    const problems: string[] = [];
-    const watch = (page: Page): void => {
-      page.on("console", (message) => {
-        if (message.type() === "error" && page.url().startsWith("chrome-extension://")) problems.push(`${page.url()}: ${message.text()}`);
-      });
-      page.on("pageerror", (error) => problems.push(`${page.url()}: ${error.message}`));
-    };
-    context.on("page", watch);
-
+    const first = await launch(extensionId, port(linkedinServer), port(stubServer));
+    const others: Launched[] = [];
     const rig: Rig = {
-      context, extensionId, worker, stub, linkedin, problems,
-      async openProfile(slug, rest = "", from) {
-        const url = `${LINKEDIN}/in/${slug}/${rest}`;
-        let page: Page;
-        if (from) {
-          // The user clicks in the app tab they are looking at.
-          await from.bringToFront();
-          const opened = context.waitForEvent("page");
-          await from.evaluate((href) => {
-            const link = Object.assign(document.createElement("a"), { href, target: "_blank", rel: "noopener noreferrer", textContent: "LinkedIn" });
-            document.body.append(link);
-            link.click();
-          }, url);
-          page = await opened;
-          await page.waitForLoadState();
-        } else {
-          page = await context.newPage();
-          await page.goto(url);
-        }
-        const sw = await worker();
-        const tabId = await sw.evaluate(async (needle) => {
-          const tabs = await chrome.tabs.query({});
-          return tabs.find((tab) => (tab.url ?? "").includes(needle))?.id ?? null;
-        }, `/in/`);
-        if (tabId === null) throw new Error("the extension cannot see the LinkedIn tab");
-        return { page, tabId };
-      },
-      async openApp(path) {
-        const page = await context.newPage();
-        await page.goto(`${SCOUTY}${path}`);
-        return page;
-      },
-      async openPopup(tabId) {
-        const popup = await context.newPage();
-        await popup.addInitScript(() => {
-          document.addEventListener("securitypolicyviolation", (event) => console.error(`CSP violation: ${event.violatedDirective} ${event.blockedURI}`));
-        });
-        await popup.goto(`chrome-extension://${extensionId}/popup.html${tabId === null ? "" : `?tabId=${tabId}`}`);
-        return popup;
-      },
-      async connect(popup) {
-        await popup.getByRole("button", { name: "Connect", exact: true }).click();
-        await expect(popup.getByRole("heading", { level: 1 })).not.toHaveText(/^(Connect to Scouty|Connecting…)$/, { timeout: 30_000 });
-      },
-      async clicks(page) {
-        return page.evaluate(() => JSON.parse(sessionStorage.getItem("__mock_clicks") ?? "[]") as Click[]);
-      },
-      async overlayText(page) {
-        const session = await context.newCDPSession(page);
-        const { root: document } = await session.send("DOM.getDocument", { depth: -1, pierce: true });
-        type Node = { nodeName: string; nodeValue?: string; children?: Node[]; shadowRoots?: Node[] };
-        const texts: string[] = [];
-        const visit = (node: Node, inside: boolean): void => {
-          const here = inside || node.nodeName === "SCOUTY-CAPTURE-OVERLAY";
-          if (here && node.nodeName === "#text" && node.nodeValue) texts.push(node.nodeValue);
-          if (node.nodeName === "STYLE") return;
-          for (const child of [...(node.children ?? []), ...(node.shadowRoots ?? [])]) visit(child, here);
-        };
-        visit(document as Node, false);
-        await session.detach();
-        return texts.join(" | ");
+      ...first, stub, linkedin,
+      async secondProfile() {
+        const other = await launch(extensionId, port(linkedinServer), port(stubServer));
+        others.push(other);
+        return other;
       },
     };
     await use(rig);
-    await context.close();
+    for (const browser of [first, ...others]) await browser.close();
     await new Promise((resolve) => linkedinServer.close(resolve));
     await new Promise((resolve) => stubServer.close(resolve));
-    await rm(profile, { recursive: true, force: true });
   },
 });
 

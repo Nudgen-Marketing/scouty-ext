@@ -82,8 +82,8 @@ App plan §15.4. Commits of both repositories, Chrome version, then each scenari
 | S2 analysis (plan within 5 minutes, ends with the reply step, no link) | |
 | S3 Stop | |
 | S4 network cut, resumed without reloading LinkedIn | |
-| S5 connection revoked mid-capture, reconnect finishes it | |
-| S6 capture stopped: started again from another browser (state 25) | |
+| S5 connection revoked mid-capture, reconnect saves what was read (partial, signed_out_of_scouty) | |
+| S6 capture stopped: started again from another browser (state 25); also automated in `e2e/capture.spec.ts` with two Chrome profiles | |
 | S7 extension below the minimum version (state 19) | |
 | S8 recent capture reused (state 7) | |
 

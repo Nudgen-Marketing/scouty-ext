@@ -224,6 +224,11 @@ one API client, least-privilege manifests, nothing reduced submitted as complete
       capture." read as a promise to finish reading; it is now "… to save what was already read.",
       and the partial result says "The connection ended, so some parts are missing." (tested in
       `test/ui/states.test.tsx` and the revoke run of `e2e/capture.spec.ts`).
+    - **S6 automated.** The takeover (the same user starts the same profile in a second Chrome
+      profile while the first reads) is now an e2e run with two persistent contexts on one stub
+      (`rig.secondProfile()` in `e2e/harness.ts`): the first shows "This capture stopped" and stops
+      reading, the second finishes, one finalized capture. It fails when the stub opens a second
+      capture instead of handing the open one over.
 
 ## Contract decisions (to reconcile with the app)
 
