@@ -92,13 +92,23 @@ describe("the extension's builders produce the valid example shapes", () => {
     const finalized = json<FinalizeResponse>("responses/finalize.json");
     expect(finalized).toMatchObject({ status: "finalized", completeness: "complete" });
     expect(Object.keys(finalized.captured).sort()).toEqual(["comments", "posts", "profileSections", "reactions"]);
-    expect(new URL(finalized.appUrl).pathname).toBe("/dashboard");
+    expect(new URL(finalized.appUrl).pathname).toMatch(APP_PATH);
+    // The app may also name a campaign page; the extension opens whatever it names on the Scouty origin.
+    for (const url of [finalized.appUrl, "https://scouty.example/dashboard/proj_1/campaigns/camp_1?linkedin=synthetic-person-0001&person=person_1"]) {
+      expect(new URL(url).origin).toBe(new URL(finalized.appUrl).origin);
+      expect(new URL(url).pathname).toMatch(APP_PATH);
+    }
+    // `recent.appUrl` is optional: the fixture predates it, and the extension falls back without it.
+    expect(recent.recent.appUrl === undefined || new URL(recent.recent.appUrl).pathname.match(APP_PATH) !== null).toBe(true);
     expect(json<SessionResponse>("responses/session.json")).toMatchObject({ protocol: 1, limits: { capturesLeftToday: 40 } });
     expect(json<StatusResponse>("responses/status.json").received[0]).toMatchObject({ section: "profile", seq: 1 });
     expect(json<ErrorBody>("responses/error-manifest-mismatch.json")).toMatchObject({ code: "LINKEDIN_MANIFEST_MISMATCH", missing: ["reactions"], mismatched: ["posts"] });
     expect(json<ErrorBody>("responses/error-outdated.json")).toMatchObject({ code: "LINKEDIN_EXTENSION_OUTDATED", minVersion: "0.1.0" });
   });
 });
+
+/** The app pages a capture may name: the dashboard, or a campaign in a project. */
+const APP_PATH = /^\/dashboard(\/[^/]+\/campaigns\/[^/]+)?$/;
 
 describe("every example gets its recorded outcome from the stub that implements section 5", () => {
   type Session = { stub: StubApi; headers: Record<string, string>; id: string };

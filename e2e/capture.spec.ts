@@ -2,6 +2,8 @@ import type { Page } from "@playwright/test";
 import { expect, expectOnlyExpandClicks, expectReadOnly, heading, test } from "./harness";
 
 const SLUG = "synthetic-person-one";
+/** The app page the server names for a lead in a campaign (the app's round trip). */
+const campaignPath = (key: string): string => `/dashboard/proj_1/campaigns/camp_1?linkedin=${encodeURIComponent(key)}&person=person_1`;
 
 /** Connect, accept the first-run consent and start a capture of the tab. */
 async function startCapture(rig: Parameters<Parameters<typeof test>[2]>[0]["rig"], slug: string, from?: Page) {
@@ -16,9 +18,11 @@ async function startCapture(rig: Parameters<Parameters<typeof test>[2]>[0]["rig"
 
 test("happy path: connect, consent, six pages read, finalize, back to the app tab with the analysis", async ({ rig }) => {
   rig.stub.state.caps = { posts: 5, comments: 5, reactions: 5 };
-  // The user is in the app, which opens the LinkedIn profile in a new tab; another app tab is on the page the server will name.
-  const app = await rig.openApp("/");
-  const other = await rig.openApp("/dashboard?view=old");
+  rig.stub.state.appPath = campaignPath;
+  // The user is in a campaign's lead list, which opens the LinkedIn profile in a new tab; another
+  // app tab is already on the campaign page the server will name.
+  const app = await rig.openApp("/dashboard/proj_1/campaigns/camp_1?view=leads");
+  const other = await rig.openApp("/dashboard/proj_1/campaigns/camp_1?view=old");
   const { page, popup } = await startCapture(rig, SLUG, app);
   await expect(heading(popup)).toHaveText(/^Reading /);
   await expect(popup.getByRole("progressbar")).toBeVisible();
@@ -64,14 +68,14 @@ test("happy path: connect, consent, six pages read, finalize, back to the app ta
   // About, the experience description and the long post: each "… more" pressed once; nothing else.
   expect((await rig.clicks(page)).map((c) => c.path)).toEqual([`/in/${SLUG}/`, `/in/${SLUG}/details/experience/`, `/in/${SLUG}/recent-activity/all/`]);
 
-  // "Open in Scouty" shows the app page the server named in the app tab that opened LinkedIn: no new
-  // tab, the other app tab and the LinkedIn tab untouched.
+  // "Open in Scouty" shows the page the server named, with its full query, in the app tab that
+  // opened LinkedIn: no new tab, the other app tab and the LinkedIn tab untouched.
   const pages = rig.context.pages().length;
   const linkedinUrl = page.url();
   await popup.getByRole("button", { name: "Open in Scouty" }).click();
-  await expect.poll(() => app.url()).toBe(`http://scouty.test/dashboard?linkedin=${SLUG}`);
+  await expect.poll(() => app.url()).toBe(`http://scouty.test${campaignPath(SLUG)}`);
   expect(rig.context.pages().length).toBe(pages);
-  expect(other.url()).toBe("http://scouty.test/dashboard?view=old");
+  expect(other.url()).toBe("http://scouty.test/dashboard/proj_1/campaigns/camp_1?view=old");
   expect(page.url()).toBe(linkedinUrl);
   // The popup ran under the strict CSP without a violation or an error.
   expect(rig.problems).toEqual([]);
@@ -242,7 +246,8 @@ test("recently captured: offers what Scouty has, and Capture again reads the pro
   await popup.getByRole("button", { name: "Capture", exact: true }).click();
   await expect(heading(popup)).toHaveText("Captured today");
   await expect(popup.getByRole("button", { name: "Open in Scouty" })).toBeVisible();
-  // No app tab opened LinkedIn here: "Open in Scouty" goes to the app tab already on that page, not a new tab.
+  // The { recent } answer names the app page (recent.appUrl). No app tab opened LinkedIn here:
+  // "Open in Scouty" goes to the app tab already on that page, not a new tab.
   const app = await rig.openApp("/dashboard?view=old");
   const pages = rig.context.pages().length;
   await popup.getByRole("button", { name: "Open in Scouty" }).click();
@@ -256,6 +261,19 @@ test("recently captured: offers what Scouty has, and Capture again reads the pro
   expect([...rig.stub.state.captures.values()].every((c) => c.status === "finalized")).toBe(true);
   expectReadOnly(rig, ["no-activity-person"]);
   expectOnlyExpandClicks(await rig.clicks(page));
+
+  // A server that names a campaign page in its { recent } answer: that page, query and all, in the
+  // app tab already on that campaign.
+  rig.stub.state.appPath = campaignPath;
+  await popup.getByRole("button", { name: "Close", exact: true }).click();
+  await popup.getByRole("button", { name: "Capture", exact: true }).click();
+  await expect(heading(popup)).toHaveText("Captured today");
+  const campaign = await rig.openApp("/dashboard/proj_1/campaigns/camp_1?view=leads");
+  const before = rig.context.pages().length;
+  await popup.getByRole("button", { name: "Open in Scouty" }).click();
+  await expect.poll(() => campaign.url()).toBe(`http://scouty.test${campaignPath("no-activity-person")}`);
+  expect(app.url()).toBe("http://scouty.test/dashboard?linkedin=no-activity-person");
+  expect(rig.context.pages().length).toBe(before);
 });
 
 test("a profile with no activity: the activity sections are declared unavailable, not uploaded", async ({ rig }) => {
