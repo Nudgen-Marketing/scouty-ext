@@ -35,7 +35,7 @@ describe("popup state", () => {
     const r = await rig();
     grant();
     await auth.signOut();
-    expect(await popupUi(ctx(r), on)).toEqual({ kind: "signedOut", devRedirectUrl: null });
+    expect(await popupUi(ctx(r), on)).toEqual({ kind: "signedOut" });
     expect(await popupUi(ctx(r, true), on)).toEqual({ kind: "connecting" });
     await auth.connect();
     expect(await popupUi(ctx(r), { tabId: 3, tabUrl: "https://www.linkedin.com/feed/", settings: false })).toEqual({ kind: "notOnProfile", workspace: "Synthetic Workspace" });
@@ -55,7 +55,7 @@ describe("popup state", () => {
     const r = await rig();
     grant();
     await giveConsent();
-    expect(await popupUi(ctx(r), { ...on, settings: true })).toEqual({ kind: "settings", name: "Synthetic Tester", email: "tester@example.invalid", workspace: "Synthetic Workspace", version: "0.1.0", devRedirectUrl: null });
+    expect(await popupUi(ctx(r), { ...on, settings: true })).toEqual({ kind: "settings", name: "Synthetic Tester", email: "tester@example.invalid", workspace: "Synthetic Workspace", version: "0.1.0" });
     await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
     await r.controller.settledWork();
     expect(await popupUi(ctx(r), on)).toMatchObject({ kind: "capturing", section: "profile", cap: 0 });

@@ -46,7 +46,8 @@ agreed, referred to by its label (P1); record no name, URL, text or screenshot o
    Expected: the prompt lists LinkedIn and Scouty only; after accepting, the popup shows "Capture a
    LinkedIn profile into Scouty" with **Connect to Scouty** (reopen the popup if Firefox closed it
    for the prompt; note whether it did).
-7. Development build only: the popup shows a "Redirect URL" line. Make sure the app's
+7. Development build only: open the collapsed **Developer** disclosure under the popup's first
+   screen and copy the "Redirect URL" line. Make sure the app's
    `scouty-ext-firefox` entry of `SCOUTY_EXTENSION_CLIENTS` has that redirect URL and
    `"origin":"moz-extension"`, and restart the app.
 8. Press **Connect to Scouty**.

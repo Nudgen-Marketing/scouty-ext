@@ -259,7 +259,7 @@ describe("capture controller", () => {
     r.tab.info = { url: undefined, status: "complete" };
     await r.controller.tabLoaded(TAB);
     expect(await r.controller.current()).toMatchObject({ phase: "done", result: { stop: "left_linkedin" } });
-    expect(captureUi(await r.controller.current(), { clickLog: [], minutesLeft: null }, "W", 0)).toEqual({ kind: "linkedinSignIn", workspace: "W" });
+    expect(captureUi(await r.controller.current(), { minutesLeft: null }, "W", 0)).toEqual({ kind: "linkedinSignIn", workspace: "W" });
   });
 
   it("a LinkedIn page outside /in/ is never read, even where the browser would allow it", async () => {
@@ -292,7 +292,7 @@ describe("capture controller", () => {
     await r.controller.settledWork();
     const state = await r.controller.current();
     expect(state).toMatchObject({ phase: "done", result: { stop: "wrong_profile", address: "https://www.linkedin.com/in/renamed-person/" } });
-    expect(captureUi(state, { clickLog: [], minutesLeft: null }, "W", 0)).toEqual({ kind: "addressChanged", address: "https://www.linkedin.com/in/renamed-person/", workspace: "W" });
+    expect(captureUi(state, { minutesLeft: null }, "W", 0)).toEqual({ kind: "addressChanged", address: "https://www.linkedin.com/in/renamed-person/", workspace: "W" });
     expect(r.injected.filter((f) => f === "reader.js")).toHaveLength(1);
   });
 
@@ -326,7 +326,7 @@ describe("capture controller", () => {
     expect(await r.controller.readerProgress(TAB, "experience", 3)).toEqual({ stop: true });
     const state = await r.controller.current();
     expect(state).toEqual({ phase: "idle", notice: { kind: "expired" } });
-    expect(captureUi(state, { clickLog: [], minutesLeft: null }, "W", 0)).toEqual({ kind: "expired", workspace: "W" });
+    expect(captureUi(state, { minutesLeft: null }, "W", 0)).toEqual({ kind: "expired", workspace: "W" });
     expect(await outbox.load()).toBeNull();
     expect(await r.controller.readerHello(TAB)).toEqual({ args: null });
     // Not silent: the notice stays until the user dismisses it or captures again.
@@ -396,7 +396,7 @@ describe("capture controller", () => {
     await r.read();
     const state = await r.controller.current();
     expect(state).toMatchObject({ phase: "finalizing", stop: "signed_out_of_scouty", blocked: "auth" });
-    expect(captureUi(state, { clickLog: [], minutesLeft: null }, "W", 0)).toEqual({ kind: "connectionEnded" });
+    expect(captureUi(state, { minutesLeft: null }, "W", 0)).toEqual({ kind: "connectionEnded" });
     expect(await auth.isConnected()).toBe(false);
     const box = (await outbox.load())!;
     expect(outbox.pending(box).map((s) => s.section)).toEqual(["experience"]);
@@ -425,7 +425,7 @@ describe("capture controller", () => {
     expect(put.status).toBe(404);
     const state = await r.controller.current();
     expect(state).toEqual({ phase: "idle", notice: { kind: "takenOver" } });
-    expect(captureUi(state, { clickLog: [], minutesLeft: null }, "W", 0)).toEqual({ kind: "takenOver", workspace: "W" });
+    expect(captureUi(state, { minutesLeft: null }, "W", 0)).toEqual({ kind: "takenOver", workspace: "W" });
     expect(await outbox.load()).toBeNull();
     expect(r.tab.updates).toHaveLength(1); // nothing more of LinkedIn was opened
   });
@@ -442,7 +442,7 @@ describe("capture controller", () => {
       expect(answered.filter((q) => q.status === 410)).toHaveLength(1); // not retried
       const state = await r.controller.current();
       expect(state).toEqual({ phase: "idle", notice: { kind: "expired" } });
-      expect(captureUi(state, { clickLog: [], minutesLeft: null }, "W", 0)).toEqual({ kind: "expired", workspace: "W" });
+      expect(captureUi(state, { minutesLeft: null }, "W", 0)).toEqual({ kind: "expired", workspace: "W" });
       expect(await outbox.load()).toBeNull();
       expect(r.timers.map((tm) => tm.ms)).not.toContain(SERVER_RETRY_MS);
     };
@@ -491,7 +491,7 @@ describe("capture controller", () => {
     await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
     const state = await r.controller.current();
     expect(state).toEqual({ phase: "idle", notice: { kind: "outdated", storeUrl: "https://example.invalid/store" } });
-    expect(captureUi(state, { clickLog: [], minutesLeft: null }, "W", 0)).toEqual({ kind: "outdated" });
+    expect(captureUi(state, { minutesLeft: null }, "W", 0)).toEqual({ kind: "outdated" });
     unwire();
     r = await rig();
     r.stub.state.available = false;
@@ -570,7 +570,7 @@ describe("capture controller", () => {
   it("every stop reason has a screen with a way out", () => {
     const reasons: StopReason[] = ["user_stopped", "tab_closed", "logged_out", "reduced_profile", "checkpoint", "not_found", "wrong_profile", "left_linkedin", "unknown_page", "timeout", "permission_missing", "signed_out_of_scouty"];
     for (const stop of reasons) {
-      const ui = captureUi({ phase: "done", tabId: TAB, result: { ...result, completeness: "partial", stop } }, { clickLog: [], minutesLeft: null }, "W", 0);
+      const ui = captureUi({ phase: "done", tabId: TAB, result: { ...result, completeness: "partial", stop } }, { minutesLeft: null }, "W", 0);
       expect(ui, stop).not.toBeNull();
     }
   });
@@ -578,7 +578,7 @@ describe("capture controller", () => {
 
 describe("waiting on Scouty is not being offline", () => {
   const NO_NETWORK_SECTIONS = { "synthetic-person-one": { posts: 0, comments: 0, reactions: 0 } };
-  const ui = (state: CaptureState) => captureUi(state, { clickLog: [], minutesLeft: null }, "W", 0);
+  const ui = (state: CaptureState) => captureUi(state, { minutesLeft: null }, "W", 0);
   /** Lets a fired timer's continuation run, then waits for the controller's queue. */
   const flush = async (r: Awaited<ReturnType<typeof rig>>): Promise<void> => {
     await new Promise((resolve) => setTimeout(resolve, 0));

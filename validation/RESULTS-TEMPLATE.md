@@ -54,7 +54,8 @@ submitted there; a browser not being submitted in this release may say "not subm
 
 ## Click logs
 
-Paste the list shown at the end of each capture (control name and matched selector only).
+Paste, per capture, the `Scouty dev: …` line from the background console and the control list
+from Settings → **Developer** → **Copy** in the popup (control name and matched selector only).
 
 ## Negative checks
 

@@ -12,6 +12,7 @@ export default defineConfig({
       dev: false,
     }),
     __SCOUTY_ENTRY__: "false",
+    __SCOUTY_DEV__: "false",
   },
   test: {
     environment: "jsdom",

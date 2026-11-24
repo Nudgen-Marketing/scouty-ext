@@ -22,7 +22,7 @@ try {
     entryPoints: [path.join(here, "main.tsx")], outfile: path.join(tmp, "gallery.js"), bundle: true, format: "iife", minify: true, jsx: "automatic",
     plugins: [inlineCss], logLevel: "warning", absWorkingDir: root, target: ["chrome116"],
     define: {
-      "process.env.NODE_ENV": JSON.stringify("production"), __SCOUTY_ENTRY__: "false",
+      "process.env.NODE_ENV": JSON.stringify("production"), __SCOUTY_ENTRY__: "false", __SCOUTY_DEV__: "false",
       __SCOUTY_BUILD__: JSON.stringify({ apiOrigin: "https://scouty.to", linkedinOrigin: "https://www.linkedin.com", clientId: "scouty-ext-chrome", browser: "chrome", version: "gallery", debugClicks: false, dev: false }),
     },
   });

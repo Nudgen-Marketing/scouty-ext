@@ -107,9 +107,6 @@ export function PopupView({ view, onAction, reducedMotion = false }: PopupViewPr
         {view.hint ? <p id={HINT_ID} data-slot="hint" className="text-[13px] break-words text-muted-foreground">{view.hint}</p> : null}
 
         {view.footer ? <p data-slot="footer" className="text-[12px] text-muted-foreground">{view.footer}</p> : null}
-        {view.notes.length ? (
-          <div data-slot="notes" className="grid gap-1 rounded-md border border-border bg-card p-2 text-[12px] break-all text-muted-foreground">{view.notes.map((line, i) => <p key={i}>{line}</p>)}</div>
-        ) : null}
       </main>
     </div>
   );

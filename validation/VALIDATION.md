@@ -59,7 +59,12 @@ threshold.
 - [ ] **R4** Development click log: only the inline "… more" control
   (`expandText: button[data-testid='expandable-text-button']`, inside a post or a profile entry's
   text) and, on legacy pages, "show more results". **Any other
-  click blocks release.**
+  click blocks release.** The log is not on any capture screen. Read it in the background console
+  (Chrome/Edge: `chrome://extensions` → the extension's "service worker" link; Firefox:
+  `about:debugging` → Inspect), one line per finished capture, for example
+  `Scouty dev: 54 clicks, all expand controls`; any other click is listed after `NOT ALLOWED`. The
+  full list of the last 10 captures in this browser session is in the popup under Settings →
+  **Developer** (development builds only, collapsed) → **Copy**.
 - [ ] **R5** LinkedIn warning, verification or "unusual activity" during or within 1 hour: none.
 - [ ] **R6** Finalize result and the app's summary: as expected (complete, or partial with the
   right reasons); summary equals the popup.

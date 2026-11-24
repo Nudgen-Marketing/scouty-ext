@@ -9,6 +9,7 @@ import { t } from "../ui/i18n";
 import type { UiState } from "../ui/state";
 import { viewFor } from "../ui/view";
 import { Skeleton } from "./components";
+import { DevPanel } from "./DevPanel";
 import { PopupView } from "./PopupView";
 import { targetTabId } from "./target-tab";
 
@@ -76,7 +77,11 @@ function Popup() {
       </div>
     );
   }
-  return <PopupView view={viewFor(state)} onAction={onAction} reducedMotion={reducedMotion} />;
+  const view = <PopupView view={viewFor(state)} onAction={onAction} reducedMotion={reducedMotion} />;
+  // Development builds only, outside the user's path: Settings (or the signed-out screen, for the
+  // redirect URL) → a collapsed "Developer" disclosure. Store builds drop this branch and DevPanel.
+  if (__SCOUTY_DEV__ && (state.kind === "settings" || state.kind === "signedOut")) return <>{view}<DevPanel /></>;
+  return view;
 }
 
 function mount(): void {

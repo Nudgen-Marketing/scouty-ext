@@ -1,8 +1,7 @@
 // Builds the UiState the popup and the overlay draw, from permissions, the connection, the tab
 // in front of the user and the capture state.
-import { DEV_BUILD, EXTENSION_VERSION, LINKEDIN_ORIGIN } from "../config";
+import { EXTENSION_VERSION, LINKEDIN_ORIGIN } from "../config";
 import { ext } from "../ext";
-import type { ClickLogEntry } from "../messages";
 import { profileFromUrl } from "../profile-key";
 import { ACTIVITY_SECTIONS, type Caps, type SectionName, type SessionResponse } from "../protocol";
 import type { UiState } from "../ui/state";
@@ -84,7 +83,7 @@ function noticeState(notice: Notice, workspace: string, now: number): UiState {
 }
 
 /** The screen for a capture that is running, sending or finished; null when there is none. */
-export function captureUi(state: CaptureState, extras: { clickLog: ClickLogEntry[]; minutesLeft: number | null }, workspace: string, now: number): UiState | null {
+export function captureUi(state: CaptureState, extras: { minutesLeft: number | null }, workspace: string, now: number): UiState | null {
   switch (state.phase) {
     case "idle":
       return state.notice ? noticeState(state.notice, workspace, now) : null;
@@ -110,14 +109,13 @@ export function captureUi(state: CaptureState, extras: { clickLog: ClickLogEntry
       return { kind: "sending", slow: state.slow, workspace };
     case "done": {
       const r = state.result;
-      const clickLog = DEV_BUILD ? extras.clickLog : null;
       if (r.stop === "logged_out" || r.stop === "left_linkedin") return { kind: "linkedinSignIn", workspace };
       if (r.stop === "checkpoint") return { kind: "verification", workspace };
       if (r.stop === "reduced_profile" || r.stop === "not_found" || r.stop === "unknown_page") return { kind: "unavailable", workspace };
       if (r.stop === "wrong_profile") return { kind: "addressChanged", address: r.address ?? "", workspace };
       if (r.completeness === "insufficient") return { kind: "failed", workspace };
-      if (r.completeness === "complete") return { kind: "doneComplete", counts: r.captured, workspace, clickLog };
-      return { kind: "donePartial", sections: r.sections, notExpanded: r.notExpanded, workspace, clickLog };
+      if (r.completeness === "complete") return { kind: "doneComplete", counts: r.captured, workspace };
+      return { kind: "donePartial", sections: r.sections, notExpanded: r.notExpanded, workspace };
     }
   }
 }
@@ -152,25 +150,24 @@ export async function popupUi(ctx: UiContext, query: PopupQuery): Promise<UiStat
   const state = await ctx.controller.current();
   const extras = await ctx.controller.extras();
   const connected = await auth.isConnected();
-  const devRedirectUrl = DEV_BUILD ? auth.redirectUri() : null;
 
   if (!connected) {
     // A capture waiting for a reconnect says so; otherwise there is only Connect.
     if (state.phase === "finalizing" && state.blocked === "auth") return { kind: "connectionEnded" };
     if (ctx.connecting()) return { kind: "connecting" };
-    return { kind: "signedOut", devRedirectUrl };
+    return { kind: "signedOut" };
   }
 
   const info = await sessionInfo(ctx);
-  if (info === null) return ctx.connecting() ? { kind: "connecting" } : { kind: "signedOut", devRedirectUrl };
+  if (info === null) return ctx.connecting() ? { kind: "connecting" } : { kind: "signedOut" };
   if ("kind" in info) return info.kind === "outdated" ? { kind: "outdated" } : { kind: "notAvailable" };
   const workspace = info.workspace.name ?? "";
 
-  if (query.settings) return { kind: "settings", name: info.user.name ?? "", email: info.user.email, workspace, version: EXTENSION_VERSION, devRedirectUrl };
+  if (query.settings) return { kind: "settings", name: info.user.name ?? "", email: info.user.email, workspace, version: EXTENSION_VERSION };
 
   const active = state.phase !== "idle" && state.phase !== "done";
   if (active && "tabId" in state && query.tabId !== null && query.tabId !== state.tabId) return { kind: "busy", workspace };
-  const capture = captureUi(state, { clickLog: extras.clickLog, minutesLeft: extras.minutesLeft }, workspace, ctx.now());
+  const capture = captureUi(state, { minutesLeft: extras.minutesLeft }, workspace, ctx.now());
   // Off a profile, the screen's Capture action is disabled with what to do instead (no dead button).
   if (capture) return { ...capture, onProfile: await targetIsProfile(state, query.tabId, query.tabUrl) };
 

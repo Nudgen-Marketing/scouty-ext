@@ -28,7 +28,9 @@ export type UiMessage =
   | { type: "ui:action"; action: UiAction; tabId: number | null }
   | { type: "ui:changed" }
   | { type: "overlay:hello" }
-  | { type: "overlay:state"; state: unknown; clickLog: ClickLogEntry[] | null }
-  | { type: "overlay:remove" };
+  | { type: "overlay:state"; state: unknown }
+  | { type: "overlay:remove" }
+  /** Development builds only: the popup's developer disclosure asks for the click log. */
+  | { type: "dev:info" };
 
 export type Message = ReaderMessage | UiMessage;

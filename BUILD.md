@@ -57,5 +57,9 @@ build must be repeated on Node 24 on a clean machine and this table updated (rel
 
 - `npm run build:dev`: the same three targets against a local or test app. The API origin comes
   from `SCOUTY_API_ORIGIN` in the environment or in the untracked `.env.local` (default
-  `http://localhost:3000`); the click log is switched on.
+  `http://localhost:3000`); the click log is switched on. It is never shown on a capture screen:
+  each finished capture prints one line (`Scouty dev: 54 clicks, all expand controls`, plus any
+  click that is not an allowed control) to the background console, and the popup's Settings →
+  **Developer** disclosure (collapsed; development builds only) lists the last 10 captures and the
+  OAuth redirect URL, with **Copy**. Store builds contain none of this (checked by `test:static`).
 - `npm run build:e2e`: `dist/e2e`, used only by the automated browser tests. It is never packaged.

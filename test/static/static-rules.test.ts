@@ -1,8 +1,10 @@
+// @vitest-environment node
 // The read-only and network guarantees, checked on the source AND on every built bundle
 // (plan 6.4). Run after `npm run build` (the test:static script builds first).
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { build } from "esbuild";
 import { describe, expect, it } from "vitest";
 import { brandTs } from "../../tools/brand.mjs";
 import { ICON_SIZES, iconSvg, markPaths } from "../../tools/icons.mjs";
@@ -22,6 +24,8 @@ const OWN_BUNDLES = ["background.js", "reader.js", "overlay.js"] as const;
 const INJECTED = ["reader.js", "overlay.js"] as const;
 
 const FETCH = /\bfetch\s*\(/;
+/** Strings that exist only in development builds: the click log's summary, storage keys, message and the Developer disclosure. */
+const DEV_ONLY = /Scouty dev|dev:info|dev\.clickLog|Developer|NOT ALLOWED|Redirect URL|Development build|controls pressed/;
 const INTERACT: [string, RegExp][] = [
   [".click(", /\.click\s*\(/], ['["click"]', /\[\s*["'`]click["'`]\s*\]/], ["dispatchEvent", /dispatchEvent/], ["scrollBy", /scrollBy/], ["scrollTo", /scrollTo/],
   ["scrollIntoView", /scrollIntoView/], [".focus(", /\.focus\s*\(/],
@@ -154,9 +158,39 @@ describe.each(TARGETS)("built bundles: dist/%s", (target) => {
     // That nothing violates the CSP at run time is asserted in the browser run (e2e/capture.spec.ts).
   });
 
-  it("store builds carry no click log", () => {
+  it("store builds carry no click log, and none of the developer disclosure or its strings", () => {
     expect(bundle("background.js")).toMatch(/debugClicks: false|"debugClicks":false/);
     expect(bundle("reader.js")).toMatch(/"debugClicks":false|debugClicks: false/);
+    for (const file of [...OWN_BUNDLES, "popup.js"]) expect(bundle(file), file).not.toMatch(DEV_ONLY);
+    // The modules that hold them are not bundled at all.
+    expect(bundle("background.js")).not.toMatch(/^\s*\/\/ src\/(background\/dev-log|dev-summary)\.ts$/m);
+    expect(bundle("_locales/en/messages.json")).not.toMatch(DEV_ONLY);
+  });
+});
+
+describe("development builds (positive control for the store-build check)", () => {
+  // Bundles the background and the popup as build.mjs --dev does, in memory: the developer code
+  // and its strings are there, so their absence from the store bundles above means something.
+  const bundleWith = async (entry: string, dev: boolean): Promise<string> => {
+    const result = await build({
+      entryPoints: [entry], bundle: true, write: false, format: entry.endsWith(".tsx") ? "iife" : "esm", jsx: "automatic", logLevel: "silent", absWorkingDir: root,
+      define: {
+        __SCOUTY_BUILD__: JSON.stringify({ apiOrigin: "http://localhost:3000", linkedinOrigin: "https://www.linkedin.com", clientId: "scouty-ext-chrome", browser: "chrome", version: "0.0.0", debugClicks: dev, dev }),
+        __SCOUTY_ENTRY__: "true", __SCOUTY_DEV__: JSON.stringify(dev), "process.env.NODE_ENV": JSON.stringify("production"),
+      },
+    });
+    return result.outputFiles[0]!.text;
+  };
+
+  it("contain the console summary, the dev:info answer and the Developer disclosure; the same source without the flag does not", async () => {
+    const [background, popup] = await Promise.all([bundleWith("src/background/index.ts", true), bundleWith("src/popup/popup.tsx", true)]);
+    expect(background).toContain("Scouty dev:");
+    expect(background).toContain("dev:info");
+    expect(popup).toContain("Developer");
+    expect(popup).toContain("dev:info");
+    const [storeBackground, storePopup] = await Promise.all([bundleWith("src/background/index.ts", false), bundleWith("src/popup/popup.tsx", false)]);
+    expect(storeBackground).not.toMatch(DEV_ONLY);
+    expect(storePopup).not.toMatch(DEV_ONLY);
   });
 });
 

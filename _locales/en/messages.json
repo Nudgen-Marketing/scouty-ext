@@ -47,9 +47,6 @@
   "actionConnect": {
     "message": "Connect to Scouty"
   },
-  "devRedirectUrl": {
-    "message": "Redirect URL: $1"
-  },
   "connectingTitle": {
     "message": "Connecting to Scouty…"
   },
@@ -259,12 +256,6 @@
   },
   "notExpandedBody": {
     "message": "Long posts were not opened in full, because LinkedIn is shown in a language Scouty doesn't expand yet."
-  },
-  "clickLogTitle": {
-    "message": "Development build: controls pressed on LinkedIn ($1)"
-  },
-  "clickLogNone": {
-    "message": "Development build: nothing was pressed on LinkedIn."
   },
   "linkedinSignInTitle": {
     "message": "Sign in to LinkedIn first"

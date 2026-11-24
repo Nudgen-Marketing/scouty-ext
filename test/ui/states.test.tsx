@@ -384,7 +384,8 @@ describe("view model", () => {
     expect(viewFor({ kind: "ready", slug: "s", workspace: "W", capturesLeft: null }).footer).toBeNull();
     expect(viewFor({ kind: "limit", resetAt: "2026-11-24T08:00:00.000Z", workspace: "W" }).body[0]).toMatch(/^Your workspace has used today's captures\. More are available after .+\.$/);
     expect(viewFor({ ...(SAMPLES[10] as Extract<UiState, { kind: "donePartial" }>), notExpanded: true }).body).toHaveLength(2);
-    expect(viewFor({ kind: "doneComplete", counts: { profileSections: 1, posts: 0, comments: 0, reactions: 0 }, workspace: "W", clickLog: [] }).notes).toEqual(["Development build: nothing was pressed on LinkedIn."]);
+    // The development click log is never part of a screen, in any build (it lives in the background console and Settings → Developer).
+    for (const state of [...SAMPLES, ...OVERLAY_SAMPLES]) expect(JSON.stringify(viewFor(state))).not.toMatch(/Development|controls pressed|selector|expandText|data-testid/);
   });
 });
 

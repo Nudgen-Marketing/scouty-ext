@@ -72,7 +72,6 @@ export function renderOverlay(view: View, onAction: (action: UiAction) => void):
     view.estimate && el("p", { class: "text" }, view.estimate),
     buttons.length > 0 && el("div", { class: "actions" }, ...buttons),
     view.hint !== null && el("p", { class: "text", id: "action-hint" }, view.hint),
-    view.notes.length > 0 && el("ul", { class: "lines notes" }, ...view.notes.map((line) => el("li", {}, line))),
   );
 }
 

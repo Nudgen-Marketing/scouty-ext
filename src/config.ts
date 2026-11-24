@@ -22,7 +22,6 @@ export const CLIENT_ID: string = build.clientId;
 export const BROWSER: BrowserName = build.browser;
 export const EXTENSION_VERSION: string = build.version;
 export const DEBUG_CLICKS: boolean = build.debugClicks;
-export const DEV_BUILD: boolean = build.dev;
 
 export const OAUTH_SCOPE = "scouty:linkedin_capture";
 export const OAUTH_RESOURCE = `${API_ORIGIN}/api/linkedin/ext`;

@@ -36,7 +36,6 @@ export type View = {
   footer: string | null;
   workspace: string | null;
   showSettings: boolean;
-  notes: string[];
 };
 
 const SECTION_LABEL: Record<SectionName, string> = {
@@ -96,7 +95,6 @@ function draft(state: UiState): Draft {
     case "signedOut":
       return {
         title: t("signedOutTitle"), body: [t("signedOutBody")], primary: action("connect", "actionConnect"),
-        notes: state.devRedirectUrl ? [t("devRedirectUrl", state.devRedirectUrl)] : [],
       };
     case "connecting":
       return { title: t("connectingTitle"), body: [t("connectingBody")], working: true, secondary: action("cancelConnect", "actionCancel", "outline") };
@@ -139,14 +137,12 @@ function draft(state: UiState): Draft {
       return {
         title: t("doneTitle"), icon: "check", pill: { tone: "good", label: t("pillComplete") }, body: [capturedSentence(state.counts)],
         primary: action("openAnalysis", "actionOpenAnalysis", "primary", "external"), secondary: action("dismiss", "actionDone", "outline"),
-        notes: clickLogNotes(state.clickLog),
       };
     case "donePartial":
       return {
         title: t("partialTitle"), pill: { tone: "neutral", label: t("pillPartial") },
         bullets: state.sections.map(sectionLine), body: state.notExpanded ? [t("partialBody"), t("notExpandedBody")] : [t("partialBody")],
         primary: action("openAnalysis", "actionOpenAnalysis", "primary", "external"), secondary: action("captureAgain", "actionCaptureAgain", "outline"),
-        notes: clickLogNotes(state.clickLog),
       };
     case "linkedinSignIn":
       return { tone: "alert", icon: "alert", title: t("linkedinSignInTitle"), body: [t("linkedinSignInBody")], primary: action("captureAgain", "actionCaptureAgain") };
@@ -199,7 +195,6 @@ function draft(state: UiState): Draft {
         ],
         links: [action("switchWorkspace", "actionSwitchWorkspace", "link"), action("whatItReads", "actionWhatScoutyReads", "link", "external")],
         secondary: action("disconnect", "actionDisconnect", "outline"),
-        notes: state.devRedirectUrl ? [t("devRedirectUrl", state.devRedirectUrl)] : [],
       };
     case "takenOver":
       return {
@@ -213,12 +208,6 @@ function draft(state: UiState): Draft {
         primary: action("captureAgain", "actionCaptureShort"), secondary: action("dismiss", "actionOk", "outline"),
       };
   }
-}
-
-function clickLogNotes(log: { name: string; selector: string }[] | null | undefined): string[] {
-  if (log === null || log === undefined) return [];
-  if (log.length === 0) return [t("clickLogNone")];
-  return [t("clickLogTitle", log.length), ...log.map((entry) => `${entry.name} (${entry.selector})`)];
 }
 
 /** The actions that start a capture in the tab the popup (or the overlay) is on. */
@@ -257,6 +246,5 @@ export function viewFor(state: UiState): View {
     footer: d.footer ?? null,
     workspace,
     showSettings: workspace !== null && state.kind !== "settings",
-    notes: d.notes ?? [],
   };
 }

@@ -70,10 +70,6 @@
   display: grid;
   gap: 4px;
 }
-.notes {
-  font-size: 12px;
-  word-break: break-all;
-}
 .progress {
   position: relative;
   height: 8px;

@@ -85,6 +85,8 @@ async function buildTarget(name, { target, apiOrigin, linkedinOrigin, key, swaps
       version: pkg.version, debugClicks, dev: devBuild,
     }),
     __SCOUTY_ENTRY__: JSON.stringify(entry),
+    // A bare constant, so esbuild drops the development-only code (and its strings) from store builds.
+    __SCOUTY_DEV__: JSON.stringify(devBuild),
   });
   const common = {
     bundle: true, minify: false, sourcemap: false, legalComments: "none", charset: "utf8",

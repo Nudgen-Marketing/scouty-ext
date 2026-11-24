@@ -7,6 +7,7 @@ import { profileFromUrl } from "../profile-key";
 import type { UiState } from "../ui/state";
 import { createApi } from "./api";
 import * as auth from "./auth";
+import { devRequest, recordCapture } from "./dev-log";
 import * as outbox from "./outbox";
 import { CaptureController, type CaptureState } from "./session";
 import { captureTarget, captureUi, forgetSessionInfo, giveConsent, popupUi, sessionInfo, targetIsProfile, type UiContext } from "./ui-state";
@@ -59,7 +60,7 @@ async function workspaceName(): Promise<string> {
 /** The overlay's screen in its tab; a capture action there starts in that tab, so it needs a profile too. */
 async function overlayState(state: CaptureState, tabId: number): Promise<UiState | null> {
   const extras = await controller.extras();
-  const view = captureUi(state, { clickLog: extras.clickLog, minutesLeft: extras.minutesLeft }, await workspaceName(), Date.now());
+  const view = captureUi(state, { minutesLeft: extras.minutesLeft }, await workspaceName(), Date.now());
   return view ? { ...view, onProfile: await targetIsProfile(state, tabId, await tabUrl(tabId)) } : null;
 }
 
@@ -69,8 +70,13 @@ async function broadcast(state: CaptureState): Promise<void> {
   if ("tabId" in state) captureTab = state.tabId;
   else if (state.notice?.kind === "recent") captureTab = null;
   if (captureTab === null) return;
+  // Development builds keep what the reader pressed for validation, outside every screen.
+  if (__SCOUTY_DEV__ && state.phase === "done") {
+    const url = await tabUrl(state.tabId);
+    void recordCapture(state.result.appUrl, profileFromUrl(url, LINKEDIN_ORIGIN)?.key ?? "", (await controller.extras()).clickLog);
+  }
   const view = await overlayState(state, captureTab);
-  const message: Message = view ? { type: "overlay:state", state: view, clickLog: null } : { type: "overlay:remove" };
+  const message: Message = view ? { type: "overlay:state", state: view } : { type: "overlay:remove" };
   ext.tabs.sendMessage(captureTab, message).catch(() => undefined);
 }
 
@@ -171,6 +177,10 @@ type Sender = { id?: string; url?: string; tab?: { id?: number } };
 async function handle(message: Message, sender: Sender): Promise<unknown> {
   if (sender.id !== ext.runtime.id) return null;
   const fromPage = typeof sender.url === "string" && sender.url.startsWith(ext.runtime.getURL(""));
+  if (__SCOUTY_DEV__ && fromPage) {
+    const dev = devRequest(message);
+    if (dev) return dev;
+  }
   const senderTab = sender.tab?.id ?? null;
   // A capture waiting on Scouty is tried again whenever the popup or the overlay asks for the state
   // and its wait is over, in case a stopped background context lost the timer.
