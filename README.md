@@ -46,7 +46,7 @@ PopupView.tsx                   session.ts    capture state machine      ──�
 | Protocol | `src/protocol.ts`, `protocol-v1/` | Types, builders and a mirror of the server's schema. `protocol-v1/` is byte-identical to the app's copy. |
 | Reader | `src/reader/` | `selectors.ts` is the only file with LinkedIn selectors; `interactions.ts` the only file that may click or scroll. |
 | Background | `src/background/` | `api.ts` is the only file that calls `fetch`, and only for the Scouty origin and a fixed path list. |
-| View model | `src/ui/state.ts`, `src/ui/view.ts` | `viewFor(state)` is pure and framework-free; every string comes from `_locales/en/messages.json`. |
+| View model | `src/ui/state.ts`, `src/ui/view.ts` | `viewFor(state)` is pure and framework-free; every string comes from `_locales/en/messages.json`. Copy rule: one short title, at most one short sentence, one clear primary action, no technical words. |
 | Popup | `src/popup/` | React 19 + Tailwind CSS 4, the same majors as the Scouty app. Thin renderer of the view model. |
 | Overlay | `src/overlay/` | Plain DOM in a closed shadow root with a small static stylesheet built from the same tokens. |
 | Tokens | `src/ui/tokens.json`, `src/ui/tokens.source.json`, `src/ui/tokens.css` | `tokens.json` is byte for byte the app's `extension-tokens.json`; `tokens.css` is generated from it and holds the only colour values the extension's code uses. |
@@ -80,7 +80,7 @@ Built popup size, per target (identical across targets apart from the build cons
 | `npm ci` | Install exactly the lockfile |
 | `npm run typecheck` / `npm run lint` | `tsc --noEmit` / `eslint .` |
 | `npm run build` | `dist/chrome`, `dist/edge`, `dist/firefox` (store builds, API `https://scouty.to`) |
-| `npm run build:dev` | The same targets against `SCOUTY_API_ORIGIN` from `.env.local` (default `http://localhost:3000`), with the click log on |
+| `npm run build:dev` | The same targets against `SCOUTY_API_ORIGIN` from `.env.local` (default `http://localhost:3000`), with the click log on: one line per capture in the background console and a collapsed Settings → **Developer** disclosure in the popup, never on a capture screen |
 | `npm test` | Unit, static, UI and contract layers |
 | `npm run test:e2e` | Builds `dist/e2e`, then the Playwright suite in Chromium against a mock LinkedIn and a stub of the capture API |
 | `npm run gallery` / `npm run test:gallery` | Builds `gallery/index.html` (open it in a browser for design review; it is git-ignored); checks it with axe, measured contrast and the 360 × 560 limit |

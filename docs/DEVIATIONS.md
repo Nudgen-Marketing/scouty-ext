@@ -143,6 +143,31 @@ one API client, least-privilege manifests, nothing reduced submitted as complete
     and the separate "Scouty" text; the overlay shows the mark (decorative) beside "Scouty"; the
     toolbar icons are the app's `src/app/icon.svg` rendered at 16, 32, 48 and 128 px by
     `npm run icons`. The static test still forbids font files and any other brand or image file.
+19. **Minimal, plain UI; the development click log leaves the UI (owner feedback 2026-11-24).**
+    After the first real run the owner found the overlay and popup too wordy and too technical
+    (the finished overlay listed 54 "… more (expandText: …)" lines under "Development build:
+    controls pressed on LinkedIn"). Every screen now has one short title, at most one short
+    sentence and one clear primary action, with no technical words; this replaces the plan 12.4
+    wording (the screens, their order, actions and roles are unchanged). Main changes: the
+    overlay's fixed line ("Scouty is reading this page. It won't click or post anything.") is
+    gone; the trust message is shown once, while reading ("Reading posts…" / "Scouty never clicks
+    or posts for you."), with a bar, "23 of 50" and the time left, and no list of steps. A
+    finished capture says "Done" with "Profile · 19 posts · 20 comments · 20 reactions",
+    **Open in Scouty** and **Close** (no "Complete" pill); a partial one says "Partly done", what
+    was read, and one line on what is missing, in place of a line per section. The ready screen no
+    longer repeats the profile address and workspace (the header shows the workspace), "This
+    profile has moved" no longer prints the new address, and the off-profile hint reads "Open a
+    LinkedIn profile in this tab first." Renamed titles include 1 "Allow access", 2 "Connect to
+    Scouty", 5 "Before you start", 22 "Something went wrong", 26 "Scouty isn't responding" and
+    27 "This capture timed out"; the full list is `_locales/en/messages.json`, and
+    `test/ui/states.test.tsx` holds the title and actions of all 27 screens and checks every
+    body is a single sentence and free of jargon. Earlier entries in this file quote the old
+    wording. The development click log (validation R4) is no longer drawn in any build:
+    development builds print one line per finished capture to the background console and keep
+    the last 10 captures in memory-only storage, readable in the popup under Settings →
+    **Developer** (collapsed, with **Copy**), which also holds the OAuth redirect URL that the
+    signed-out screen used to show. Store builds contain none of it (the `__SCOUTY_DEV__` build
+    constant; `test/static` checks the store bundles and the catalog).
 
 ## Contract decisions (to reconcile with the app)
 
@@ -227,8 +252,8 @@ extension follows the app's `src/lib/linkedin/protocol.ts`:
   it can only start there on a LinkedIn profile. On every screen with one (7 **Capture again**, 11
   **Capture again**, 12 **Capture again**, 15 **Capture this page**, 22 **Capture again**, 25
   **Capture here**, 26 at create **Try now**, 27 **Capture**), when that tab is not a profile the
-  action is shown disabled and the screen says "Open the lead's LinkedIn profile in this tab to
-  capture it."; the popup re-checks the tab every 1.5 s, so the action turns on once the
+  action is shown disabled and the screen says "Open a LinkedIn profile in this tab first."
+  (wording of deviation 19); the popup re-checks the tab every 1.5 s, so the action turns on once the
   profile is open. Other actions on the screen stay usable (`onProfile` in `src/ui/state.ts`,
   `targetIsProfile` in `src/background/ui-state.ts`; tested in `test/ui/states.test.tsx`,
   `test/unit/ui-state.test.ts` and the gallery's "off a profile" frames).
