@@ -20,8 +20,13 @@ export type Rig = {
   linkedin: ReturnType<typeof createMockLinkedin>;
   /** Console errors and CSP violations seen on extension pages. */
   problems: string[];
-  /** Opens a mock LinkedIn page and returns it with its tab id. */
-  openProfile(slug: string, rest?: string): Promise<{ page: Page; tabId: number }>;
+  /**
+   * Opens a mock LinkedIn page and returns it with its tab id. With `from` (a stub app page), the
+   * app opens it in a new tab as the Scouty app does (a `_blank`, `noopener` link), so its tab has an opener.
+   */
+  openProfile(slug: string, rest?: string, from?: Page): Promise<{ page: Page; tabId: number }>;
+  /** Opens a page of the stub Scouty app in a new tab. */
+  openApp(path: string): Promise<Page>;
   /** Opens the popup (as a tab) for a given tab. */
   openPopup(tabId: number | null): Promise<Page>;
   /** Connect to Scouty through the browser's web-auth flow against the stub. */
@@ -70,9 +75,24 @@ export const test = base.extend<{ rig: Rig }>({
 
     const rig: Rig = {
       context, extensionId, worker, stub, linkedin, problems,
-      async openProfile(slug, rest = "") {
-        const page = await context.newPage();
-        await page.goto(`${LINKEDIN}/in/${slug}/${rest}`);
+      async openProfile(slug, rest = "", from) {
+        const url = `${LINKEDIN}/in/${slug}/${rest}`;
+        let page: Page;
+        if (from) {
+          // The user clicks in the app tab they are looking at.
+          await from.bringToFront();
+          const opened = context.waitForEvent("page");
+          await from.evaluate((href) => {
+            const link = Object.assign(document.createElement("a"), { href, target: "_blank", rel: "noopener noreferrer", textContent: "LinkedIn" });
+            document.body.append(link);
+            link.click();
+          }, url);
+          page = await opened;
+          await page.waitForLoadState();
+        } else {
+          page = await context.newPage();
+          await page.goto(url);
+        }
         const sw = await worker();
         const tabId = await sw.evaluate(async (needle) => {
           const tabs = await chrome.tabs.query({});
@@ -80,6 +100,11 @@ export const test = base.extend<{ rig: Rig }>({
         }, `/in/`);
         if (tabId === null) throw new Error("the extension cannot see the LinkedIn tab");
         return { page, tabId };
+      },
+      async openApp(path) {
+        const page = await context.newPage();
+        await page.goto(`${SCOUTY}${path}`);
+        return page;
       },
       async openPopup(tabId) {
         const popup = await context.newPage();
