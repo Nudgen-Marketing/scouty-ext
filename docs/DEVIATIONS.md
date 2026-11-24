@@ -174,7 +174,8 @@ one API client, least-privilege manifests, nothing reduced submitted as complete
     LinkedIn profile in a new tab, the user captures it, and **Open in Scouty** should take them
     back to the app, on that campaign and lead list, without piling up tabs. The page is still the
     `appUrl` the server returns (falling back to the extension's own Scouty addresses as before);
-    what changed is the tab. `src/background/app-tab.ts` picks, in order: (a) the tab that opened
+    what changed is the tab. The reused tab is navigated to that whole address, query included (the
+    app's campaign pages carry `?linkedin=<key>&person=<id>`). `src/background/app-tab.ts` picks, in order: (a) the tab that opened
     the LinkedIn tab (`openerTabId`), if it still exists and is on the Scouty origin; (b) a Scouty
     tab whose path equals the target's (query ignored), in any window; (c) the most recently used
     (`lastAccessed`) Scouty tab in the LinkedIn tab's window, or the last focused window when no
@@ -195,7 +196,8 @@ one API client, least-privilege manifests, nothing reduced submitted as complete
     the app tab as `openerTabId`, but Chromium records the opener as the tab that was active when
     the new one opened and can drop it later, so (b) and (c) are the fallbacks. Tested in
     `test/unit/app-tab.test.ts` (each choice, an opener on LinkedIn or another site, a missing
-    permission, the LinkedIn tab never navigated) and in `e2e/capture.spec.ts` (the happy path goes
+    permission, the LinkedIn tab never navigated, a campaign page shown in the reused tab with its
+    full query) and in `e2e/capture.spec.ts` (the happy path goes
     back to the app tab that opened LinkedIn, past another app tab on the same page; "recently
     captured" reuses an app tab on the target page). Firefox behaviour is **not verified** in a
     browser here (no Firefox on the build machine); MDN documents the same rules.
@@ -216,9 +218,16 @@ extension follows the app's `src/lib/linkedin/protocol.ts`:
 - `pageSlug` is the raw slug from the tab's address, not normalized.
 - `Counts` is `{ profileSections, posts, comments, reactions }`.
 - One `Idempotency-Key` (a UUID) per create; one per distinct manifest for finalize.
-- "Open in Scouty" for a recent capture opens `<origin>/dashboard?linkedin=<profileKey>`, because
-  the `{ recent }` answer carries no URL. After finalize the server's `appUrl` is used, and only if
-  it is on the Scouty origin.
+- "Open in Scouty" opens the page the server names: after finalize its `appUrl`, and after a
+  recent capture the `{ recent }` answer's optional `recent.appUrl` (added by the app on
+  2026-11-24, for the campaign round trip; the protocol-v1 fixtures predate it and are unchanged).
+  Either is used only if it is on the Scouty origin (`appUrl` and `recentAppUrl` in
+  `src/background/app-tab.ts`). Without `recent.appUrl` (an older server) the extension falls back
+  to `<origin>/dashboard?linkedin=<profileKey>`. The page may be the dashboard or a campaign,
+  `<origin>/dashboard/<projectId>/campaigns/<campaignId>?linkedin=<key>&person=<personId>`; the
+  extension opens it as named, query included (`test/contract/contract.test.ts`,
+  `test/unit/app-tab.test.ts`, `test/unit/session.test.ts`, the e2e happy path and "recently
+  captured").
 - A 404 answer to create is shown as "This profile can't be captured", whatever its code.
 - `src/ui/tokens.json` is byte for byte the app's `src/lib/linkedin/__fixtures__/extension-tokens.json`
   (`{ radius, light, dark, pill: { light, dark } }`); where and when it was copied is in
