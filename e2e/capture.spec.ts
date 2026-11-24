@@ -6,10 +6,10 @@ const SLUG = "synthetic-person-one";
 async function startCapture(rig: Parameters<Parameters<typeof test>[2]>[0]["rig"], slug: string) {
   const { page, tabId } = await rig.openProfile(slug);
   const popup = await rig.openPopup(tabId);
-  await expect(heading(popup)).toHaveText("Capture a LinkedIn profile into Scouty");
+  await expect(heading(popup)).toHaveText("Connect to Scouty");
   await rig.connect(popup);
-  await expect(heading(popup)).toHaveText("Before your first capture");
-  await popup.getByRole("button", { name: "I understand, capture" }).click();
+  await expect(heading(popup)).toHaveText("Before you start");
+  await popup.getByRole("button", { name: "Got it, capture" }).click();
   return { page, popup, tabId };
 }
 
@@ -18,14 +18,16 @@ test("happy path: connect, consent, six pages read, finalize, open the analysis"
   const { page, popup } = await startCapture(rig, SLUG);
   await expect(heading(popup)).toHaveText(/^Reading /);
   await expect(popup.getByRole("progressbar")).toBeVisible();
-  // The in-page overlay is there, says what it is, and is closed to the page.
-  await expect.poll(() => rig.overlayText(page)).toContain("Scouty is reading this page. It won't click or post anything.");
+  // The in-page overlay is there, says what it is (and, once, that Scouty never acts), and is closed to the page.
+  await expect.poll(() => rig.overlayText(page)).toContain("Scouty never clicks or posts for you.");
   expect(await page.evaluate(() => document.querySelector("scouty-capture-overlay")?.shadowRoot ?? null)).toBeNull();
   expect(await page.evaluate(() => document.querySelector("scouty-capture-overlay")?.getAttribute("aria-label"))).toBe("Scouty capture");
 
-  await expect(heading(popup)).toHaveText("Captured");
-  await expect(popup.getByText("Profile, 3 posts, 2 comments, 2 reactions.")).toBeVisible();
-  await expect.poll(() => rig.overlayText(page)).toContain("Captured");
+  await expect(heading(popup)).toHaveText("Done");
+  await expect(popup.getByText("Profile · 3 posts · 2 comments · 2 reactions", { exact: true })).toBeVisible();
+  await expect.poll(() => rig.overlayText(page)).toContain("Profile · 3 posts · 2 comments · 2 reactions");
+  // The finished overlay holds the counts and its two buttons, and nothing technical.
+  expect(await rig.overlayText(page)).not.toMatch(/never clicks|controls pressed|selector|expandText/);
 
   const capture = [...rig.stub.state.captures.values()][0]!;
   expect(capture.status).toBe("finalized");
@@ -58,9 +60,9 @@ test("happy path: connect, consent, six pages read, finalize, open the analysis"
   // About, the experience description and the long post: each "… more" pressed once; nothing else.
   expect((await rig.clicks(page)).map((c) => c.path)).toEqual([`/in/${SLUG}/`, `/in/${SLUG}/details/experience/`, `/in/${SLUG}/recent-activity/all/`]);
 
-  // "Open analysis in Scouty" opens the app page the server named.
+  // "Open in Scouty" opens the app page the server named.
   const opened = rig.context.waitForEvent("page");
-  await popup.getByRole("button", { name: "Open analysis in Scouty" }).click();
+  await popup.getByRole("button", { name: "Open in Scouty" }).click();
   expect((await opened).url()).toBe(`http://scouty.test/dashboard?linkedin=${SLUG}`);
   // The popup ran under the strict CSP without a violation or an error.
   expect(rig.problems).toEqual([]);
@@ -68,7 +70,7 @@ test("happy path: connect, consent, six pages read, finalize, open the analysis"
 
 test("signed out of LinkedIn: stops on the reduced profile and sends no content", async ({ rig }) => {
   const { page, popup } = await startCapture(rig, "signed-out-person");
-  await expect(heading(popup)).toHaveText("This profile can't be read");
+  await expect(heading(popup)).toHaveText("Can't read this profile");
   const capture = [...rig.stub.state.captures.values()][0]!;
   expect(capture.result).toMatchObject({ completeness: "insufficient" });
   expect(capture.manifest!.stop).toBe("reduced_profile");
@@ -81,7 +83,7 @@ test("signed out of LinkedIn: stops on the reduced profile and sends no content"
 
 test("checkpoint mid-scroll: that section is discarded, earlier ones are kept, capture stops", async ({ rig }) => {
   const { page, popup } = await startCapture(rig, "checkpoint-person");
-  await expect(heading(popup)).toHaveText("LinkedIn wants to verify something");
+  await expect(heading(popup)).toHaveText("LinkedIn wants to check it's you");
   const capture = [...rig.stub.state.captures.values()][0]!;
   expect(capture.manifest!.stop).toBe("checkpoint");
   expect(capture.manifest!.sections.map((s) => `${s.section}:${s.state}:${s.reason}`)).toEqual([
@@ -100,8 +102,9 @@ test("slug redirect: stops with the address LinkedIn uses and reads nothing from
   const { SLUGS } = await import("./mock-linkedin.mjs");
   (SLUGS as Record<string, unknown>)["synthetic-person-one"] = { redirect: "renamed-person" };
   try {
-    await expect(heading(popup)).toHaveText("LinkedIn shows this person at a different address");
-    await expect(popup.getByText("http://linkedin.test/in/renamed-person/. Capture from that page instead.")).toBeVisible();
+    await expect(heading(popup)).toHaveText("This profile has moved");
+    await expect(popup.getByText("Capture it from its new page.")).toBeVisible();
+    await expect(popup.getByRole("button", { name: "Capture this page" })).toBeVisible();
     const capture = [...rig.stub.state.captures.values()][0]!;
     expect(capture.manifest!.stop).toBe("wrong_profile");
     expect(capture.manifest!.sections.map((s) => `${s.section}:${s.state}`)).toEqual(["profile:complete", "experience:skipped", "skills:skipped", "posts:skipped"]);
@@ -115,7 +118,7 @@ test("slug redirect: stops with the address LinkedIn uses and reads nothing from
 
 test("a section over the cap stops at the cap", async ({ rig }) => {
   const { page, popup } = await startCapture(rig, "many-posts-person");
-  await expect(heading(popup)).toHaveText("Captured");
+  await expect(heading(popup)).toHaveText("Done");
   const posts = [...rig.stub.state.captures.values()][0]!.sections.get("posts")!.payload;
   expect(posts.blockCount).toBe(5);
   expect(posts.reachedCap).toBe(true);
@@ -127,12 +130,13 @@ test("a section over the cap stops at the cap", async ({ rig }) => {
 test("the user presses Stop: the section being read is sent as partial, later ones are skipped", async ({ rig }) => {
   rig.stub.state.caps = { posts: 100, comments: 5, reactions: 5 };
   const { page, popup } = await startCapture(rig, "slow-person");
-  await expect(heading(popup)).toHaveText("Reading posts");
-  await expect(popup.getByRole("progressbar")).toHaveAttribute("aria-valuetext", /^[5-9] of up to 100 posts$/, { timeout: 60_000 });
+  await expect(heading(popup)).toHaveText("Reading posts…");
+  await expect(popup.getByRole("progressbar")).toHaveAttribute("aria-valuetext", /^[5-9] of 100 posts$/, { timeout: 60_000 });
   await popup.getByRole("button", { name: "Stop" }).click();
-  await expect(heading(popup)).toHaveText("Captured part of this profile");
-  await expect(popup.getByText(/^Posts: \d+ read, then stopped\.$/)).toBeVisible();
-  await expect(popup.getByText("Comments: not read.")).toBeVisible();
+  await expect(heading(popup)).toHaveText("Partly done");
+  // What was read (posts in part; comments and reactions not at all), then why it is partial.
+  await expect(popup.getByText(/^Profile · \d+ posts?$/)).toBeVisible();
+  await expect(popup.getByText("You stopped early, so some parts are missing.")).toBeVisible();
   const capture = [...rig.stub.state.captures.values()][0]!;
   expect(capture.result).toMatchObject({ completeness: "partial" });
   expect(capture.manifest!.stop).toBe("user_stopped");
@@ -158,7 +162,7 @@ test("network cut during upload, then restored: resumes without loading any Link
   rig.stub.clearFaults();
   rig.stub.state.requests.length = 0;
   await popup.getByRole("button", { name: "Try now" }).click();
-  await expect(heading(popup)).toHaveText("Captured");
+  await expect(heading(popup)).toHaveText("Done");
   const capture = [...rig.stub.state.captures.values()][0]!;
   expect(capture.result).toMatchObject({ completeness: "complete" });
   // Resume asked what the server holds, sent what was missing and finalized.
@@ -176,7 +180,7 @@ test("access token expired mid-capture: one refresh, then the capture completes"
   const { page, popup } = await startCapture(rig, SLUG);
   await expect.poll(() => rig.stub.state.captures.size).toBe(1);
   rig.stub.expireAccessTokens();
-  await expect(heading(popup)).toHaveText("Captured");
+  await expect(heading(popup)).toHaveText("Done");
   const refreshes = rig.stub.state.requests.filter((r) => r.path === "/oauth/token" && r.status === 200);
   expect(refreshes.length).toBe(2); // the code exchange at connect, and exactly one refresh
   expect(rig.stub.state.requests.some((r) => r.status === 401)).toBe(true);
@@ -190,11 +194,11 @@ test("connection revoked mid-capture: reading stops; reconnecting finishes sendi
   await expect.poll(() => rig.stub.state.captures.size).toBe(1);
   rig.stub.revokeAll();
   await expect(heading(popup)).toHaveText("Connect to Scouty again");
-  await expect(popup.getByText("Your connection ended. Connect within a few minutes to finish sending this capture.")).toBeVisible();
+  await expect(popup.getByText("Do it in the next few minutes to finish this capture.")).toBeVisible();
   const loads = rig.linkedin.requests.filter((r) => r.path.startsWith("/in/")).length;
   expect([...rig.stub.state.captures.values()][0]!.status).toBe("open");
-  await popup.getByRole("button", { name: "Connect to Scouty" }).click();
-  await expect(heading(popup)).toHaveText("Captured part of this profile");
+  await popup.getByRole("button", { name: "Connect", exact: true }).click();
+  await expect(heading(popup)).toHaveText("Partly done");
   const capture = [...rig.stub.state.captures.values()][0]!;
   expect(capture.status).toBe("finalized");
   expect(capture.manifest!.stop).toBe("signed_out_of_scouty");
@@ -208,11 +212,11 @@ test("extension below the minimum version: told to update, nothing is read", asy
   const { page, tabId } = await rig.openProfile(SLUG);
   const popup = await rig.openPopup(tabId);
   await rig.connect(popup);
-  await expect(heading(popup)).toHaveText("Before your first capture");
+  await expect(heading(popup)).toHaveText("Before you start");
   rig.stub.state.minVersion = "99.0.0";
-  await popup.getByRole("button", { name: "I understand, capture" }).click();
-  await expect(heading(popup)).toHaveText("Update the Scouty extension");
-  await expect(popup.getByRole("button", { name: "Open the store page" })).toBeVisible();
+  await popup.getByRole("button", { name: "Got it, capture" }).click();
+  await expect(heading(popup)).toHaveText("Update Scouty");
+  await expect(popup.getByRole("button", { name: "Update", exact: true })).toBeVisible();
   expect(rig.stub.state.captures.size).toBe(0);
   expect(rig.linkedin.requests.filter((r) => r.path.startsWith("/in/")).map((r) => r.path)).toEqual([`/in/${SLUG}/`]); // the user's own page load
   expect(await rig.clicks(page)).toEqual([]);
@@ -222,17 +226,17 @@ test("extension below the minimum version: told to update, nothing is read", asy
 test("recently captured: offers what Scouty has, and Capture again reads the profile again", async ({ rig }) => {
   rig.stub.state.caps = { posts: 0, comments: 0, reactions: 0 };
   const { page, popup } = await startCapture(rig, "no-activity-person");
-  await expect(heading(popup)).toHaveText("Captured");
-  await popup.getByRole("button", { name: "Done" }).click();
+  await expect(heading(popup)).toHaveText("Done");
+  await popup.getByRole("button", { name: "Close", exact: true }).click();
   await expect(heading(popup)).toHaveText("Capture this profile");
   const loads = rig.linkedin.requests.filter((r) => r.path.startsWith("/in/")).length;
-  await popup.getByRole("button", { name: "Capture to Scouty" }).click();
+  await popup.getByRole("button", { name: "Capture", exact: true }).click();
   await expect(heading(popup)).toHaveText("Captured today");
   await expect(popup.getByRole("button", { name: "Open in Scouty" })).toBeVisible();
   expect(rig.linkedin.requests.filter((r) => r.path.startsWith("/in/")).length).toBe(loads); // nothing was read
   expect(rig.stub.state.captures.size).toBe(1);
   await popup.getByRole("button", { name: "Capture again" }).click();
-  await expect(heading(popup)).toHaveText("Captured");
+  await expect(heading(popup)).toHaveText("Done");
   expect(rig.stub.state.captures.size).toBe(2);
   expect([...rig.stub.state.captures.values()].every((c) => c.status === "finalized")).toBe(true);
   expectReadOnly(rig, ["no-activity-person"]);
@@ -242,7 +246,7 @@ test("recently captured: offers what Scouty has, and Capture again reads the pro
 test("a profile with no activity: the activity sections are declared unavailable, not uploaded", async ({ rig }) => {
   rig.stub.state.caps = { posts: 5, comments: 5, reactions: 5 };
   const { page, popup } = await startCapture(rig, "no-activity-person");
-  await expect(heading(popup)).toHaveText("Captured");
+  await expect(heading(popup)).toHaveText("Done");
   const capture = [...rig.stub.state.captures.values()][0]!;
   expect(capture.manifest!.sections.slice(3).map((s) => `${s.section}:${s.state}:${s.reason}`)).toEqual([
     "posts:unavailable:no_such_section", "comments:unavailable:no_such_section", "reactions:unavailable:no_such_section",
@@ -272,10 +276,10 @@ test("permission not granted: the popup asks first and offers nothing else", asy
   const tabId = await sw.evaluate(async () => Math.max(...(await chrome.tabs.query({})).map((tab) => tab.id ?? -1)));
   expect(await sw.evaluate(async (id) => (await chrome.tabs.get(id)).url ?? null, tabId)).toBeNull();
   const popup = await rig.openPopup(tabId);
-  await expect(heading(popup)).toHaveText("Allow Scouty to work here");
+  await expect(heading(popup)).toHaveText("Allow access");
   await expect(popup.getByRole("button", { name: "Allow" })).toBeVisible();
-  await expect(popup.getByRole("button", { name: "Connect to Scouty" })).toHaveCount(0);
-  await expect(popup.getByRole("button", { name: "Capture to Scouty" })).toHaveCount(0);
+  await expect(popup.getByRole("button", { name: "Connect", exact: true })).toHaveCount(0);
+  await expect(popup.getByRole("button", { name: "Capture", exact: true })).toHaveCount(0);
   expect(rig.stub.state.requests).toEqual([]);
   expect(rig.linkedin.requests.filter((r) => r.path.startsWith("/in/")).map((r) => r.path)).toEqual([`/in/${SLUG}/`]); // the user's own page load
   expectReadOnly(rig, [SLUG]);

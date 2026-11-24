@@ -1,10 +1,10 @@
 // Small local components that mirror the app's patterns (src/components/ui in the app: button,
-// status-pill, alert, skeleton) with the same measurements and tokens. Nothing is imported from
+// alert, skeleton) with the same measurements and tokens. Nothing is imported from
 // the app, and no component library is used: these few have no behaviour a native element lacks.
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { BRAND_LOGO_WIDTH, BRAND_MARK_PATHS, BRAND_WORD_PATHS } from "../ui/brand";
 import { ICONS, type IconName } from "../ui/icons";
-import type { ButtonVariant, PillTone } from "../ui/view";
+import type { ButtonVariant } from "../ui/view";
 
 export const cn = (...parts: (string | false | null | undefined)[]): string => parts.filter(Boolean).join(" ");
 
@@ -41,18 +41,6 @@ export function Button({ variant = "primary", size = "default", className, type 
         SIZES[size], VARIANTS[variant], className)}
       {...props} />
   );
-}
-
-const TONES: Record<PillTone, string> = {
-  good: "bg-pill-good-bg text-pill-good-fg ring-pill-good-ring",
-  active: "bg-pill-active-bg text-pill-active-fg ring-pill-active-ring",
-  waiting: "bg-pill-waiting-bg text-pill-waiting-fg ring-pill-waiting-ring",
-  problem: "bg-pill-problem-bg text-pill-problem-fg ring-pill-problem-ring",
-  neutral: "bg-pill-neutral-bg text-pill-neutral-fg ring-pill-neutral-ring",
-};
-
-export function StatusPill({ tone, children }: { tone: PillTone; children: ReactNode }) {
-  return <span data-tone={tone} className={cn("inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset", TONES[tone])}>{children}</span>;
 }
 
 /** The message block. Errors are role="alert"; everything else is a polite live region. */

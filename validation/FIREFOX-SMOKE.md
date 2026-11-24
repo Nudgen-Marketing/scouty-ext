@@ -41,24 +41,24 @@ agreed, referred to by its label (P1); record no name, URL, text or screenshot o
    no "access your data for all websites", no history, tabs or cookies permission. Leave the
    switches off.
 5. Click the toolbar icon (pin it from the extensions menu first if needed).
-   Expected: "Allow Scouty to work here" with **Allow** and "What does it read?".
+   Expected: "Allow access" with **Allow** and "What Scouty reads".
 6. Press **Allow** and accept the Firefox permission prompt.
-   Expected: the prompt lists LinkedIn and Scouty only; after accepting, the popup shows "Capture a
-   LinkedIn profile into Scouty" with **Connect to Scouty** (reopen the popup if Firefox closed it
-   for the prompt; note whether it did).
+   Expected: the prompt lists LinkedIn and Scouty only; after accepting, the popup shows "Connect
+   to Scouty" with **Connect** (reopen the popup if Firefox closed it for the prompt; note whether
+   it did).
 7. Development build only: open the collapsed **Developer** disclosure under the popup's first
    screen and copy the "Redirect URL" line. Make sure the app's
    `scouty-ext-firefox` entry of `SCOUTY_EXTENSION_CLIENTS` has that redirect URL and
    `"origin":"moz-extension"`, and restart the app.
-8. Press **Connect to Scouty**.
+8. Press **Connect**.
    Expected: a window opens on Scouty's consent page; after approving, the popup shows "Open a
-   LinkedIn profile" and "Connected to <workspace>". Record whether the window was already signed
-   in to Scouty.
-9. Open P1 on LinkedIn, click the icon, read the first-run notice, press **I understand, capture**.
+   LinkedIn profile", with the workspace name in its header. Record whether the window was
+   already signed in to Scouty.
+9. Open P1 on LinkedIn, click the icon, read the first-run notice, press **Got it, capture**.
    Expected: a small Scouty panel at the bottom-left of the page with a progress bar and **Stop**;
-   the tab visits six pages; the panel ends with "Captured" (or "Captured part of this profile",
-   with the reason listed).
-10. Press **Open analysis in Scouty**.
+   the tab visits six pages; the panel ends with "Done" and the counts (or "Partly done", with one
+   line on what is missing).
+10. Press **Open in Scouty**.
     Expected: the app opens on that profile, with the same counts as the popup.
 11. Optional, needs a second browser (for example Chrome with the extension connected to the same
     Scouty account): in Firefox press **Capture again** on P1 and, while it is still reading,
@@ -66,7 +66,7 @@ agreed, referred to by its label (P1); record no name, URL, text or screenshot o
     Expected: the other browser's capture runs; Firefox shows "This capture stopped" with **OK**
     and **Capture here**, and nothing more from the Firefox run reaches the app.
 12. Popup → settings (gear) → **Disconnect**, then click the icon again.
-    Expected: **Connect to Scouty**. In Scouty, Settings → Connected Apps no longer lists an active
+    Expected: "Connect to Scouty" with **Connect**. In Scouty, Settings → Connected Apps no longer lists an active
     "Scouty LinkedIn Capture (Firefox)" connection.
 13. Back in `about:debugging`, check the extension's Console once more.
     Expected: no error was logged during the run.

@@ -50,12 +50,14 @@ export function renderOverlay(view: View, onAction: (action: UiAction) => void):
     if (!p.indeterminate) attrs["aria-valuenow"] = String(p.value);
     const bar = el("div", { class: p.indeterminate ? "shimmer" : "bar" });
     if (!p.indeterminate) bar.style.width = `${p.max > 0 ? Math.round((Math.min(p.value, p.max) / p.max) * 100) : 0}%`;
-    message.append(el("div", attrs, bar), el("p", { class: "text" }, p.text));
+    message.append(el("div", attrs, bar));
+    // The count and the time left on one line, under the bar.
+    const row = el("div", { class: "progress-row" }, el("span", {}, p.text), view.estimate && el("span", {}, view.estimate));
+    message.append(row);
     if (p.indeterminate) message.append(el("p", { class: "text working-label" }, t("working")));
   } else if (view.working) {
     message.append(el("div", { class: "progress", "aria-hidden": "true" }, el("div", { class: "shimmer" })), el("p", { class: "text working-label" }, t("working")));
   }
-  const steps = view.steps.length > 0 && el("ol", { class: "steps" }, ...view.steps.map((step) => el("li", { "data-status": step.status, "aria-label": step.description }, step.label)));
   const buttons = [view.primary, view.secondary].filter((a) => a !== null).map((a) => {
     const attrs: Record<string, string> = { type: "button", class: a.variant === "primary" ? "btn" : "btn btn--outline", "data-action": a.id };
     if (a.disabled) Object.assign(attrs, { disabled: "", "aria-describedby": "action-hint" });
@@ -64,12 +66,9 @@ export function renderOverlay(view: View, onAction: (action: UiAction) => void):
     return button;
   });
   return el("div", { class: "card", "data-view": view.kind },
+    // The Scouty mark and name, so the panel is never mistaken for part of LinkedIn.
     el("div", { class: "header" }, markSvg(), el("span", {}, t("brand"))),
-    // Always shown, so the panel is never mistaken for part of LinkedIn.
-    el("p", { class: "fixed-line" }, t("overlayFixedLine")),
     message,
-    steps,
-    view.estimate && el("p", { class: "text" }, view.estimate),
     buttons.length > 0 && el("div", { class: "actions" }, ...buttons),
     view.hint !== null && el("p", { class: "text", id: "action-hint" }, view.hint),
   );

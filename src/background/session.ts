@@ -31,7 +31,7 @@ export type Notice =
    */
   | { kind: "takenOver" }
   /**
-   * Screen 27, "This capture ran out of time": the capture's 20 minutes ran out before it was sent,
+   * Screen 27, "This capture timed out": the capture's 20 minutes ran out before it was sent,
    * noticed by this browser's clock or answered by Scouty (410 LINKEDIN_CAPTURE_EXPIRED). Nothing of
    * it was saved.
    */
@@ -262,7 +262,7 @@ export class CaptureController {
 
   /**
    * Expiry is checked lazily, by every handler, not by a timer. A capture whose time ran out ends in
-   * "This capture ran out of time", not silently.
+   * "This capture timed out", not silently.
    */
   private async expireIfDue(): Promise<boolean> {
     if (this.state.phase === "idle" || this.state.phase === "done" || this.state.phase === "starting") return false;
@@ -646,7 +646,7 @@ export class CaptureController {
   /**
    * Sending failed after the API client's own retries. A network error shows "You're offline"; an
    * answer from Scouty that it cannot take the capture right now (408, 429, 502, 503, 504) shows
-   * "Scouty isn't answering right now" and is tried again on its own after a wait (the server's
+   * "Scouty isn't responding" and is tried again on its own after a wait (the server's
    * Retry-After when longer), for as long as this browser keeps the capture.
    */
   private async waitOut(error: unknown): Promise<void> {

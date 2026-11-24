@@ -4,7 +4,7 @@ import { useEffect, useRef, type KeyboardEvent } from "react";
 import type { UiAction } from "../messages";
 import { t } from "../ui/i18n";
 import type { View, ViewAction } from "../ui/view";
-import { Alert, Button, Icon, Logo, Progress, StatusPill, Working } from "./components";
+import { Alert, Button, Icon, Logo, Progress, Working } from "./components";
 
 export type PopupViewProps = { view: View; onAction: (action: UiAction) => void; reducedMotion?: boolean };
 
@@ -53,40 +53,28 @@ export function PopupView({ view, onAction, reducedMotion = false }: PopupViewPr
         ) : null}
       </header>
 
-      <main className="grid gap-4 px-4 py-4">
+      <main className="grid gap-4 p-4">
         <Alert tone={view.tone}>
-          {view.pill ? <div><StatusPill tone={view.pill.tone}>{view.pill.label}</StatusPill></div> : null}
-          <h1 ref={title} tabIndex={-1} className="flex items-start gap-2 text-base leading-snug font-semibold break-words outline-none">
+          <h1 ref={title} tabIndex={-1} className="flex items-start gap-2 text-[15px] leading-snug font-semibold break-words outline-none">
             {view.icon ? <Icon name={view.icon} className={view.tone === "alert" ? "mt-0.5 text-destructive" : "mt-0.5 text-pill-good-fg"} /> : null}
             <span>{view.title}</span>
           </h1>
           {view.bullets.length ? (
             <ul className="grid list-disc gap-1.5 pl-5 text-[13px] text-muted-foreground">{view.bullets.map((line, i) => <li key={i} className="break-words">{line}</li>)}</ul>
           ) : null}
-          {view.body.map((line, i) => <p key={i} className="text-sm break-words text-muted-foreground">{line}</p>)}
+          {view.body.map((line, i) => <p key={i} className="text-[13px] break-words text-muted-foreground">{line}</p>)}
           {view.progress ? (
-            <div className="grid gap-1.5">
+            <div className="mt-1 grid gap-1.5">
               <Progress value={view.progress.value} max={view.progress.max} valueText={view.progress.valueText} label={view.title} indeterminate={view.progress.indeterminate} reducedMotion={reducedMotion} />
-              <p data-slot="progress-text" className="text-[13px] text-muted-foreground">{view.progress.indeterminate && reducedMotion ? t("working") : view.progress.text}</p>
+              {/* The count and the time left on one line, under the bar. */}
+              <div className="flex justify-between gap-2 text-[12px] text-muted-foreground">
+                <span data-slot="progress-text">{view.progress.indeterminate && reducedMotion ? t("working") : view.progress.text}</span>
+                {view.estimate ? <span data-slot="estimate">{view.estimate}</span> : null}
+              </div>
             </div>
           ) : null}
           {view.working ? <Working label={t("working")} reducedMotion={reducedMotion} /> : null}
         </Alert>
-
-        {view.steps.length ? (
-          <ol data-slot="steps" className="grid gap-1 text-[13px]">
-            {view.steps.map((step, i) => (
-              <li key={i} data-status={step.status} aria-label={step.description} aria-current={step.status === "current" ? "step" : undefined}
-                className={step.status === "waiting" ? "flex items-center gap-2 text-muted-foreground" : "flex items-center gap-2 text-foreground"}>
-                <span aria-hidden="true" className="grid size-4 place-items-center">
-                  {step.status === "done" ? <Icon name="check" className="text-pill-good-fg" /> : step.status === "current" ? <span className="size-2 rounded-full bg-primary" /> : <span className="size-1.5 rounded-full bg-input" />}
-                </span>
-                <span aria-hidden="true" className={step.status === "current" ? "font-medium" : undefined}>{step.label}</span>
-              </li>
-            ))}
-          </ol>
-        ) : null}
-        {view.estimate ? <p data-slot="estimate" className="text-[12px] text-muted-foreground">{view.estimate}</p> : null}
 
         {view.details.length ? (
           <dl className="grid gap-2 text-[13px]">

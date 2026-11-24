@@ -51,9 +51,9 @@ export type UiKind = UiScreen["kind"];
  * The 27 screens: the 24 of plan 12.4 in its order, then three added after review (docs/DEVIATIONS.md):
  * "takenOver" (25, "This capture stopped") for a capture the server no longer knows, started again
  * from another browser or device or removed in Scouty; "notAnswering" (26, "Scouty isn't
- * answering right now") when Scouty is reachable but failing or rate-limiting, as opposed to 16,
- * "You're offline", which is only for a network failure; and "expired" (27, "This capture ran out
- * of time") when a capture's 20 minutes ran out before it was sent.
+ * responding") when Scouty is reachable but failing or rate-limiting, as opposed to 16,
+ * "You're offline", which is only for a network failure; and "expired" (27, "This capture timed
+ * out") when a capture's 20 minutes ran out before it was sent.
  */
 export const UI_KINDS: readonly UiKind[] = [
   "permission", "signedOut", "connecting", "notOnProfile", "consent", "ready", "recent", "capturing", "sending",

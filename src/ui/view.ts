@@ -1,14 +1,15 @@
 // viewFor(state): the view model of every screen (plan 12.4). Pure and framework-free: the popup
 // (React) and the in-page overlay (plain DOM) are thin renderers of what this returns.
 // Every string comes from messages.json through t(); a test fails on a sentence written here.
+// Copy rule (owner feedback 2026-11-24): one short title, at most one short sentence, one clear
+// primary action, no technical words.
 import type { UiAction } from "../messages";
 import type { Counts, SectionName } from "../protocol";
 import { t } from "./i18n";
 import type { IconName } from "./icons";
-import { UI_KINDS, type SectionLine, type StepStatus, type UiKind, type UiState } from "./state";
+import { UI_KINDS, type SectionLine, type UiKind, type UiState } from "./state";
 
 export type ButtonVariant = "primary" | "outline" | "ghost" | "link";
-export type PillTone = "good" | "active" | "waiting" | "problem" | "neutral";
 export type ViewAction = { id: UiAction; label: string; variant: ButtonVariant; icon: IconName | null; disabled?: boolean };
 
 export type View = {
@@ -19,11 +20,11 @@ export type View = {
   tone: "status" | "alert";
   icon: IconName | null;
   title: string;
+  /** At most one short sentence. */
   body: string[];
   bullets: string[];
-  pill: { tone: PillTone; label: string } | null;
+  /** text: the count beside the bar ("23 of 50"), empty when there is none; valueText: the fuller screen-reader value. */
   progress: { value: number; max: number; text: string; valueText: string; indeterminate: boolean } | null;
-  steps: { label: string; status: StepStatus; description: string }[];
   estimate: string | null;
   details: { label: string; value: string }[];
   /** True while something is happening without a number to show (spinner, or a "Working…" label under reduced motion). */
@@ -38,10 +39,6 @@ export type View = {
   showSettings: boolean;
 };
 
-const SECTION_LABEL: Record<SectionName, string> = {
-  profile: "sectionProfile", experience: "sectionExperience", skills: "sectionSkills",
-  posts: "sectionPosts", comments: "sectionComments", reactions: "sectionReactions",
-};
 const READING: Record<SectionName, string> = {
   profile: "readingProfile", experience: "readingExperience", skills: "readingSkills",
   posts: "readingPosts", comments: "readingComments", reactions: "readingReactions",
@@ -49,7 +46,6 @@ const READING: Record<SectionName, string> = {
 const PROGRESS_VALUE: Partial<Record<SectionName, string>> = {
   posts: "progressValuePosts", comments: "progressValueComments", reactions: "progressValueReactions",
 };
-const STEP_DESCRIPTION: Record<StepStatus, string> = { done: "stepDone", current: "stepCurrent", waiting: "stepWaiting" };
 const DAY_MS = 86_400_000;
 
 const action = (id: UiAction, key: string, variant: ButtonVariant = "primary", icon: IconName | null = null): ViewAction =>
@@ -57,22 +53,35 @@ const action = (id: UiAction, key: string, variant: ButtonVariant = "primary", i
 
 const plural = (count: number, one: string, many: string): string => (count === 1 ? t(one) : t(many, count));
 
-function capturedSentence(counts: Counts): string {
+/** "Profile · 19 posts · 20 comments · 20 reactions". */
+function countsLine(counts: Counts): string {
   const parts: string[] = [];
   if (counts.profileSections > 0) parts.push(t("countProfile"));
   parts.push(plural(counts.posts, "countPostsOne", "countPosts"));
   parts.push(plural(counts.comments, "countCommentsOne", "countComments"));
   parts.push(plural(counts.reactions, "countReactionsOne", "countReactions"));
-  return `${parts.join(", ")}.`;
+  return parts.join(" · ");
 }
 
-function sectionLine(line: SectionLine): string {
-  const label = t(SECTION_LABEL[line.section]);
-  const counted = line.section === "posts" || line.section === "comments" || line.section === "reactions";
-  if (line.state === "skipped") return t("lineNotRead", label);
-  if (line.state === "unavailable") return t("lineNothing", label);
-  if (line.state === "partial") return counted ? t("lineReadStopped", label, line.count ?? 0) : t("lineReadPlainStopped", label);
-  return counted ? t("lineRead", label, line.count ?? 0) : t("lineReadPlain", label);
+/** The counts of what a partial capture did read; sections not read are left out. */
+function partialCountsLine(sections: SectionLine[]): string {
+  const read = (line: SectionLine): boolean => line.state === "complete" || line.state === "partial";
+  const parts: string[] = [];
+  if (sections.some((line) => line.section === "profile" && read(line))) parts.push(t("countProfile"));
+  const KEYS = { posts: ["countPostsOne", "countPosts"], comments: ["countCommentsOne", "countComments"], reactions: ["countReactionsOne", "countReactions"] } as const;
+  for (const [section, [one, many]] of Object.entries(KEYS)) {
+    const line = sections.find((l) => l.section === section);
+    if (line && read(line)) parts.push(plural(line.count ?? 0, one, many));
+  }
+  return parts.join(" · ");
+}
+
+/** The one short line that says why a capture is partial. */
+function partialReason(sections: SectionLine[], notExpanded: boolean): string {
+  const gaps = sections.filter((line) => line.state === "skipped" || line.state === "partial");
+  if (gaps.some((line) => line.reason === "user_stopped")) return t("partialStopped");
+  if (gaps.length === 0 && notExpanded) return t("partialShortened");
+  return t("partialMissing");
 }
 
 function recentTitle(finalizedAt: string, now: string): string {
@@ -91,7 +100,7 @@ type Draft = Partial<View> & { title: string };
 function draft(state: UiState): Draft {
   switch (state.kind) {
     case "permission":
-      return { title: t("permissionTitle"), body: [t("permissionBody")], primary: action("allow", "actionAllow"), secondary: action("whatItReads", "actionWhatItReads", "link", "external") };
+      return { title: t("permissionTitle"), body: [t("permissionBody")], primary: action("allow", "actionAllow"), secondary: action("whatItReads", "actionWhatScoutyReads", "link", "external") };
     case "signedOut":
       return {
         title: t("signedOutTitle"), body: [t("signedOutBody")], primary: action("connect", "actionConnect"),
@@ -99,7 +108,7 @@ function draft(state: UiState): Draft {
     case "connecting":
       return { title: t("connectingTitle"), body: [t("connectingBody")], working: true, secondary: action("cancelConnect", "actionCancel", "outline") };
     case "notOnProfile":
-      return { title: t("notOnProfileTitle"), body: [t("notOnProfileBody")], primary: action("openScouty", "actionOpenScouty", "primary", "external"), footer: t("connectedTo", state.workspace) };
+      return { title: t("notOnProfileTitle"), body: [t("notOnProfileBody")], primary: action("openScouty", "actionOpenScouty", "primary", "external") };
     case "consent":
       return {
         title: t("consentTitle"), bullets: [t("consentPoint1"), t("consentPoint2"), t("consentPoint3")],
@@ -107,7 +116,7 @@ function draft(state: UiState): Draft {
       };
     case "ready":
       return {
-        title: t("readyTitle"), body: [t("readyBody", state.slug, state.workspace)], primary: action("capture", "actionCapture"),
+        title: t("readyTitle"), primary: action("capture", "actionCapture"),
         footer: state.capturesLeft === null ? null : plural(state.capturesLeft, "capturesLeftOne", "capturesLeft"),
       };
     case "recent":
@@ -118,40 +127,43 @@ function draft(state: UiState): Draft {
     case "capturing": {
       const counted = state.cap > 0;
       const valueKey = PROGRESS_VALUE[state.section];
-      const text = state.loading ? t("progressLoading") : counted ? t("progressCount", state.count, state.cap) : t("progressReading");
+      const text = state.loading ? t("progressLoading") : counted ? t("progressCount", state.count, state.cap) : "";
+      const title = t(READING[state.section]);
       return {
-        title: t(READING[state.section]),
+        // The one place the trust message is shown: while Scouty is on the page.
+        title, body: [t("readingTrust")],
         progress: {
           value: counted ? Math.min(state.count, state.cap) : 0, max: counted ? state.cap : 1, text,
-          valueText: counted && valueKey && !state.loading ? t(valueKey, state.count, state.cap) : text,
+          valueText: counted && valueKey && !state.loading ? t(valueKey, state.count, state.cap) : text || title,
           indeterminate: state.loading || !counted,
         },
-        steps: state.steps.map((step) => ({ label: t(SECTION_LABEL[step.section]), status: step.status, description: t(STEP_DESCRIPTION[step.status], t(SECTION_LABEL[step.section])) })),
         estimate: state.minutesLeft <= 1 ? t("estimateOne") : t("estimateMany", state.minutesLeft),
         primary: action("stop", "actionStop", "primary", "x"),
       };
     }
     case "sending":
-      return { title: t("sendingTitle"), body: state.slow ? [t("sendingBody"), t("sendingSlow")] : [t("sendingBody")], working: true };
+      return { title: t("sendingTitle"), body: [state.slow ? t("sendingSlow") : t("sendingBody")], working: true };
     case "doneComplete":
       return {
-        title: t("doneTitle"), icon: "check", pill: { tone: "good", label: t("pillComplete") }, body: [capturedSentence(state.counts)],
-        primary: action("openAnalysis", "actionOpenAnalysis", "primary", "external"), secondary: action("dismiss", "actionDone", "outline"),
+        title: t("doneTitle"), icon: "check", body: [countsLine(state.counts)],
+        primary: action("openAnalysis", "actionOpenInScouty", "primary", "external"), secondary: action("dismiss", "actionClose", "outline"),
       };
-    case "donePartial":
+    case "donePartial": {
+      const counts = partialCountsLine(state.sections);
       return {
-        title: t("partialTitle"), pill: { tone: "neutral", label: t("pillPartial") },
-        bullets: state.sections.map(sectionLine), body: state.notExpanded ? [t("partialBody"), t("notExpandedBody")] : [t("partialBody")],
-        primary: action("openAnalysis", "actionOpenAnalysis", "primary", "external"), secondary: action("captureAgain", "actionCaptureAgain", "outline"),
+        // The counts line, then one short line on what is missing.
+        title: t("partialTitle"), body: counts ? [counts, partialReason(state.sections, state.notExpanded)] : [partialReason(state.sections, state.notExpanded)],
+        primary: action("openAnalysis", "actionOpenInScouty", "primary", "external"), secondary: action("captureAgain", "actionCaptureAgain", "outline"),
       };
+    }
     case "linkedinSignIn":
-      return { tone: "alert", icon: "alert", title: t("linkedinSignInTitle"), body: [t("linkedinSignInBody")], primary: action("captureAgain", "actionCaptureAgain") };
+      return { tone: "alert", icon: "alert", title: t("linkedinSignInTitle"), body: [t("linkedinSignInBody")], primary: action("captureAgain", "actionTryAgain") };
     case "verification":
       return { tone: "alert", icon: "alert", title: t("verificationTitle"), body: [t("verificationBody")], primary: action("dismiss", "actionOk") };
     case "unavailable":
       return { tone: "alert", icon: "alert", title: t("unavailableTitle"), body: [t("unavailableBody")], primary: action("dismiss", "actionOk") };
     case "addressChanged":
-      return { tone: "alert", icon: "alert", title: t("addressChangedTitle"), body: [t("addressChangedBody", state.address)], primary: action("capture", "actionCaptureThisPage") };
+      return { tone: "alert", icon: "alert", title: t("addressChangedTitle"), body: [t("addressChangedBody")], primary: action("capture", "actionCaptureThisPage") };
     case "offline":
       return { tone: "alert", icon: "alert", title: t("offlineTitle"), body: [t("offlineBody")], primary: action("retryNow", "actionTryNow") };
     case "notAnswering":
@@ -159,13 +171,13 @@ function draft(state: UiState): Draft {
         // The capture could not be started: nothing is kept, so Try now starts it again.
         return {
           tone: "alert", icon: "alert", title: t("notAnsweringTitle"),
-          body: [t("notAnsweringStartBody"), state.retryAt ? t("notAnsweringStartRetryAt", clockTime(state.retryAt)) : t("notAnsweringStartLater")],
+          body: [state.retryAt ? t("notAnsweringStartRetryAt", clockTime(state.retryAt)) : t("notAnsweringStartBody")],
           primary: action("capture", "actionTryNow"),
         };
       }
       return {
         tone: "alert", icon: "alert", title: t("notAnsweringTitle"),
-        body: state.retryAt ? [t("notAnsweringBody"), t("notAnsweringRetryAt", clockTime(state.retryAt))] : [t("notAnsweringBody")],
+        body: [state.retryAt ? t("notAnsweringRetryAt", clockTime(state.retryAt)) : t("notAnsweringBody")],
         primary: action("retryNow", "actionTryNow"),
       };
     case "connectionEnded":
@@ -182,7 +194,7 @@ function draft(state: UiState): Draft {
     case "suppressed":
       return { tone: "alert", icon: "alert", title: t("suppressedTitle"), body: [t("suppressedBody")], primary: action("dismiss", "actionOk") };
     case "failed":
-      return { tone: "alert", icon: "alert", title: t("failedTitle"), body: [t("failedBody")], primary: action("captureAgain", "actionCaptureAgain") };
+      return { tone: "alert", icon: "alert", title: t("failedTitle"), body: [t("failedBody")], primary: action("captureAgain", "actionTryAgain") };
     case "busy":
       return { tone: "alert", icon: "alert", title: t("busyTitle"), body: [t("busyBody")], primary: action("showCapture", "actionShowIt") };
     case "settings":
@@ -198,14 +210,14 @@ function draft(state: UiState): Draft {
       };
     case "takenOver":
       return {
-        tone: "alert", icon: "alert", title: t("takenOverTitle"), body: [t("takenOverBody"), t("takenOverNext")],
+        tone: "alert", icon: "alert", title: t("takenOverTitle"), body: [t("takenOverBody")],
         primary: action("dismiss", "actionOk"), secondary: action("captureAgain", "actionCaptureHere", "outline"),
       };
     case "expired":
       // Capture starts a new capture of the profile in the tab the popup is on, as Capture here does on 25.
       return {
-        tone: "alert", icon: "alert", title: t("expiredTitle"), body: [t("expiredBody"), t("expiredNext")],
-        primary: action("captureAgain", "actionCaptureShort"), secondary: action("dismiss", "actionOk", "outline"),
+        tone: "alert", icon: "alert", title: t("expiredTitle"), body: [t("expiredBody")],
+        primary: action("captureAgain", "actionCapture"), secondary: action("dismiss", "actionOk", "outline"),
       };
   }
 }
@@ -233,9 +245,7 @@ export function viewFor(state: UiState): View {
     title: d.title,
     body: d.body ?? [],
     bullets: d.bullets ?? [],
-    pill: d.pill ?? null,
     progress: d.progress ?? null,
-    steps: d.steps ?? [],
     estimate: d.estimate ?? null,
     details: d.details ?? [],
     working: d.working ?? false,

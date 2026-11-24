@@ -1,5 +1,5 @@
 // Fixed sample data: one UiState per screen (the 24 of plan 12.4 in its order, then "takenOver", "This capture stopped",
-// "notAnswering", "Scouty isn't answering right now", and "expired", "This capture ran out of time"). Used by the
+// "notAnswering", "Scouty isn't responding", and "expired", "This capture timed out"). Used by the
 // state gallery and by the UI tests, so both show exactly the same 27 states. All names are invented.
 import type { UiState } from "../src/ui/state";
 

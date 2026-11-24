@@ -594,7 +594,7 @@ describe("waiting on Scouty is not being offline", () => {
     expect(transition(server, events.resume)).toEqual(finalizing);
   });
 
-  it("503 on finalize after the retries: 'Scouty isn't answering', not 'offline'; tried again on its own, then done", async () => {
+  it("503 on finalize after the retries: 'Scouty isn't responding', not 'offline'; tried again on its own, then done", async () => {
     const r = await rig({ capsBySlug: NO_NETWORK_SECTIONS });
     await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
     r.stub.fail(/POST .*\/finalize$/, "503", 6);
@@ -614,7 +614,7 @@ describe("waiting on Scouty is not being offline", () => {
     expect(r.tab.updates).toHaveLength(opened);
   });
 
-  it("429 with a Retry-After over 30 s: not retried at once, 'Scouty isn't answering' with roughly when; tried again after the wait, also after a restart", async () => {
+  it("429 with a Retry-After over 30 s: not retried at once, 'Scouty isn't responding' with roughly when; tried again after the wait, also after a restart", async () => {
     const r = await rig({ capsBySlug: NO_NETWORK_SECTIONS });
     await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
     r.stub.fail(/POST .*\/finalize$/, "429-long", 1);

@@ -42,11 +42,6 @@
   width: 20px;
   height: 20px;
 }
-.fixed-line {
-  margin: 0;
-  font-size: 12px;
-  color: var(--muted-foreground);
-}
 .message {
   display: grid;
   gap: 6px;
@@ -91,29 +86,23 @@
   border-radius: 999px;
   background: var(--primary);
 }
-.working-label {
-  display: none;
-}
-.steps {
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.progress-row {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
+  justify-content: space-between;
+  gap: 8px;
   font-size: 12px;
   color: var(--muted-foreground);
 }
-.steps [data-status="done"],
-.steps [data-status="current"] {
-  color: var(--foreground);
-}
-.steps [data-status="current"] {
-  font-weight: 600;
+.working-label {
+  display: none;
 }
 .actions {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+}
+.actions .btn {
+  flex: 1 1 auto;
 }
 .btn {
   display: inline-flex;

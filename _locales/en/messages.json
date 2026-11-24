@@ -20,38 +20,29 @@
   "overlayRegion": {
     "message": "Scouty capture"
   },
-  "overlayFixedLine": {
-    "message": "Scouty is reading this page. It won't click or post anything."
-  },
-  "connectedTo": {
-    "message": "Connected to $1"
-  },
   "permissionTitle": {
-    "message": "Allow Scouty to work here"
+    "message": "Allow access"
   },
   "permissionBody": {
-    "message": "Scouty needs your permission to read LinkedIn profile pages you choose to capture, and to send them to your Scouty workspace."
+    "message": "Scouty only reads the LinkedIn profiles you choose."
   },
   "actionAllow": {
     "message": "Allow"
   },
-  "actionWhatItReads": {
-    "message": "What does it read?"
-  },
   "signedOutTitle": {
-    "message": "Capture a LinkedIn profile into Scouty"
-  },
-  "signedOutBody": {
-    "message": "This extension only reads, and only when you press Capture."
-  },
-  "actionConnect": {
     "message": "Connect to Scouty"
   },
+  "signedOutBody": {
+    "message": "Sign in once to start capturing profiles."
+  },
+  "actionConnect": {
+    "message": "Connect"
+  },
   "connectingTitle": {
-    "message": "Connecting to Scouty…"
+    "message": "Connecting…"
   },
   "connectingBody": {
-    "message": "Finish signing in in the window that opened."
+    "message": "Finish signing in in the new window."
   },
   "actionCancel": {
     "message": "Cancel"
@@ -60,31 +51,28 @@
     "message": "Open a LinkedIn profile"
   },
   "notOnProfileBody": {
-    "message": "Go to someone's profile on LinkedIn (linkedin.com/in/…), then click this icon."
+    "message": "Then click the Scouty icon again."
   },
   "actionOpenScouty": {
     "message": "Open Scouty"
   },
   "consentTitle": {
-    "message": "Before your first capture"
+    "message": "Before you start"
   },
   "consentPoint1": {
-    "message": "Scouty reads this profile and this person's recent posts, comments and reactions from this tab, and sends them to your workspace."
+    "message": "Scouty reads this profile and the person's recent posts, comments and reactions."
   },
   "consentPoint2": {
-    "message": "It only reads. It never clicks Follow, Like, Connect or Message, never posts, and never reads your LinkedIn password, cookies or messages."
+    "message": "It never clicks, likes, connects, messages or posts for you."
   },
   "consentPoint3": {
-    "message": "Opening a profile counts as a profile view, which this person may see. Tools like this are against LinkedIn's terms and LinkedIn may restrict your account."
+    "message": "The person may see that you viewed their profile. LinkedIn doesn't allow tools like this and may limit your account."
   },
   "actionAcceptConsent": {
-    "message": "I understand, capture"
+    "message": "Got it, capture"
   },
   "readyTitle": {
     "message": "Capture this profile"
-  },
-  "readyBody": {
-    "message": "$1 → $2"
   },
   "capturesLeft": {
     "message": "$1 captures left today"
@@ -93,7 +81,7 @@
     "message": "1 capture left today"
   },
   "actionCapture": {
-    "message": "Capture to Scouty"
+    "message": "Capture"
   },
   "recentTitleToday": {
     "message": "Captured today"
@@ -105,7 +93,7 @@
     "message": "Captured $1 days ago"
   },
   "recentBody": {
-    "message": "You can use what Scouty already has, or read the profile again."
+    "message": "It's already in Scouty."
   },
   "actionOpenInScouty": {
     "message": "Open in Scouty"
@@ -114,73 +102,46 @@
     "message": "Capture again"
   },
   "readingProfile": {
-    "message": "Reading the profile"
+    "message": "Reading the profile…"
   },
   "readingExperience": {
-    "message": "Reading experience"
+    "message": "Reading experience…"
   },
   "readingSkills": {
-    "message": "Reading skills"
+    "message": "Reading skills…"
   },
   "readingPosts": {
-    "message": "Reading posts"
+    "message": "Reading posts…"
   },
   "readingComments": {
-    "message": "Reading comments"
+    "message": "Reading comments…"
   },
   "readingReactions": {
-    "message": "Reading reactions"
+    "message": "Reading reactions…"
   },
-  "sectionProfile": {
-    "message": "Profile"
-  },
-  "sectionExperience": {
-    "message": "Experience"
-  },
-  "sectionSkills": {
-    "message": "Skills"
-  },
-  "sectionPosts": {
-    "message": "Posts"
-  },
-  "sectionComments": {
-    "message": "Comments"
-  },
-  "sectionReactions": {
-    "message": "Reactions"
+  "readingTrust": {
+    "message": "Scouty never clicks or posts for you."
   },
   "progressCount": {
-    "message": "$1 of up to $2"
+    "message": "$1 of $2"
   },
   "progressValuePosts": {
-    "message": "$1 of up to $2 posts"
+    "message": "$1 of $2 posts"
   },
   "progressValueComments": {
-    "message": "$1 of up to $2 comments"
+    "message": "$1 of $2 comments"
   },
   "progressValueReactions": {
-    "message": "$1 of up to $2 reactions"
+    "message": "$1 of $2 reactions"
   },
   "progressLoading": {
     "message": "Opening the page…"
   },
-  "progressReading": {
-    "message": "Reading…"
-  },
-  "stepDone": {
-    "message": "$1, done"
-  },
-  "stepCurrent": {
-    "message": "$1, in progress"
-  },
-  "stepWaiting": {
-    "message": "$1, waiting"
-  },
   "estimateOne": {
-    "message": "About 1 minute left"
+    "message": "About 1 min left"
   },
   "estimateMany": {
-    "message": "About $1 minutes left"
+    "message": "About $1 min left"
   },
   "actionStop": {
     "message": "Stop"
@@ -189,13 +150,13 @@
     "message": "Sending to Scouty…"
   },
   "sendingBody": {
-    "message": "Keep this browser open for a moment."
+    "message": "Keep this browser open."
   },
   "sendingSlow": {
-    "message": "Still sending. Your connection seems slow."
+    "message": "Still sending, so keep this browser open."
   },
   "doneTitle": {
-    "message": "Captured"
+    "message": "Done"
   },
   "countProfile": {
     "message": "Profile"
@@ -218,71 +179,50 @@
   "countReactionsOne": {
     "message": "1 reaction"
   },
-  "pillComplete": {
-    "message": "Complete"
-  },
-  "pillPartial": {
-    "message": "Partial"
-  },
-  "actionOpenAnalysis": {
-    "message": "Open analysis in Scouty"
-  },
-  "actionDone": {
-    "message": "Done"
+  "actionClose": {
+    "message": "Close"
   },
   "partialTitle": {
-    "message": "Captured part of this profile"
+    "message": "Partly done"
   },
-  "lineRead": {
-    "message": "$1: $2 read."
+  "partialStopped": {
+    "message": "You stopped early, so some parts are missing."
   },
-  "lineReadPlain": {
-    "message": "$1: read."
+  "partialMissing": {
+    "message": "Some parts couldn't be read."
   },
-  "lineReadStopped": {
-    "message": "$1: $2 read, then stopped."
-  },
-  "lineReadPlainStopped": {
-    "message": "$1: read in part, then stopped."
-  },
-  "lineNotRead": {
-    "message": "$1: not read."
-  },
-  "lineNothing": {
-    "message": "$1: nothing to read."
-  },
-  "partialBody": {
-    "message": "Scouty will work with what it has and tell you what's missing."
-  },
-  "notExpandedBody": {
-    "message": "Long posts were not opened in full, because LinkedIn is shown in a language Scouty doesn't expand yet."
+  "partialShortened": {
+    "message": "Some long posts weren't opened in full."
   },
   "linkedinSignInTitle": {
-    "message": "Sign in to LinkedIn first"
+    "message": "Sign in to LinkedIn"
   },
   "linkedinSignInBody": {
-    "message": "You're not signed in to LinkedIn in this browser. Sign in on linkedin.com, then press Capture again. Nothing was sent."
+    "message": "Sign in on linkedin.com, then try again."
+  },
+  "actionTryAgain": {
+    "message": "Try again"
   },
   "verificationTitle": {
-    "message": "LinkedIn wants to verify something"
+    "message": "LinkedIn wants to check it's you"
   },
   "verificationBody": {
-    "message": "Capture has stopped. Complete LinkedIn's check yourself, and wait until LinkedIn is back to normal before capturing again."
+    "message": "Finish LinkedIn's check, then wait a while before trying again."
   },
   "actionOk": {
     "message": "OK"
   },
   "unavailableTitle": {
-    "message": "This profile can't be read"
+    "message": "Can't read this profile"
   },
   "unavailableBody": {
-    "message": "LinkedIn is showing a limited version of this profile, or it isn't available to you."
+    "message": "LinkedIn isn't showing the full profile."
   },
   "addressChangedTitle": {
-    "message": "LinkedIn shows this person at a different address"
+    "message": "This profile has moved"
   },
   "addressChangedBody": {
-    "message": "$1. Capture from that page instead."
+    "message": "Capture it from its new page."
   },
   "actionCaptureThisPage": {
     "message": "Capture this page"
@@ -291,25 +231,22 @@
     "message": "You're offline"
   },
   "offlineBody": {
-    "message": "Scouty will finish sending as soon as you're back online. Keep the browser open."
+    "message": "Scouty will finish once you're back online."
   },
   "notAnsweringTitle": {
-    "message": "Scouty isn't answering right now"
+    "message": "Scouty isn't responding"
   },
   "notAnsweringBody": {
-    "message": "Your capture is kept in this browser. Scouty will keep trying to send it while this browser is open."
+    "message": "Scouty will keep trying to send your capture."
   },
   "notAnsweringRetryAt": {
-    "message": "Scouty asked to wait a little. The next try is at about $1."
+    "message": "Scouty will try again at $1."
   },
   "notAnsweringStartBody": {
-    "message": "This capture didn't start. Nothing was read or sent."
-  },
-  "notAnsweringStartLater": {
-    "message": "Try again in a moment."
+    "message": "Please try again in a moment."
   },
   "notAnsweringStartRetryAt": {
-    "message": "Scouty asked to wait a little. Try again after about $1."
+    "message": "Please try again after $1."
   },
   "actionTryNow": {
     "message": "Try now"
@@ -318,73 +255,64 @@
     "message": "Connect to Scouty again"
   },
   "connectionEndedBody": {
-    "message": "Your connection ended. Connect within a few minutes to finish sending this capture."
+    "message": "Do it in the next few minutes to finish this capture."
   },
   "limitTitle": {
     "message": "That's all for today"
   },
   "limitBody": {
-    "message": "Your workspace has used today's captures. More are available after $1."
+    "message": "More captures after $1."
   },
   "limitBodyLater": {
-    "message": "Your workspace has used today's captures. More are available later."
+    "message": "Try again later."
   },
   "outdatedTitle": {
-    "message": "Update the Scouty extension"
+    "message": "Update Scouty"
   },
   "outdatedBody": {
-    "message": "This version is too old to capture. Update it, then try again."
+    "message": "This version is too old to capture."
   },
   "actionOpenStore": {
-    "message": "Open the store page"
+    "message": "Update"
   },
   "notAvailableTitle": {
     "message": "Not available yet"
   },
   "notAvailableBody": {
-    "message": "LinkedIn capture isn't switched on for your Scouty account."
+    "message": "LinkedIn capture isn't on for your account."
   },
   "suppressedTitle": {
-    "message": "This profile can't be captured"
+    "message": "Can't capture this profile"
   },
   "suppressedBody": {
-    "message": "Scouty doesn't keep information about this person."
+    "message": "Scouty doesn't keep data about this person."
   },
   "failedTitle": {
-    "message": "Scouty couldn't receive this capture"
+    "message": "Something went wrong"
   },
   "failedBody": {
-    "message": "Nothing was saved. Press Capture again."
+    "message": "Nothing was saved."
   },
   "takenOverTitle": {
     "message": "This capture stopped"
   },
   "takenOverBody": {
-    "message": "It was started again from another browser or device, or removed in Scouty. Nothing more from this capture will be sent."
-  },
-  "takenOverNext": {
-    "message": "To read this profile again from here, press Capture here."
+    "message": "It was restarted elsewhere or removed in Scouty."
   },
   "actionCaptureHere": {
     "message": "Capture here"
   },
   "expiredTitle": {
-    "message": "This capture ran out of time"
+    "message": "This capture timed out"
   },
   "expiredBody": {
-    "message": "A capture has to be sent to Scouty within 20 minutes. Nothing from it was saved."
-  },
-  "expiredNext": {
-    "message": "Press Capture to read this profile again."
-  },
-  "actionCaptureShort": {
-    "message": "Capture"
+    "message": "It took too long, so nothing was saved."
   },
   "captureNeedsProfile": {
-    "message": "Open the lead's LinkedIn profile in this tab to capture it."
+    "message": "Open a LinkedIn profile in this tab first."
   },
   "busyTitle": {
-    "message": "A capture is in progress"
+    "message": "Already capturing"
   },
   "busyBody": {
     "message": "Finish or stop it first."

@@ -14,36 +14,37 @@ import { viewFor } from "../../src/ui/view";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-/** Title and primary action of every screen, word for word from plan 12.4. */
+/** Title, primary and secondary action of every screen (short, plain copy: owner feedback 2026-11-24). */
 const EXPECTED: [string, string | null, string | null][] = [
-  ["Allow Scouty to work here", "Allow", "What does it read?"],
-  ["Capture a LinkedIn profile into Scouty", "Connect to Scouty", null],
-  ["Connecting to Scouty…", null, "Cancel"],
+  ["Allow access", "Allow", "What Scouty reads"],
+  ["Connect to Scouty", "Connect", null],
+  ["Connecting…", null, "Cancel"],
   ["Open a LinkedIn profile", "Open Scouty", null],
-  ["Before your first capture", "I understand, capture", "Cancel"],
-  ["Capture this profile", "Capture to Scouty", null],
+  ["Before you start", "Got it, capture", "Cancel"],
+  ["Capture this profile", "Capture", null],
   ["Captured 3 days ago", "Open in Scouty", "Capture again"],
-  ["Reading posts", "Stop", null],
+  ["Reading posts…", "Stop", null],
   ["Sending to Scouty…", null, null],
-  ["Captured", "Open analysis in Scouty", "Done"],
-  ["Captured part of this profile", "Open analysis in Scouty", "Capture again"],
-  ["Sign in to LinkedIn first", "Capture again", null],
-  ["LinkedIn wants to verify something", "OK", null],
-  ["This profile can't be read", "OK", null],
-  ["LinkedIn shows this person at a different address", "Capture this page", null],
+  ["Done", "Open in Scouty", "Close"],
+  ["Partly done", "Open in Scouty", "Capture again"],
+  ["Sign in to LinkedIn", "Try again", null],
+  ["LinkedIn wants to check it's you", "OK", null],
+  ["Can't read this profile", "OK", null],
+  ["This profile has moved", "Capture this page", null],
   ["You're offline", "Try now", null],
-  ["Connect to Scouty again", "Connect to Scouty", null],
+  ["Connect to Scouty again", "Connect", null],
   ["That's all for today", "Open Scouty", null],
-  ["Update the Scouty extension", "Open the store page", null],
+  ["Update Scouty", "Update", null],
   ["Not available yet", "Open Scouty", null],
-  ["This profile can't be captured", "OK", null],
-  ["Scouty couldn't receive this capture", "Capture again", null],
-  ["A capture is in progress", "Show it", null],
+  ["Can't capture this profile", "OK", null],
+  ["Something went wrong", "Try again", null],
+  ["Already capturing", "Show it", null],
   ["Settings", null, "Disconnect"],
   ["This capture stopped", "OK", "Capture here"],
-  ["Scouty isn't answering right now", "Try now", null],
-  ["This capture ran out of time", "Capture", "OK"],
+  ["Scouty isn't responding", "Try now", null],
+  ["This capture timed out", "Capture", "OK"],
 ];
+const JARGON = /token|manifest|payload|section|upload|http|status code|selector|element|capture api|api\b|!/i;
 const ERRORS = new Set(["linkedinSignIn", "verification", "unavailable", "addressChanged", "offline", "connectionEnded", "limit", "outdated", "notAvailable", "suppressed", "failed", "busy", "takenOver", "notAnswering", "expired"]);
 
 let root: Root | null = null;
@@ -83,7 +84,7 @@ describe("the 27 screens", () => {
       expect(node.querySelector("h1")!.textContent).toBe(title);
       expect(node.querySelector("[data-primary]")?.textContent ?? null).toBe(primary);
       expect(node.querySelectorAll("[data-primary]").length).toBeLessThanOrEqual(1);
-      if (secondary) expect([...node.querySelectorAll("[data-slot='actions'] button:not([data-primary])")].map((b) => b.textContent)).toContain(secondary);
+      if (secondary) expect([...node.querySelectorAll("main button:not([data-primary])")].map((b) => b.textContent)).toContain(secondary);
       const message = node.querySelector("[data-slot='message']")!;
       expect(message.getAttribute("role")).toBe(ERRORS.has(kind) ? "alert" : "status");
       if (!ERRORS.has(kind)) expect(message.getAttribute("aria-live")).toBe("polite");
@@ -98,50 +99,57 @@ describe("the 27 screens", () => {
       for (const button of node.querySelectorAll("button")) expect((button.textContent || button.getAttribute("aria-label") || "").length).toBeGreaterThan(0);
       // Every screen has a way out, except the brief "sending" one.
       if (kind !== "sending") expect(node.querySelectorAll("main button").length).toBeGreaterThan(0);
-      // No jargon in what the user reads.
-      expect(node.textContent).not.toMatch(/token|manifest|payload|!/i);
+      // No jargon in what the user reads or hears.
+      const heard = [...node.querySelectorAll("[aria-label], [aria-valuetext]")].map((el) => `${el.getAttribute("aria-label") ?? ""} ${el.getAttribute("aria-valuetext") ?? ""}`).join(" ");
+      expect(`${node.textContent} ${heard}`).not.toMatch(JARGON);
+      // Short: at most one sentence of body (a finished capture adds its counts line), one primary action.
+      const view = viewFor(state);
+      expect(view.body.length, kind).toBeLessThanOrEqual(kind === "donePartial" ? 2 : 1);
+      for (const line of view.body) expect(line.split(/[.?]\s/).length, line).toBe(1);
       expect(await audit(node)).toEqual([]);
     });
   });
 
   it("the exact copy of the screens with fixed text", () => {
     const text = (i: number): string => mount(SAMPLES[i]!).querySelector("main")!.textContent!;
-    expect(text(0)).toContain("Scouty needs your permission to read LinkedIn profile pages you choose to capture, and to send them to your Scouty workspace.");
-    expect(text(1)).toContain("This extension only reads, and only when you press Capture.");
-    expect(text(3)).toContain("Go to someone's profile on LinkedIn (linkedin.com/in/…), then click this icon.");
-    expect(text(3)).toContain("Connected to Example Workspace");
-    expect(text(4)).toContain("It only reads. It never clicks Follow, Like, Connect or Message, never posts, and never reads your LinkedIn password, cookies or messages.");
-    expect(text(4)).toContain("Tools like this are against LinkedIn's terms and LinkedIn may restrict your account.");
-    expect(text(5)).toContain("synthetic-person-one → Example Workspace");
+    expect(text(0)).toContain("Scouty only reads the LinkedIn profiles you choose.");
+    expect(text(1)).toContain("Sign in once to start capturing profiles.");
+    expect(text(3)).toContain("Then click the Scouty icon again.");
+    expect(text(4)).toContain("It never clicks, likes, connects, messages or posts for you.");
+    expect(text(4)).toContain("LinkedIn doesn't allow tools like this and may limit your account.");
+    expect(text(4)).toContain("The person may see that you viewed their profile.");
     expect(text(5)).toContain("38 captures left today");
-    expect(text(7)).toContain("23 of up to 50");
-    expect(text(7)).toContain("About 1 minute left");
-    expect(text(8)).toContain("Still sending. Your connection seems slow.");
-    expect(text(9)).toContain("Profile, 42 posts, 12 comments, 50 reactions.");
-    expect(text(10)).toContain("Posts: 23 read, then stopped.");
-    expect(text(10)).toContain("Reactions: not read.");
-    expect(text(10)).toContain("Scouty will work with what it has and tell you what's missing.");
-    expect(text(11)).toContain("Nothing was sent.");
-    expect(text(14)).toContain("https://www.linkedin.com/in/synthetic-person-renamed/. Capture from that page instead.");
-    expect(text(16)).toContain("Connect within a few minutes to finish sending this capture.");
-    expect(text(20)).toContain("Scouty doesn't keep information about this person.");
-    expect(text(21)).toContain("Nothing was saved. Press Capture again.");
+    expect(text(7)).toContain("Scouty never clicks or posts for you.");
+    expect(text(7)).toContain("23 of 50");
+    expect(text(7)).toContain("About 1 min left");
+    expect(text(8)).toContain("Still sending, so keep this browser open.");
+    expect(text(9)).toContain("Profile · 42 posts · 12 comments · 50 reactions");
+    expect(text(10)).toContain("Profile · 23 posts");
+    expect(text(10)).toContain("You stopped early, so some parts are missing.");
+    expect(text(11)).toContain("Sign in on linkedin.com, then try again.");
+    expect(text(14)).toContain("Capture it from its new page.");
+    expect(text(16)).toContain("Do it in the next few minutes to finish this capture.");
+    expect(text(20)).toContain("Scouty doesn't keep data about this person.");
+    expect(text(21)).toContain("Nothing was saved.");
     expect(text(23)).toContain("Synthetic Tester · tester@example.invalid");
-    expect(text(24)).toContain("It was started again from another browser or device, or removed in Scouty. Nothing more from this capture will be sent.");
-    expect(text(24)).toContain("To read this profile again from here, press Capture here.");
-    expect(text(25)).toContain("Your capture is kept in this browser. Scouty will keep trying to send it while this browser is open.");
-    expect(text(25)).toContain(`The next try is at about ${new Date("2026-11-23T10:42:00.000Z").toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`);
-    expect(text(26)).toContain("A capture has to be sent to Scouty within 20 minutes. Nothing from it was saved.");
-    expect(text(26)).toContain("Press Capture to read this profile again.");
+    expect(text(24)).toContain("It was restarted elsewhere or removed in Scouty.");
+    expect(text(25)).toContain(`Scouty will try again at ${new Date("2026-11-23T10:42:00.000Z").toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`);
+    expect(text(26)).toContain("It took too long, so nothing was saved.");
+    // The trust message is shown once, where Scouty is on the page: not on every screen.
+    for (const [i, state] of SAMPLES.entries()) if (state.kind !== "capturing") expect(text(i), state.kind).not.toContain("never clicks or posts for you");
+    // The workspace is in the header, not repeated in the text; the profile address is not shown.
+    expect(text(3)).not.toContain("Example Workspace");
+    expect(text(5)).not.toContain("synthetic-person-one");
+    expect(text(14)).not.toContain("https://");
   });
 
-  it.each(["light", "dark"] as const)("27 \"This capture ran out of time\" (%s): its own copy, not 22's; Capture starts again, OK dismisses; roles and axe", async (theme) => {
+  it.each(["light", "dark"] as const)("27 \"This capture timed out\" (%s): its own copy, not 22's; Capture starts again, OK dismisses; roles and axe", async (theme) => {
     const view = viewFor({ kind: "expired", workspace: "W" });
     const failed = viewFor({ kind: "failed", workspace: "W" });
     expect(view.n).toBe(27);
-    expect(view.title).toBe("This capture ran out of time");
+    expect(view.title).toBe("This capture timed out");
     expect(view.title).not.toBe(failed.title);
-    expect(view.body).toEqual(["A capture has to be sent to Scouty within 20 minutes. Nothing from it was saved.", "Press Capture to read this profile again."]);
+    expect(view.body).toEqual(["It took too long, so nothing was saved."]);
     expect(view.primary).toMatchObject({ id: "captureAgain", label: "Capture", variant: "primary" });
     expect(view.secondary).toMatchObject({ id: "dismiss", label: "OK" });
     // The same start-again action as 25's Capture here.
@@ -149,7 +157,7 @@ describe("the 27 screens", () => {
     expect(view.tone).toBe("alert");
     const onAction = vi.fn();
     const node = mount({ kind: "expired", workspace: "W" }, { theme, onAction });
-    expect(node.querySelector("h1")!.textContent).toBe("This capture ran out of time");
+    expect(node.querySelector("h1")!.textContent).toBe("This capture timed out");
     expect(node.querySelector("[data-slot='message']")!.getAttribute("role")).toBe("alert");
     const primary = node.querySelector<HTMLButtonElement>("[data-primary]")!;
     expect(primary.textContent).toBe("Capture");
@@ -165,14 +173,14 @@ describe("the 27 screens", () => {
   const CAPTURE_SCREENS: [UiState, string, UiAction][] = [
     [{ kind: "expired", workspace: "W" }, "Capture", "captureAgain"],
     [{ kind: "takenOver", workspace: "W" }, "Capture here", "captureAgain"],
-    [{ kind: "failed", workspace: "W" }, "Capture again", "captureAgain"],
+    [{ kind: "failed", workspace: "W" }, "Try again", "captureAgain"],
     [SAMPLES[6]!, "Capture again", "captureAgain"],
     [SAMPLES[10]!, "Capture again", "captureAgain"],
-    [{ kind: "linkedinSignIn", workspace: "W" }, "Capture again", "captureAgain"],
+    [{ kind: "linkedinSignIn", workspace: "W" }, "Try again", "captureAgain"],
     [SAMPLES[14]!, "Capture this page", "capture"],
     [{ kind: "notAnswering", retryAt: null, sending: false, workspace: "W" }, "Try now", "capture"],
   ];
-  const HINT = "Open the lead's LinkedIn profile in this tab to capture it.";
+  const HINT = "Open a LinkedIn profile in this tab first.";
 
   describe.each(["light", "dark"] as const)("capture actions (%s)", (theme) => {
     it.each(CAPTURE_SCREENS.map(([state, label, id]) => [state.kind, label, id, state] as const))("%s on a profile: %s is enabled and sends %s; axe", async (_kind, label, id, state) => {
@@ -231,36 +239,36 @@ describe("the 27 screens", () => {
     card.remove();
   });
 
-  it("26 \"Scouty isn't answering\" is not 16 \"You're offline\": its own copy, the same Try now", () => {
+  it("26 \"Scouty isn't responding\" is not 16 \"You're offline\": its own copy, the same Try now", () => {
     const busy = viewFor({ kind: "notAnswering", retryAt: null, sending: true, workspace: "W" });
     const offline = viewFor({ kind: "offline", workspace: "W" });
     expect(busy.n).toBe(26);
     expect(offline.n).toBe(16);
-    expect(busy.title).toBe("Scouty isn't answering right now");
+    expect(busy.title).toBe("Scouty isn't responding");
     expect(busy.title).not.toBe(offline.title);
     expect(busy.body.join(" ")).not.toMatch(/offline|online|connection/i);
     // Without a rate limit there is no time, only that it keeps trying.
-    expect(busy.body).toEqual(["Your capture is kept in this browser. Scouty will keep trying to send it while this browser is open."]);
+    expect(busy.body).toEqual(["Scouty will keep trying to send your capture."]);
     expect([busy.primary, busy.secondary, busy.links]).toEqual([offline.primary, offline.secondary, offline.links]);
     expect(busy.primary).toMatchObject({ id: "retryNow", label: "Try now" });
     expect(busy.tone).toBe("alert");
     // With a rate limit it says roughly when.
     const limited = viewFor({ kind: "notAnswering", retryAt: "2026-11-23T10:42:00.000Z", sending: true, workspace: "W" });
-    expect(limited.body).toHaveLength(2);
-    expect(limited.body[1]).toBe(`Scouty asked to wait a little. The next try is at about ${new Date("2026-11-23T10:42:00.000Z").toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`);
+    expect(limited.body).toHaveLength(1);
+    expect(limited.body[0]).toBe(`Scouty will try again at ${new Date("2026-11-23T10:42:00.000Z").toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`);
   });
 
   it.each(["light", "dark"] as const)("26 at create (%s): nothing kept, Try now starts the capture again; roles and axe", async (theme) => {
     const view = viewFor({ kind: "notAnswering", retryAt: null, sending: false, workspace: "W" });
     expect(view.n).toBe(26);
-    expect(view.title).toBe("Scouty isn't answering right now");
-    expect(view.body).toEqual(["This capture didn't start. Nothing was read or sent.", "Try again in a moment."]);
+    expect(view.title).toBe("Scouty isn't responding");
+    expect(view.body).toEqual(["Please try again in a moment."]);
     expect(view.primary).toMatchObject({ id: "capture", label: "Try now" });
     expect(view.body.join(" ")).not.toMatch(/offline|kept|keep trying/i);
     const limited = viewFor({ kind: "notAnswering", retryAt: "2026-11-23T10:42:00.000Z", sending: false, workspace: "W" });
-    expect(limited.body[1]).toBe(`Scouty asked to wait a little. Try again after about ${new Date("2026-11-23T10:42:00.000Z").toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`);
+    expect(limited.body[0]).toBe(`Please try again after ${new Date("2026-11-23T10:42:00.000Z").toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`);
     const node = mount({ kind: "notAnswering", retryAt: null, sending: false, workspace: "W" }, { theme });
-    expect(node.querySelector("h1")!.textContent).toBe("Scouty isn't answering right now");
+    expect(node.querySelector("h1")!.textContent).toBe("Scouty isn't responding");
     expect(node.querySelector("[data-primary]")!.textContent).toBe("Try now");
     expect(node.querySelector("[data-slot='message']")!.getAttribute("role")).toBe("alert");
     expect(await audit(node)).toEqual([]);
@@ -284,22 +292,25 @@ describe("the 27 screens", () => {
     (node.querySelector("[data-primary]") as HTMLElement).focus();
     act(() => root!.render(<PopupView view={viewFor(SAMPLES[7]!)} onAction={() => undefined} />));
     expect(document.activeElement).toBe(node.querySelector("h1"));
-    expect(node.querySelector("h1")!.textContent).toBe("Reading posts");
+    expect(node.querySelector("h1")!.textContent).toBe("Reading posts…");
     // Progress updates within the same screen do not steal focus.
     (node.querySelector("[data-primary]") as HTMLElement).focus();
     act(() => root!.render(<PopupView view={viewFor({ ...(SAMPLES[7] as Extract<UiState, { kind: "capturing" }>), count: 24 })} onAction={() => undefined} />));
     expect(document.activeElement).toBe(node.querySelector("[data-primary]"));
   });
 
-  it("progress has progressbar semantics with the count as its value text", () => {
-    const bar = mount(SAMPLES[7]!).querySelector("[role='progressbar']")!;
+  it("progress has progressbar semantics with the count as its value text, and one compact line under it", () => {
+    const node = mount(SAMPLES[7]!);
+    const bar = node.querySelector("[role='progressbar']")!;
     expect(bar.getAttribute("aria-valuenow")).toBe("23");
     expect(bar.getAttribute("aria-valuemax")).toBe("50");
-    expect(bar.getAttribute("aria-valuetext")).toBe("23 of up to 50 posts");
+    expect(bar.getAttribute("aria-valuetext")).toBe("23 of 50 posts");
+    expect(bar.getAttribute("aria-label")).toBe("Reading posts…");
     expect((bar.querySelector("[data-slot='bar']") as HTMLElement).style.width).toBe("46%");
-    expect([...document.querySelectorAll("[data-slot='steps'] li")].map((li) => li.getAttribute("aria-label"))).toEqual([
-      "Profile, done", "Experience, done", "Skills, done", "Posts, in progress", "Comments, waiting", "Reactions, waiting",
-    ]);
+    expect(node.querySelector("[data-slot='progress-text']")!.textContent).toBe("23 of 50");
+    expect(node.querySelector("[data-slot='estimate']")!.textContent).toBe("About 1 min left");
+    // No list of steps: the title says the current one in plain words.
+    expect(node.querySelector("[data-slot='steps'], ol")).toBeNull();
   });
 
   it("a loading page shows an indeterminate shimmer without a value", () => {
@@ -375,15 +386,21 @@ describe("view model", () => {
 
   it("counts, days and time are worded without special cases leaking", () => {
     const done = viewFor({ kind: "doneComplete", counts: { profileSections: 0, posts: 1, comments: 1, reactions: 1 }, workspace: "W" });
-    expect(done.body).toEqual(["1 post, 1 comment, 1 reaction."]);
+    expect(done.body).toEqual(["1 post · 1 comment · 1 reaction"]);
     const recent = (finalizedAt: string): string => viewFor({ kind: "recent", finalizedAt, now: "2026-11-23T10:00:00.000Z", workspace: "W" }).title;
     expect(recent("2026-11-23T09:00:00.000Z")).toBe("Captured today");
     expect(recent("2026-11-22T09:00:00.000Z")).toBe("Captured yesterday");
     expect(recent("2026-11-17T09:00:00.000Z")).toBe("Captured 6 days ago");
     expect(viewFor({ kind: "ready", slug: "s", workspace: "W", capturesLeft: 1 }).footer).toBe("1 capture left today");
     expect(viewFor({ kind: "ready", slug: "s", workspace: "W", capturesLeft: null }).footer).toBeNull();
-    expect(viewFor({ kind: "limit", resetAt: "2026-11-24T08:00:00.000Z", workspace: "W" }).body[0]).toMatch(/^Your workspace has used today's captures\. More are available after .+\.$/);
-    expect(viewFor({ ...(SAMPLES[10] as Extract<UiState, { kind: "donePartial" }>), notExpanded: true }).body).toHaveLength(2);
+    expect(viewFor({ kind: "limit", resetAt: "2026-11-24T08:00:00.000Z", workspace: "W" }).body[0]).toMatch(/^More captures after .+\.$/);
+    // A partial capture: what was read, then one line on why it is partial.
+    const partial = SAMPLES[10] as Extract<UiState, { kind: "donePartial" }>;
+    expect(viewFor({ ...partial, notExpanded: true }).body).toEqual(["Profile · 23 posts", "You stopped early, so some parts are missing."]);
+    const timedOut = partial.sections.map((line) => (line.state === "skipped" ? { ...line, reason: "timeout" as const } : line.state === "partial" ? { ...line, reason: "timeout" as const } : line));
+    expect(viewFor({ ...partial, sections: timedOut }).body[1]).toBe("Some parts couldn't be read.");
+    const whole = partial.sections.map((line) => ({ ...line, state: "complete" as const, reason: null, count: line.count ?? 3 }));
+    expect(viewFor({ ...partial, sections: whole, notExpanded: true }).body).toEqual(["Profile · 23 posts · 3 comments · 3 reactions", "Some long posts weren't opened in full."]);
     // The development click log is never part of a screen, in any build (it lives in the background console and Settings → Developer).
     for (const state of [...SAMPLES, ...OVERLAY_SAMPLES]) expect(JSON.stringify(viewFor(state))).not.toMatch(/Development|controls pressed|selector|expandText|data-testid/);
   });
@@ -406,7 +423,7 @@ describe("in-page overlay", () => {
     expect(overlay.host.getAttribute("aria-label")).toBe("Scouty capture");
     expect(document.styleSheets.length).toBe(sheets);
     expect(document.querySelectorAll("style, link[rel='stylesheet']").length).toBe(styles);
-    expect(document.body.textContent).not.toContain("Scouty is reading this page");
+    expect(document.body.textContent).not.toContain("Scouty never clicks or posts for you");
     overlay.remove();
     expect(document.querySelectorAll(HOST_TAG)).toHaveLength(0);
     attach.mockRestore();
@@ -432,8 +449,11 @@ describe("in-page overlay", () => {
     expect(mark.getAttribute("aria-hidden")).toBe("true");
     expect(mark.getAttribute("fill")).toBe("currentColor");
     expect([...mark.querySelectorAll("path")].map((p) => p.getAttribute("d"))).toEqual(BRAND_MARK_PATHS);
-    expect(card.querySelector(".fixed-line")!.textContent).toBe("Scouty is reading this page. It won't click or post anything.");
+    expect(card.querySelector(".fixed-line")).toBeNull();
     expect(card.querySelector(".title")!.textContent).toBe(viewFor(state).title);
+    // No jargon, and no more than the title, one line (two for a partial capture), the progress and the actions.
+    expect(card.textContent).not.toMatch(JARGON);
+    expect(card.querySelectorAll(".message > .text:not(.working-label)").length).toBeLessThanOrEqual(kind === "donePartial" ? 2 : 1);
     if (kind === "capturing") {
       const stop = card.querySelector("[data-action='stop']") as HTMLButtonElement;
       expect(stop.textContent).toBe("Stop");
@@ -447,11 +467,27 @@ describe("in-page overlay", () => {
     card.remove();
   });
 
-  it("shows the capturing count and the steps", () => {
+  it("while reading: the step in plain words, the trust message once, a bar, the count and time left, Stop", () => {
     const card = renderOverlay(viewFor(OVERLAY_SAMPLES[0]!), () => undefined);
+    expect(card.querySelector(".title")!.textContent).toBe("Reading posts…");
+    expect([...card.querySelectorAll(".message > .text")].map((p) => p.textContent)).toEqual(["Scouty never clicks or posts for you."]);
     const bar = card.querySelector("[role='progressbar']")!;
-    expect(bar.getAttribute("aria-valuetext")).toBe("23 of up to 50 posts");
-    expect(card.textContent).toContain("23 of up to 50");
-    expect([...card.querySelectorAll(".steps li")].map((li) => li.textContent)).toEqual(["Profile", "Experience", "Skills", "Posts", "Comments", "Reactions"]);
+    expect(bar.getAttribute("aria-valuetext")).toBe("23 of 50 posts");
+    expect(card.querySelector(".progress-row")!.textContent).toBe("23 of 50About 1 min left");
+    expect(card.querySelector(".steps, ol")).toBeNull();
+    expect([...card.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Stop"]);
+  });
+
+  it("when done: \"Done\", the counts line, Open in Scouty and Close, nothing else", () => {
+    const onAction = vi.fn();
+    const card = renderOverlay(viewFor(OVERLAY_SAMPLES[3]!), onAction);
+    expect(card.querySelector(".title")!.textContent).toBe("Done");
+    expect([...card.querySelectorAll(".message > .text")].map((p) => p.textContent)).toEqual(["Profile · 42 posts · 12 comments · 50 reactions"]);
+    const buttons = [...card.querySelectorAll<HTMLButtonElement>("button")];
+    expect(buttons.map((b) => b.textContent)).toEqual(["Open in Scouty", "Close"]);
+    expect(buttons[0]!.className).toBe("btn");
+    for (const b of buttons) b.click();
+    expect(onAction.mock.calls.map((c) => c[0])).toEqual(["openAnalysis", "dismiss"]);
+    expect(card.textContent).toBe("ScoutyDoneProfile · 42 posts · 12 comments · 50 reactionsOpen in ScoutyClose");
   });
 });

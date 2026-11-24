@@ -90,8 +90,8 @@ export const test = base.extend<{ rig: Rig }>({
         return popup;
       },
       async connect(popup) {
-        await popup.getByRole("button", { name: "Connect to Scouty" }).click();
-        await expect(popup.getByRole("heading", { level: 1 })).not.toHaveText(/Capture a LinkedIn profile into Scouty|Connecting to Scouty…/, { timeout: 30_000 });
+        await popup.getByRole("button", { name: "Connect", exact: true }).click();
+        await expect(popup.getByRole("heading", { level: 1 })).not.toHaveText(/^(Connect to Scouty|Connecting…)$/, { timeout: 30_000 });
       },
       async clicks(page) {
         return page.evaluate(() => JSON.parse(sessionStorage.getItem("__mock_clicks") ?? "[]") as Click[]);
