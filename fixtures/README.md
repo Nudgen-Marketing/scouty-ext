@@ -9,17 +9,24 @@ Written by hand. Each file starts with
 `SYNTHETIC: not captured from LinkedIn; structure is a best guess`.
 **They prove the code's logic, not that the selectors match LinkedIn.**
 
+Since selectors version 2 (2026-11-24) the fixtures that drive the reader reproduce LinkedIn's
+server-driven UI ("SDUI"): generated atomic class names with no meaning, `componentkey`,
+`data-testid`, a `data-sdui-screen` naming the page, `main#workspace`, `role=list`/`listitem`
+lists (`data-component-type=LazyColumn`), `expandable-text-box` / `expandable-text-button`, post
+links (`/feed/update/<urn>/`, `/analytics/post-summary/<urn>/`), "2w •" dates and action buttons
+named by `aria-label`. Every name, text, slug, link and id in them is invented.
+
 | File | What it stands for |
 | --- | --- |
-| `profile.html` | A signed-in profile: top card with Connect, Message, Follow and More, About with "…see more", Experience, Education, Skills, and a contact section that must never be read |
-| `profile-empty.html` | A profile with a name and nothing else |
-| `details-experience.html`, `details-skills.html`, `details-empty.html` | The two detail pages, and one LinkedIn shows as empty |
-| `activity-posts.html` | Three blocks: one with an activity URN, one long post with "…see more", one whose id is not an activity URN; a "Show more results" control |
-| `activity-comments.html` | A post the lead commented on, with the lead's comment after it |
-| `activity-reactions.html` | Two posts the lead reacted to, one in Vietnamese |
-| `activity-empty.html` | LinkedIn's "nothing to see" page |
-| `reduced-profile.html`, `authwall.html`, `checkpoint.html`, `not-found.html`, `unrelated.html` | The page states that stop a capture |
-| `interaction-traps.html` | Controls that must never be clicked, including ones given the expand control's class, placed inside a text container, or labelled in a language not on the word list |
+| `sdui-profile.html` | A profile: top card (name, a pronoun line, headline, contact link, Connect / Message / More), About with "… more", Experience, Education, Skills (with Endorse), Licenses & certifications, Languages; owner-only sections (Analytics, Suggested for you, Profile language, Public profile & URL), recommendations (People you may know, You might like, Who your viewers also viewed), an ad section with its own "… more", the Activity teaser, a section without a heading and a contact section — none of which may be read |
+| `sdui-profile-empty.html` | A profile with a top card and nothing else |
+| `sdui-details-experience.html`, `sdui-details-skills.html`, `sdui-details-empty.html` | The two detail pages (entries of paragraphs inside `componentkey` divs, a description with "… more", back / add / filter-tab / ad controls that must never be pressed), and one with an empty root |
+| `sdui-activity-posts.html` | Three items: an own post (analytics link), a long post with "… more" and "1w • Edited •", a repost with a document carousel and a ugcPost link |
+| `sdui-activity-comments.html` | Two items: a post the lead commented on (post first, the lead's comment last, a link with a comment query), and one with no post link |
+| `sdui-activity-reactions.html` | "likes this" with an activity URN, "liked a comment on this" with a share URN, in Vietnamese |
+| `sdui-activity-empty.html` | The activity list with no item (how LinkedIn shows this is unverified) |
+| `sdui-interaction-traps.html` | Controls that must never be clicked: every action control given the expand control's `data-testid` and `aria-hidden` and put in its own text box, controls refused by structure alone (labels not on the word list, menus, dialogs, forms, links, a hidden ancestor, an action next to "… more", owner-only sections, outside an item or outside `main`) |
+| `reduced-profile.html`, `authwall.html`, `checkpoint.html`, `not-found.html`, `unrelated.html` | Legacy page states that stop a capture (the sign-in, authwall and checkpoint addresses are tested by URL) |
 
 The mock LinkedIn server of the browser tests (`e2e/mock-linkedin.mjs`) serves these same files.
 
@@ -47,7 +54,8 @@ anonymous labels (P1, P2, …): no name, URL, text or screenshot of LinkedIn con
    times match the post's date within a day; long posts expanded versus left truncated; profile
    sections found, and whether Experience and Skills are complete; total duration.
 4. **Click log.** The development build lists every control it pressed when the capture ends.
-   Expected: only "see more" inside post or profile text, and "show more results". **Anything
+   Expected: only "… more" (`expandable-text-button`) inside post or profile text, and on legacy
+   pages "show more results". **Anything
    else is a release blocker.**
 5. Negative checks: signed out of LinkedIn; a renamed profile URL; closing the tab mid-capture;
    LinkedIn set to German (nothing is clicked and the summary says posts were not expanded).

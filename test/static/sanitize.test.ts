@@ -56,9 +56,10 @@ describe("sanitizer", () => {
     const doc = new JSDOM(out).window.document;
     expect(out.startsWith("<!-- SANITIZED by tools/sanitize.mjs")).toBe(true);
     // The kept ids and classes still drive page-state detection.
-    expect(detectPageState(doc)).toBe("checkpoint");
+    expect(detectPageState(doc, "profile")).toBe("checkpoint");
     doc.querySelector("#captcha-internal")!.remove();
-    expect(detectPageState(doc)).toBe("ok");
+    // Legacy markup is never "ok" any more (selectors version 2 needs the SDUI workspace and screen).
+    expect(detectPageState(doc, "profile")).toBe("unknown");
     expect(doc.documentElement.getAttribute("lang")).toBe("en");
     const block = doc.querySelector(".feed-shared-update-v2")!;
     expect(block.getAttribute("data-urn")).toMatch(/^urn:li:activity:7\d{18}$/);
@@ -89,5 +90,27 @@ describe("sanitizer", () => {
     expect(placeholderText("مرحبا")).toBe("ببببب");
     expect(placeholderText("漢字かな")).toBe("字字字字");
     expect(placeholderText("Tiếng Việt")).toBe("xxxxx xxxx");
+  });
+  it("keeps the SDUI hooks the reader needs, and nothing of the person: no slug, no URN, no text", () => {
+    const sdui = `<!doctype html><html lang="en"><body><div data-sdui-screen="com.linkedin.sdui.flagshipnav.profile.ProfileExperienceDetails">
+<main id="workspace" class="q1zx w8pv"><section componentkey="opaqueleak"><div id="com.linkedin.sdui.profile.card.refleak99Topcard"><h2>Realname Surname</h2></div></section>
+<div data-testid="profile_ExperienceDetailsSection_hrefleak" data-component-type="LazyColumn"><div componentkey="opaqueleak2"><p>secretword at Realcompany</p>
+<span data-testid="expandable-text-box" tabindex="-1">privatevalue<button type="button" aria-hidden="true" data-testid="expandable-text-button">… more</button></span>
+<a href="https://www.linkedin.com/feed/update/urn:li:activity:7130316800000000000/">x</a><a href="/analytics/post-summary/urn:li:share:7122689536000000000/">y</a><a href="/in/hrefleak/">z</a>
+<div data-testid="a1b2c3dataleak"></div><div data-sdui-screen="javascript:dataleak"></div></div></div></main></div></body></html>`;
+    const out = sanitizeHtml(sdui);
+    for (const secret of ["Realname", "Surname", "Realcompany", "secretword", "privatevalue", "hrefleak", "opaqueleak", "refleak99", "dataleak", "7130316800000000000", "7122689536000000000"]) {
+      expect(out.toLowerCase(), secret).not.toContain(secret.toLowerCase());
+    }
+    const doc = new JSDOM(out, { url: "https://www.linkedin.com/in/x/details/experience/" }).window.document;
+    expect(detectPageState(doc, "experience")).toBe("ok");
+    expect(doc.querySelector("[data-testid='profile_ExperienceDetailsSection_x']")).not.toBeNull();
+    expect(doc.querySelector("[data-testid='expandable-text-box'] > button[data-testid='expandable-text-button'][aria-hidden='true']")!.textContent).toBe("… more");
+    expect(doc.querySelector("[id='com.linkedin.sdui.profile.card.xTopcard']")).not.toBeNull();
+    expect(Array.from(doc.querySelectorAll("a")).map((a) => a.getAttribute("href"))).toEqual([
+      "/feed/update/urn:li:activity:7000000000000000001/", "/analytics/post-summary/urn:li:share:7000000000000000002/", "",
+    ]);
+    expect(doc.querySelectorAll("[componentkey]")).toHaveLength(2);
+    expect(doc.querySelector("[componentkey]")!.getAttribute("componentkey")).toBe("");
   });
 });

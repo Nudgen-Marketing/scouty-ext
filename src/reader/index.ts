@@ -5,11 +5,11 @@ import { ext } from "../ext";
 import type { ReaderArgs, ReaderMessage, ReaderResult } from "../messages";
 import { profileKeyFromSlug, slugFromPath } from "../profile-key";
 import { ACTIVITY_SECTIONS, buildActivityPayload, buildProfilePayload, serialize, type SectionPayload } from "../protocol";
-import { degradedBlock, expandWithin, findBlocks, hasEmptyState, readBlocks, textContainersOf, type ReadContext } from "./blocks";
+import { activityListEmpty, degradedBlock, expandWithin, findBlocks, hasEmptyState, isLoading, readBlocks, textContainersOf, type ReadContext } from "./blocks";
 import { fitByteBudget, utf8Length } from "./clamp";
 import { createInteractions } from "./interactions";
 import { runScrollLoop } from "./pacing";
-import { detectPageState, stopReasonFor, type PageState } from "./page-state";
+import { detectPageState, pageStateFromPath, stopReasonFor, type PageState } from "./page-state";
 import { expandProfile, profileProgress, readProfile } from "./profile";
 import { SELECTORS_VERSION, selectors } from "./selectors";
 import { domIsVisible, type IsVisible } from "./visible-text";
@@ -38,6 +38,10 @@ export async function readSection(args: ReaderArgs, env: ReaderEnv): Promise<Rea
   const clickLog = interactions.clickLog;
   const ctx: ReadContext = { doc, isVisible: env.isVisible, interactions, now: env.now() };
 
+  // LinkedIn's sign-in, authwall or checkpoint address: stop before anything else.
+  const byPath = pageStateFromPath(address?.pathname ?? "");
+  if (byPath) return { kind: "stopped", reason: byPath, address: null, clickLog };
+
   // Target check: the page must be the profile this capture was created for.
   const slug = slugFromPath(address?.pathname ?? "");
   const key = slug ? profileKeyFromSlug(slug) : null;
@@ -47,10 +51,11 @@ export async function readSection(args: ReaderArgs, env: ReaderEnv): Promise<Rea
   }
 
   // The application may still be drawing: give an unrecognised page a moment before failing closed.
-  let state: PageState = detectPageState(doc);
+  const section = args.section;
+  let state: PageState = detectPageState(doc, section);
   for (let i = 0; state === "unknown" && i < SETTLE_TRIES; i += 1) {
     await env.wait(SETTLE_MS);
-    state = detectPageState(doc);
+    state = detectPageState(doc, section);
   }
   if (state !== "ok") return { kind: "stopped", reason: stopReasonFor(state), address: null, clickLog };
 
@@ -59,13 +64,14 @@ export async function readSection(args: ReaderArgs, env: ReaderEnv): Promise<Rea
   const limits = activity ? PACING.activity : PACING.profile;
 
   const loop = await runScrollLoop({
-    pageState: () => detectPageState(doc),
+    pageState: () => detectPageState(doc, section),
     scrollStep: () => interactions.scrollStep(),
     expandNew: () => {
       if (activity) expandWithin(findBlocks(doc).flatMap((block) => textContainersOf(block)), ctx);
       else expandProfile(ctx, args.section);
     },
     collect: () => (activity ? findBlocks(doc).length : profileProgress(ctx, args.section)),
+    loading: () => activity && isLoading(doc),
     loadMore: () => interactions.loadMore(),
     onProgress: env.onProgress,
     wait: env.wait,
@@ -79,7 +85,7 @@ export async function readSection(args: ReaderArgs, env: ReaderEnv): Promise<Rea
     return { kind: "stopped", reason: stopReasonFor(loop.state), address: null, clickLog };
   }
   // Once more before anything is built: content from a page in a bad state is never kept.
-  const last = detectPageState(doc);
+  const last = detectPageState(doc, section);
   if (last !== "ok") return { kind: "stopped", reason: stopReasonFor(last), address: null, clickLog };
 
   const meta = {
@@ -97,7 +103,7 @@ export async function readSection(args: ReaderArgs, env: ReaderEnv): Promise<Rea
       const fitted = fitByteBudget(capped, base, HARD_LIMITS.payloadByteBudget);
       const reachedCap = all.length >= cap || fitted.cut;
       payload = buildActivityPayload(args.section, { ...meta, read: "ok", reachedCap }, fitted.kept);
-    } else if (hasEmptyState(doc, selectors.activity.emptyState)) {
+    } else if (hasEmptyState(doc, selectors.activity.emptyState) || activityListEmpty(doc)) {
       payload = buildActivityPayload(args.section, { ...meta, read: "empty", reachedCap: false }, []);
     } else {
       const whole = degradedBlock(ctx);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseActivityUrn, permalinkFor, plausibleIsoTime, urnTime } from "../../src/reader/urn";
+import { parseActivityUrn, permalinkFor, plausibleIsoTime, postUrnFromHref, postUrnFromLinks, urnTime } from "../../src/reader/urn";
 
 const NOW = Date.UTC(2026, 0, 1);
 
@@ -36,5 +36,32 @@ describe("urn", () => {
     expect(plausibleIsoTime("2023-11-20T09:00:00.000Z", NOW)).toBe("2023-11-20T09:00:00.000Z");
     expect(plausibleIsoTime("1999-01-01T00:00:00Z", NOW)).toBeNull();
     expect(plausibleIsoTime("not a date", NOW)).toBeNull();
+  });
+  it.each([
+    ["/feed/update/urn:li:activity:7130316800000000000/", "activity", "urn:li:activity:7130316800000000000"],
+    ["https://www.linkedin.com/feed/update/urn:li:activity:7130316800000000000/", "activity", "urn:li:activity:7130316800000000000"],
+    ["/feed/update/urn:li:activity:7130316800000000000/?commentUrn=urn%3Ali%3Acomment%3A%28activity%3A1%2C2%29", "activity", "urn:li:activity:7130316800000000000"],
+    ["/feed/update/urn%3Ali%3Aactivity%3A7130316800000000000/", "activity", "urn:li:activity:7130316800000000000"],
+    ["/analytics/post-summary/urn:li:activity:7130316800000000000/", "activity", "urn:li:activity:7130316800000000000"],
+    ["/feed/update/urn:li:share:7122689536000000000/", "share", "urn:li:share:7122689536000000000"],
+    ["/feed/update/urn:li:ugcPost:7131078450000000001", "ugcPost", "urn:li:ugcPost:7131078450000000001"],
+  ])("reads the post URN of %s", (href, kind, urn) => {
+    expect(postUrnFromHref(href)).toEqual({ kind, urn });
+  });
+
+  it.each([
+    null, "", "/in/synthetic-person-one/", "/feed/", "/feed/hashtag/placeholders/", "/feed/update/urn:li:comment:7130316800000000000/",
+    "/feed/update/urn:li:activity:12345/", "/feed/update/urn:li:activity:7130316800000000000x/", "/x/feed/update/urn:li:activity:7130316800000000000/",
+    "/feed/update/urn:li:activity:7130316800000000000/extra/", "/feed/update/%E0%A4%A/",
+  ])("ignores %s", (href) => {
+    expect(postUrnFromHref(href)).toBeNull();
+  });
+
+  it("prefers an activity URN among an item's links", () => {
+    expect(postUrnFromLinks(["/in/x/", "/feed/update/urn:li:share:7122689536000000000/", "/analytics/post-summary/urn:li:activity:7130316800000000000/"]))
+      .toEqual({ kind: "activity", urn: "urn:li:activity:7130316800000000000" });
+    expect(postUrnFromLinks(["/feed/update/urn:li:ugcPost:7131078450000000001/", "/feed/update/urn:li:share:7122689536000000000/"]))
+      .toEqual({ kind: "ugcPost", urn: "urn:li:ugcPost:7131078450000000001" });
+    expect(postUrnFromLinks(["/in/x/", null])).toBeNull();
   });
 });

@@ -99,4 +99,23 @@ describe("pacing", () => {
     await run(o);
     expect(seen).toEqual([0, 20, 40]);
   });
+  it("waits while the loader shows, a bounded number of pauses per step, and then counts the step", async () => {
+    // Items arrive while the loader shows: the loop waits for them instead of counting idle steps.
+    let loaderUntil = 0;
+    const o = options({
+      cap: 10,
+      loading: () => o.pauses.length < loaderUntil,
+      counts: () => Math.min(10, o.pauses.length),
+      scrollStep: () => { o.scrolls += 1; loaderUntil = o.pauses.length + 3; },
+    });
+    const result = await run(o);
+    expect(result.end).toBe("cap");
+    expect(o.scrolls).toBeLessThan(10);
+    // A loader that never goes away cannot hold the loop: each step waits at most PACING.loaderWaits more pauses.
+    const stuck = options({ loading: () => true });
+    const end = await run(stuck);
+    expect(end.end).toBe("idle");
+    expect(stuck.scrolls).toBe(PACING.idleSteps);
+    expect(stuck.pauses).toHaveLength(PACING.idleSteps * (1 + PACING.loaderWaits));
+  });
 });

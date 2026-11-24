@@ -15,6 +15,12 @@ export function fixtureHtml(name: string): string {
 
 export type Loaded = { dom: JSDOM; doc: Document; clicks: Element[]; scrolls: () => number };
 
+/** Section paths below /in/<slug>/. */
+export const PATHS = {
+  profile: `/in/${SLUG}/`, experience: `/in/${SLUG}/details/experience/`, skills: `/in/${SLUG}/details/skills/`,
+  posts: `/in/${SLUG}/recent-activity/all/`, comments: `/in/${SLUG}/recent-activity/comments/`, reactions: `/in/${SLUG}/recent-activity/reactions/`,
+} as const;
+
 /** Loads a synthetic fixture at a LinkedIn-shaped address and wires the page's own behaviour. */
 export function load(name: string, pathname = `/in/${SLUG}/`, html?: string): Loaded {
   const dom = new JSDOM(html ?? fixtureHtml(name), { url: `https://www.linkedin.com${pathname}` });
@@ -22,13 +28,13 @@ export function load(name: string, pathname = `/in/${SLUG}/`, html?: string): Lo
   const clicks: Element[] = [];
   const scrollBy = vi.fn();
   dom.window.scrollBy = scrollBy as unknown as typeof dom.window.scrollBy;
-  // What the page itself does when "…see more" is pressed: show the rest and drop the control.
+  // What the page itself does when "… more" is pressed: show the rest and drop the control.
   doc.addEventListener("click", (event) => {
     const target = event.target as Element;
     clicks.push(target);
-    if (target.matches("button.inline-show-more-text__button, button.feed-shared-inline-show-more-text__see-more-less-toggle") && target.hasAttribute("aria-expanded")) {
-      target.parentElement?.querySelector("[data-rest]")?.removeAttribute("hidden");
-      target.remove();
+    if (target.matches("button[data-testid='expandable-text-button']")) {
+      target.closest("[data-testid='expandable-text-box']")?.querySelector("[data-rest]")?.removeAttribute("hidden");
+      if (!target.hasAttribute("data-stays")) target.remove();
     }
   }, true);
   return { dom, doc, clicks, scrolls: () => scrollBy.mock.calls.length };

@@ -53,6 +53,8 @@ export const PACING = {
   minPauseMs: 1200,
   maxPauseMs: 2500,
   idleSteps: 3,
+  /** Extra pauses after a scroll step while LinkedIn's loader is showing, before the step counts as idle. */
+  loaderWaits: 3,
   activity: { maxSteps: 40, budgetMs: 90_000 },
   profile: { maxSteps: 15, budgetMs: 45_000 },
 } as const;

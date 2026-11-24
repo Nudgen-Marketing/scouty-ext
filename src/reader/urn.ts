@@ -14,6 +14,37 @@ export function parseActivityUrn(value: string | null | undefined): string | nul
   return URN_PATTERN.test(trimmed) ? trimmed : null;
 }
 
+export type PostUrnKind = "activity" | "share" | "ugcPost";
+export type PostUrn = { kind: PostUrnKind; urn: string };
+
+const POST_PATHS = ["/feed/update/", "/analytics/post-summary/"];
+const POST_URN_IN_PATH = /^urn:li:(activity|share|ugcPost):(\d{6,25})\/?$/;
+
+/**
+ * The post URN a link names, for the two link forms LinkedIn uses on activity pages:
+ * `/feed/update/<urn>/` and `/analytics/post-summary/<urn>/` (one's own posts). Anything else is null.
+ */
+export function postUrnFromHref(href: string | null | undefined): PostUrn | null {
+  if (!href) return null;
+  let path: string;
+  try {
+    path = decodeURIComponent(new URL(href, "https://www.linkedin.com").pathname);
+  } catch {
+    return null;
+  }
+  const prefix = POST_PATHS.find((p) => path.startsWith(p));
+  if (!prefix) return null;
+  const match = POST_URN_IN_PATH.exec(path.slice(prefix.length));
+  if (!match) return null;
+  return { kind: match[1] as PostUrnKind, urn: `urn:li:${match[1]}:${match[2]}` };
+}
+
+/** The first activity URN among the links, else the first share or ugcPost URN, else null. */
+export function postUrnFromLinks(hrefs: readonly (string | null)[]): PostUrn | null {
+  const found = hrefs.map(postUrnFromHref).filter((u): u is PostUrn => u !== null);
+  return found.find((u) => u.kind === "activity") ?? found[0] ?? null;
+}
+
 /** The public permalink of the post an activity URN names. Always on www.linkedin.com. */
 export function permalinkFor(urn: string): string | null {
   const parsed = parseActivityUrn(urn);

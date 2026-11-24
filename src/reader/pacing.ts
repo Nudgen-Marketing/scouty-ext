@@ -12,6 +12,8 @@ export type LoopOptions = {
   expandNew: () => void;
   /** Number of items found so far. */
   collect: () => number;
+  /** True while the page shows that more items are loading; the loop waits (bounded) before counting a step idle. */
+  loading?: () => boolean;
   /** Clicks the load-more control if one exists and is allowed. */
   loadMore: () => boolean;
   /** Reports progress; "stop" ends the loop (the user pressed Stop). */
@@ -56,6 +58,10 @@ export async function runScrollLoop(o: LoopOptions): Promise<LoopResult> {
     o.scrollStep();
     steps += 1;
     await o.wait(pauseMs(o.random));
+    // Infinite scroll: while LinkedIn's loader shows, give it a few more pauses (still within the budget).
+    for (let extra = 0; extra < PACING.loaderWaits && o.loading?.() && o.now() - started < o.budgetMs; extra += 1) {
+      await o.wait(pauseMs(o.random));
+    }
     o.expandNew();
     const next = o.collect();
     if (next > count) {

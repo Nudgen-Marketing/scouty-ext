@@ -5,19 +5,19 @@
 // (plan 6.4). The word list is a second line only.
 
 import type { ClickLogEntry } from "../messages";
-import { closestAny, matchesAny, queryAll, queryFirst, selectors } from "./selectors";
+import { closestAny, isActionControl, isProfileSectionLabel, matchesAny, queryAll, queryFirst, selectors } from "./selectors";
 
 export type ClickKind = "expandText" | "loadMore";
 
 const FORBIDDEN_ROLES = new Set(["menuitem", "menuitemcheckbox", "menuitemradio", "switch", "tab", "option", "link"]);
 const FORBIDDEN_CONTAINERS =
-  "[role='toolbar'],[role='menu'],[role='menubar'],[role='dialog'],[role='alertdialog'],dialog,menu,header,[role='banner'],nav,form,a,[href]";
+  "[role='toolbar'],[role='menu'],[role='menubar'],[role='dialog'],[role='alertdialog'],[role='tablist'],dialog,menu,header,[role='banner'],nav,form,a,[href]";
 
 // Second line of defence: action words in English and Vietnamese, matched against the accessible
 // name and the text of the element.
 const DENY_WORDS = [
   "follow", "connect", "message", "like", "react", "comment", "repost", "share", "send", "subscribe", "save",
-  "report", "block", "contact info", "invite", "endorse",
+  "report", "block", "contact info", "invite", "endorse", "menu", "page", "navigate", "add a ", "ad options",
   "theo dõi", "kết nối", "nhắn tin", "tin nhắn", "thích", "bày tỏ", "bình luận", "đăng lại", "chia sẻ", "gửi",
   "đăng ký", "lưu", "báo cáo", "chặn", "thông tin liên hệ",
 ];
@@ -26,23 +26,58 @@ function accessibleName(el: Element): string {
   return `${el.getAttribute("aria-label") ?? ""} ${el.getAttribute("title") ?? ""} ${el.textContent ?? ""}`.toLowerCase();
 }
 
+/**
+ * aria-hidden: nothing hidden from assistive technology is clicked, with ONE exception. LinkedIn
+ * marks its expand control (button[data-testid=expandable-text-button]) aria-hidden="true"; that
+ * control is allowed when it is itself the only aria-hidden element on its path (no hidden ancestor).
+ */
+function hiddenAllowed(el: Element, kind: ClickKind): boolean {
+  if (el.parentElement?.closest("[aria-hidden='true']")) return false;
+  if (el.getAttribute("aria-hidden") === "true") return kind === "expandText" && matchesAny(el, selectors.expandText);
+  return true;
+}
+
+/** Inside a profile section whose heading is one of the profile's own sections (never an ad or owner-only section). */
+function inProfileSection(box: Element): boolean {
+  const section = box.closest(selectors.expandSection);
+  const heading = section ? queryFirst(section, selectors.profile.sectionHeading) : null;
+  return heading !== null && isProfileSectionLabel(heading.textContent ?? "");
+}
+
+/** The text box an expand control belongs to, if it may be expanded at all. */
+function expandableBox(el: Element): Element | null {
+  const box = closestAny(el, selectors.textContainer);
+  if (!box) return null;
+  // Inside an activity item, a profile section or a detail page, within the main column.
+  if (!closestAny(box, selectors.mainColumn)) return null;
+  if (!closestAny(box, selectors.expandScope) && !inProfileSection(box)) return null;
+  // Never in or next to an action control: the box holds no control but expand controls.
+  for (const other of Array.from(box.querySelectorAll("button, [role='button'], [role='menuitem'], [role='tab'], input, select, textarea"))) {
+    if (!matchesAny(other, selectors.expandText) || isActionControl(other)) return null;
+  }
+  return box;
+}
+
 /** The structural allow-list. Every condition must hold. */
 export function mayClick(el: Element, kind: ClickKind): boolean {
   // 1. A plain button: never a link, never a submit control, never inside a form.
   if (el.tagName.toUpperCase() !== "BUTTON") return false;
   if (el.hasAttribute("href") || el.getAttribute("type") === "submit" || el.hasAttribute("disabled")) return false;
-  // 3. Not inside an action bar, toolbar, menu, dialog, header, navigation, form or link.
+  // 3. Not inside an action bar, toolbar, menu, tab list, dialog, header, navigation, form or link.
   if (closestAny(el, selectors.actionBar) || el.closest(FORBIDDEN_CONTAINERS)) return false;
-  // 4. Not a toggle, not a menu or tab item, no popup, no action-style attribute.
+  // 4. Not a toggle, not a menu or tab item, no popup, no action-style attribute or name, not hidden
+  //    (but for the one expand control LinkedIn hides from assistive technology).
   if (el.hasAttribute("aria-pressed") || el.hasAttribute("aria-haspopup") || el.hasAttribute("aria-checked")) return false;
   const role = (el.getAttribute("role") ?? "").toLowerCase();
   if (FORBIDDEN_ROLES.has(role)) return false;
   for (const attribute of selectors.actionControlAttributes) if (el.hasAttribute(attribute)) return false;
+  if (isActionControl(el)) return false;
+  if (el.closest("[inert]") || !hiddenAllowed(el, kind)) return false;
   // 5. It is one of the two known controls …
   // 2. … in the only place that control may be.
   if (kind === "expandText") {
     if (!matchesAny(el, selectors.expandText)) return false;
-    if (!closestAny(el, selectors.textContainer)) return false;
+    if (!expandableBox(el)) return false;
   } else {
     if (!matchesAny(el, selectors.loadMore)) return false;
     if (closestAny(el, selectors.activity.block) || closestAny(el, selectors.textContainer)) return false;
@@ -57,7 +92,7 @@ export type Interactions = {
   readonly clicksEnabled: boolean;
   /** Scrolls the window by 0.8 of the viewport. */
   scrollStep(): void;
-  /** Clicks an inline "…see more" control if the allow-list permits. Each control is clicked at most once. */
+  /** Clicks an inline "… more" control if the allow-list permits. Each control is clicked at most once. */
   expandText(el: Element): boolean;
   /** Clicks the "Show more results" control after the last block, if there is one and it is allowed. */
   loadMore(): boolean;

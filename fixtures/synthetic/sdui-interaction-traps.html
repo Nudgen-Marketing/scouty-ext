@@ -1,0 +1,64 @@
+<!-- SYNTHETIC: not captured from LinkedIn; structure is a best guess, modelled on LinkedIn's server-driven UI (SDUI) as surveyed on 2026-11-24. Every name, text, slug and id is invented. -->
+<!-- Controls that must never be clicked. Many are given the expand control's data-testid (and its
+     aria-hidden="true") and placed inside a text box, as drifted markup or a hostile page could;
+     others carry a label in a language that is not on the word list. data-ok marks the only
+     controls that may be pressed; data-trap marks everything else. -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Traps | Synthetic</title></head>
+<body>
+<div class="q8zr t1mw" data-sdui-screen="com.linkedin.sdui.flagshipnav.profile.ProfileRecentActivityAll">
+<nav class="k2vd" aria-label="Primary"><span data-testid="expandable-text-box"><button type="button" aria-hidden="true" data-testid="expandable-text-button" data-trap="in-nav">… more</button></span></nav>
+<main id="workspace" class="m4ql z9re">
+  <div role="list" data-component-type="LazyColumn" data-testid="e5f6a7b8c9d0" class="l5ow">
+    <div role="listitem" componentkey="synthetic-trap-item" class="i2po">
+      <span data-testid="expandable-text-box" tabindex="-1">Trap post text.<span data-rest hidden> Hidden remainder.</span><button type="button" aria-hidden="true" data-testid="expandable-text-button" data-ok="expand">… more</button></span>
+      <!-- Action controls disguised as the expand control, each alone in its own text box. -->
+      <span data-testid="expandable-text-box"><button type="button" aria-hidden="true" data-testid="expandable-text-button" aria-label="Open reactions menu" data-trap="reactions-menu"></button></span>
+      <span data-testid="expandable-text-box"><button type="button" aria-hidden="true" data-testid="expandable-text-button" aria-label="Reaction button state: no reaction" data-trap="reaction-state"><span>Like</span></button></span>
+      <span data-testid="expandable-text-box"><button type="button" aria-hidden="true" data-testid="expandable-text-button" data-trap="comment"><span>Comment</span></button></span>
+      <span data-testid="expandable-text-box"><button type="button" aria-hidden="true" data-testid="expandable-text-button" data-trap="repost"><span>Repost</span></button></span>
+      <span data-testid="expandable-text-box"><button type="button" aria-hidden="true" data-testid="expandable-text-button" data-trap="send"><span>Send</span></button></span>
+      <span data-testid="expandable-text-box"><button type="button" aria-hidden="true" data-testid="expandable-text-button" aria-label="Open control menu for post by Synthetic Person One" data-trap="control-menu"></button></span>
+      <span data-testid="expandable-text-box"><button type="button" aria-hidden="true" data-testid="expandable-text-button" aria-label="Follow Another Synthetic Author" data-trap="follow"><span>Follow</span></button></span>
+      <span data-testid="expandable-text-box"><button type="button" aria-hidden="true" data-testid="expandable-text-button" aria-label="Go to next page of document" data-trap="next-page"></button></span>
+      <span data-testid="expandable-text-box"><button type="button" aria-hidden="true" data-testid="expandable-text-button" aria-label="Go to previous page of document" data-trap="previous-page"></button></span>
+      <span data-testid="expandable-text-box"><button type="button" aria-hidden="true" data-testid="expandable-text-button" data-trap="page-of">Page 2 of 4</button></span>
+      <span data-testid="expandable-text-box"><button type="button" aria-hidden="true" data-testid="expandable-text-button" data-trap="contact">Contact info</button></span>
+      <!-- Structure alone refuses these: labels are in a language the word list does not know. -->
+      <span data-testid="expandable-text-box"><button type="button" aria-hidden="true" data-testid="expandable-text-button" aria-pressed="false" data-trap="toggle-foreign">Gefällt mir</button></span>
+      <span data-testid="expandable-text-box"><button type="button" aria-hidden="true" data-testid="expandable-text-button" data-follow-state="" data-trap="attr-foreign">Folgen</button></span>
+      <span data-testid="expandable-text-box"><button type="button" aria-hidden="true" data-testid="expandable-text-button" role="menuitem" data-trap="menuitem">Mehr</button></span>
+      <span data-testid="expandable-text-box"><button type="button" aria-hidden="true" data-testid="expandable-text-button" aria-haspopup="true" data-trap="popup">Weiter</button></span>
+      <span data-testid="expandable-text-box"><button type="submit" aria-hidden="true" data-testid="expandable-text-button" data-trap="submit">Absenden</button></span>
+      <span data-testid="expandable-text-box"><a data-testid="expandable-text-button" href="/messaging/" data-trap="anchor">… more</a></span>
+      <span data-testid="expandable-text-box"><a href="/messaging/"><button type="button" aria-hidden="true" data-testid="expandable-text-button" data-trap="button-in-anchor">… more</button></a></span>
+      <span data-testid="expandable-text-box"><form action="/x" method="post"><button type="button" aria-hidden="true" data-testid="expandable-text-button" data-trap="in-form">… more</button></form></span>
+      <div role="menu"><span data-testid="expandable-text-box"><button type="button" aria-hidden="true" data-testid="expandable-text-button" data-trap="in-menu">… more</button></span></div>
+      <div role="dialog"><span data-testid="expandable-text-box"><button type="button" aria-hidden="true" data-testid="expandable-text-button" data-trap="in-dialog">… more</button></span></div>
+      <div role="toolbar"><span data-testid="expandable-text-box"><button type="button" aria-hidden="true" data-testid="expandable-text-button" data-trap="in-toolbar">… more</button></span></div>
+      <div aria-hidden="true"><span data-testid="expandable-text-box"><button type="button" aria-hidden="true" data-testid="expandable-text-button" data-trap="hidden-ancestor">… more</button></span></div>
+      <span data-testid="expandable-text-box"><button type="button" aria-hidden="true" data-testid="expandable-text-button" data-trap="next-to-action">… more</button><button type="button" aria-label="Follow Another Synthetic Author" data-trap="action-in-box">Follow</button></span>
+      <span data-testid="expandable-text-box"><button type="button" aria-hidden="true" class="v6wo" data-trap="hidden-other-button">… more</button></span>
+      <button type="button" aria-hidden="true" data-testid="expandable-text-button" data-trap="outside-text-box">… more</button>
+      <div class="u8kq">
+        <button type="button" aria-label="Open reactions menu" data-trap="bar-reactions-menu"></button>
+        <button type="button" aria-label="Reaction button state: no reaction" aria-pressed="false" data-trap="bar-like"><span>Like</span></button>
+        <button type="button" data-trap="bar-comment"><span>Comment</span></button>
+        <button type="button" data-trap="bar-repost"><span>Repost</span></button>
+        <button type="button" data-trap="bar-send"><span>Send</span></button>
+        <button type="button" class="scaffold-finite-scroll__load-button" data-trap="loadmore-in-block">Show more results</button>
+      </div>
+    </div>
+  </div>
+  <section class="s0aa"><h2 class="w0ty">Suggested for you</h2><span data-testid="expandable-text-box">Owner-only text.<button type="button" aria-hidden="true" data-testid="expandable-text-button" data-trap="owner-only-section">… more</button></span></section>
+  <section class="s0aa"><span data-testid="expandable-text-box">No heading.<button type="button" aria-hidden="true" data-testid="expandable-text-button" data-trap="section-without-heading">… more</button></span></section>
+  <span data-testid="expandable-text-box">Loose text.<button type="button" aria-hidden="true" data-testid="expandable-text-button" data-trap="outside-item">… more</button></span>
+  <button type="button" class="scaffold-finite-scroll__load-button" data-trap="loadmore-follow">Follow more people</button>
+  <button type="button" class="scaffold-finite-scroll__load-button" data-ok="loadmore">Show more results</button>
+</main>
+<aside class="r1ra"><span data-testid="expandable-text-box">Outside main.<button type="button" aria-hidden="true" data-testid="expandable-text-button" data-trap="outside-main">… more</button></span></aside>
+</div>
+<script src="/static/behaviour.js"></script>
+</body>
+</html>

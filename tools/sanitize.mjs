@@ -1,6 +1,7 @@
 // Allow-list sanitizer for saved LinkedIn pages (owner task E0). This repository is public, so the
 // output keeps PAGE STRUCTURE ONLY: tag names, class names, roles, and the names of aria-* and
-// data-* attributes. Every text, link, image, id, title, label and script is dropped or replaced.
+// data-* attributes, plus the server-driven UI hooks the reader needs (the workspace id, the
+// screen name, a few data-testid values with any slug replaced, post links with made-up URNs). Every text, link, image, id, title, label and script is dropped or replaced.
 //
 //   npm run sanitize -- saved.html fixtures/sanitized/<name>.html
 //
@@ -18,13 +19,21 @@ const KEEP_VALUE = new Set(["role", "dir", "lang", "type"]); // and "class", han
 /** aria-* attributes whose true/false value is kept; every other aria-* and data-* keeps its name only. */
 const KEEP_BOOLEAN = new Set(["aria-hidden", "aria-pressed", "aria-expanded"]);
 /** Attributes kept as a bare name, because the reader's rules depend on their presence. */
-const KEEP_NAME = new Set(["hidden", "disabled", "href"]);
+const KEEP_NAME = new Set(["hidden", "disabled", "href", "componentkey"]);
 /** The few ids the page-state selectors depend on. Every other id is dropped. */
-export const KEEP_IDS = new Set(["global-nav", "captcha-internal"]);
+export const KEEP_IDS = new Set(["global-nav", "captcha-internal", "workspace"]);
+/** LinkedIn's server-driven UI hooks the reader depends on (selectors.ts, version 2). */
+const SDUI_SCREEN = /^com\.linkedin\.sdui\.[A-Za-z.]{1,120}$/;
+const TOP_CARD_ID = /^com\.linkedin\.sdui\.profile\.card\..*Topcard$/;
+const KEEP_TESTIDS = new Set(["expandable-text-box", "expandable-text-button", "loader"]);
+/** data-testid prefixes followed by the profile's slug: the slug is replaced. */
+const TESTID_PREFIXES = ["profile_ExperienceDetailsSection_", "profile_SkillDetails_"];
+const POST_LINK = /^(?:https?:\/\/[^/]+)?\/(feed\/update|analytics\/post-summary)\/(?:urn|urn%3A)(?::|%3A)li(?::|%3A)(activity|share|ugcPost)(?::|%3A)(\d{6,25})/i;
 /** Interface labels the reader depends on. A text node is kept only when it is exactly one of these. */
 export const KEEP_LABELS = new Set([
   "…see more", "see more", "...see more", "show more results", "about", "experience", "education", "skills", "languages", "featured",
   "recommendations", "licenses & certifications", "contact info", "xem thêm", "…xem thêm", "hiển thị thêm kết quả",
+  "… more", "…more", "feed post",
 ]);
 const URN = /^urn:li:activity:(\d{6,25})$/;
 const FIXED_TIME = "2020-01-01T00:00:00.000Z";
@@ -65,6 +74,15 @@ export function sanitizeHtml(html) {
         const digits = URN.exec(value)[1].length;
         out.push(`${name}="urn:li:activity:${("7" + String(urns).padStart(digits - 1, "0")).slice(0, digits)}"`);
       } else if (name === "datetime") out.push(`datetime="${FIXED_TIME}"`);
+      else if (name === "data-sdui-screen" && SDUI_SCREEN.test(value)) out.push(`${name}="${value}"`);
+      else if (name === "data-component-type" && /^[A-Za-z]{1,40}$/.test(value)) out.push(`${name}="${value}"`);
+      else if (name === "data-testid" && KEEP_TESTIDS.has(value)) out.push(`${name}="${value}"`);
+      else if (name === "data-testid" && TESTID_PREFIXES.some((p) => value.startsWith(p))) out.push(`${name}="${TESTID_PREFIXES.find((p) => value.startsWith(p))}x"`);
+      else if (name === "href" && POST_LINK.test(value)) {
+        const [, form, kind, id] = POST_LINK.exec(value);
+        urns += 1;
+        out.push(`href="/${form}/urn:li:${kind}:${("7" + String(urns).padStart(id.length - 1, "0")).slice(0, id.length)}/"`);
+      } else if (name === "id" && TOP_CARD_ID.test(value)) out.push(`id="com.linkedin.sdui.profile.card.xTopcard"`);
       else if (name === "class") {
         const classes = value.split(/\s+/).filter((c) => /^[A-Za-z_-][A-Za-z0-9_-]*$/.test(c));
         if (classes.length) out.push(`class="${escapeAttr(classes.join(" "))}"`);

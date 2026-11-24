@@ -66,7 +66,7 @@ describe("source rules (src/)", () => {
   });
 
   it("LinkedIn selectors and class names live only in reader/selectors.ts", () => {
-    const marks = /feed-shared|scaffold-|artdeco-|pvs-|update-components|global-nav|inline-show-more|comments-comment/;
+    const marks = /feed-shared|scaffold-|artdeco-|pvs-|update-components|global-nav|inline-show-more|comments-comment|data-sdui-screen|com\.linkedin\.sdui|expandable-text|LazyColumn|main#workspace|componentkey|profile_(ExperienceDetailsSection|SkillDetails)_/;
     expect(SRC.filter((f) => marks.test(code(f)))).toEqual(["src/reader/selectors.ts"]);
     expect(read("src/reader/selectors.ts")).not.toMatch(/contact-info|overlay\/contact/);
   });
