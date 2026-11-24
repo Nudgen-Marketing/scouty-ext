@@ -6,6 +6,7 @@ import type { Message, UiAction } from "../messages";
 import { profileFromUrl } from "../profile-key";
 import type { UiState } from "../ui/state";
 import { createApi } from "./api";
+import { openAppPage } from "./app-tab";
 import * as auth from "./auth";
 import { devRequest, recordCapture } from "./dev-log";
 import * as outbox from "./outbox";
@@ -84,6 +85,11 @@ function open(url: string): void {
   void ext.tabs.create({ url });
 }
 
+/** An app page: back in the Scouty tab the user came from when there is one (src/background/app-tab.ts). */
+function openApp(url: string, linkedinTabId: number | null): void {
+  void openAppPage(url, linkedinTabId);
+}
+
 /** Only pages of the Scouty app are ever opened, plus the store page the server names. */
 function appUrl(candidate: string | null | undefined): string {
   return candidate && candidate.startsWith(`${API_ORIGIN}/`) ? candidate : `${API_ORIGIN}/`;
@@ -145,14 +151,15 @@ async function act(action: UiAction, tabId: number | null): Promise<void> {
     case "dismiss": return controller.dismiss();
     case "retryNow": return controller.resume();
     case "openAnalysis": {
-      if (state.phase === "done") return open(appUrl(state.result.appUrl));
+      const linkedinTab = "tabId" in state ? state.tabId : tabId;
+      if (state.phase === "done") return openApp(appUrl(state.result.appUrl), linkedinTab);
       if (state.phase === "idle" && state.notice?.kind === "recent") {
         const profile = profileFromUrl(state.notice.url, LINKEDIN_ORIGIN);
-        return open(profile ? `${API_ORIGIN}/dashboard?linkedin=${encodeURIComponent(profile.key)}` : appUrl(null));
+        return openApp(profile ? `${API_ORIGIN}/dashboard?linkedin=${encodeURIComponent(profile.key)}` : appUrl(null), linkedinTab);
       }
-      return open(appUrl(null));
+      return openApp(appUrl(null), linkedinTab);
     }
-    case "openScouty": return open(appUrl(null));
+    case "openScouty": return openApp(appUrl(null), "tabId" in state ? state.tabId : tabId);
     case "whatItReads": return open(PRIVACY_URL);
     case "openStore": {
       const info = await sessionInfo(ui, true);
