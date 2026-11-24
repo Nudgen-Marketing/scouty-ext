@@ -2,6 +2,7 @@
 // status-pill, alert, skeleton) with the same measurements and tokens. Nothing is imported from
 // the app, and no component library is used: these few have no behaviour a native element lacks.
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { BRAND_LOGO_WIDTH, BRAND_MARK_PATHS, BRAND_WORD_PATHS } from "../ui/brand";
 import { ICONS, type IconName } from "../ui/icons";
 import type { ButtonVariant, PillTone } from "../ui/view";
 
@@ -82,9 +83,14 @@ export function Progress({ value, max, valueText, label, indeterminate, reducedM
   );
 }
 
-/** Placeholder mark: a plain letter tile. The Scouty logo is not published here (plan 12.1). */
-export function Mark() {
-  return <span aria-hidden="true" data-slot="mark" className="grid size-5 place-items-center rounded-sm bg-primary text-[12px] leading-none font-bold text-primary-foreground">S</span>;
+/** The Scouty logo, as the app's Logo: the mark and the outlined wordmark in the text colour. */
+export function Logo({ className }: { className?: string }) {
+  return (
+    <svg viewBox={`0 0 ${BRAND_LOGO_WIDTH} 60`} fill="currentColor" role="img" aria-label="Scouty" focusable="false" data-slot="logo" className={cn("h-8 w-auto shrink-0 text-foreground", className)}>
+      <g transform="translate(2 7)">{BRAND_MARK_PATHS.map((d) => <path key={d} d={d} />)}</g>
+      {BRAND_WORD_PATHS.map((d) => <path key={d} d={d} />)}
+    </svg>
+  );
 }
 
 /** A spinner, or under reduced motion a static label. */

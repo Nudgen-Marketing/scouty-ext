@@ -37,16 +37,10 @@
   font-weight: 600;
 }
 .mark {
-  display: grid;
-  place-items: center;
+  flex: none;
+  display: block;
   width: 20px;
   height: 20px;
-  border-radius: calc(var(--radius) * 0.6);
-  background: var(--primary);
-  color: var(--primary-foreground);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1;
 }
 .fixed-line {
   margin: 0;

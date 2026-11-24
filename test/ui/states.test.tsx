@@ -8,6 +8,7 @@ import { OVERLAY_SAMPLES, SAMPLES } from "../../gallery/samples";
 import type { UiAction } from "../../src/messages";
 import { HOST_TAG, mountOverlay, renderOverlay } from "../../src/overlay/overlay";
 import { PopupView } from "../../src/popup/PopupView";
+import { BRAND_LOGO_WIDTH, BRAND_MARK_PATHS, BRAND_WORD_PATHS } from "../../src/ui/brand";
 import { UI_KINDS, type UiState } from "../../src/ui/state";
 import { viewFor } from "../../src/ui/view";
 
@@ -87,8 +88,13 @@ describe("the 27 screens", () => {
       expect(message.getAttribute("role")).toBe(ERRORS.has(kind) ? "alert" : "status");
       if (!ERRORS.has(kind)) expect(message.getAttribute("aria-live")).toBe("polite");
       expect(message.contains(node.querySelector("h1"))).toBe(true);
+      // The header shows the Scouty logo, named once for assistive technology.
+      const logo = node.querySelector("header svg[data-slot='logo']")!;
+      expect(logo.getAttribute("role")).toBe("img");
+      expect(logo.getAttribute("aria-label")).toBe("Scouty");
+      expect(node.querySelector("header")!.textContent).not.toContain("Scouty");
       // Icons are decorative: hidden from assistive technology, with text beside them.
-      for (const svg of node.querySelectorAll("svg")) expect(svg.getAttribute("aria-hidden")).toBe("true");
+      for (const svg of node.querySelectorAll("svg:not([data-slot='logo'])")) expect(svg.getAttribute("aria-hidden")).toBe("true");
       for (const button of node.querySelectorAll("button")) expect((button.textContent || button.getAttribute("aria-label") || "").length).toBeGreaterThan(0);
       // Every screen has a way out, except the brief "sending" one.
       if (kind !== "sending") expect(node.querySelectorAll("main button").length).toBeGreaterThan(0);
@@ -321,6 +327,18 @@ describe("the 27 screens", () => {
     expect(outside).not.toMatch(/animation|transition/);
   });
 
+  it("the header logo is the app's: mark and outlined wordmark in the text colour, then the workspace", () => {
+    const node = mount(SAMPLES[5]!);
+    const logo = node.querySelector("header svg[data-slot='logo']")!;
+    expect(logo.getAttribute("viewBox")).toBe(`0 0 ${BRAND_LOGO_WIDTH} 60`);
+    expect(logo.getAttribute("fill")).toBe("currentColor");
+    expect(logo.getAttribute("class")).toContain("text-foreground");
+    expect([...logo.querySelectorAll("g[transform='translate(2 7)'] path")].map((p) => p.getAttribute("d"))).toEqual(BRAND_MARK_PATHS);
+    expect([...logo.querySelectorAll(":scope > path")].map((p) => p.getAttribute("d"))).toEqual(BRAND_WORD_PATHS);
+    expect(logo.nextElementSibling!.getAttribute("data-slot")).toBe("workspace");
+    expect(node.querySelector("[data-slot='mark']")).toBeNull();
+  });
+
   it("settings shows the account, the workspace, the version and Disconnect in secondary style", () => {
     const node = mount(SAMPLES[23]!);
     expect(node.querySelector("[data-action='disconnect']")!.getAttribute("data-variant")).toBe("outline");
@@ -408,7 +426,11 @@ describe("in-page overlay", () => {
     const onAction = vi.fn();
     const card = renderOverlay(viewFor(state), onAction);
     document.body.append(card);
-    expect(card.querySelector(".header")!.textContent).toBe("SScouty");
+    expect(card.querySelector(".header")!.textContent).toBe("Scouty");
+    const mark = card.querySelector(".header svg.mark")!;
+    expect(mark.getAttribute("aria-hidden")).toBe("true");
+    expect(mark.getAttribute("fill")).toBe("currentColor");
+    expect([...mark.querySelectorAll("path")].map((p) => p.getAttribute("d"))).toEqual(BRAND_MARK_PATHS);
     expect(card.querySelector(".fixed-line")!.textContent).toBe("Scouty is reading this page. It won't click or post anything.");
     expect(card.querySelector(".title")!.textContent).toBe(viewFor(state).title);
     if (kind === "capturing") {

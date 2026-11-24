@@ -3,9 +3,10 @@
 //
 // Framework-free on purpose: this runs inside the LinkedIn page. One host element appended to
 // <html>, a CLOSED shadow root, a small static stylesheet built from the same tokens as the popup,
-// and only text nodes and buttons created with DOM APIs (no HTML strings). It reads nothing from
+// and only text nodes, buttons and the Scouty mark (SVG) created with DOM APIs (no HTML strings). It reads nothing from
 // the page, touches no storage and makes no request.
 import { ext } from "../ext";
+import { BRAND_MARK_PATHS } from "../ui/brand";
 import type { Message, UiAction } from "../messages";
 import { t } from "../ui/i18n";
 import type { UiState } from "../ui/state";
@@ -22,6 +23,19 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string,
   for (const [name, value] of Object.entries(attrs)) node.setAttribute(name, value);
   for (const child of children) if (child) node.append(child);
   return node;
+}
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+/** The Scouty mark, decorative (the "Scouty" text next to it names the panel), in the text colour. */
+function markSvg(): SVGSVGElement {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  for (const [name, value] of Object.entries({ class: "mark", viewBox: "0 0 40 40", fill: "currentColor", "aria-hidden": "true", focusable: "false" })) svg.setAttribute(name, value);
+  for (const d of BRAND_MARK_PATHS) {
+    const path = document.createElementNS(SVG_NS, "path");
+    path.setAttribute("d", d);
+    svg.append(path);
+  }
+  return svg;
 }
 
 export function renderOverlay(view: View, onAction: (action: UiAction) => void): HTMLElement {
@@ -50,7 +64,7 @@ export function renderOverlay(view: View, onAction: (action: UiAction) => void):
     return button;
   });
   return el("div", { class: "card", "data-view": view.kind },
-    el("div", { class: "header" }, el("span", { class: "mark", "aria-hidden": "true" }, "S"), el("span", {}, t("brand"))),
+    el("div", { class: "header" }, markSvg(), el("span", {}, t("brand"))),
     // Always shown, so the panel is never mistaken for part of LinkedIn.
     el("p", { class: "fixed-line" }, t("overlayFixedLine")),
     message,

@@ -4,7 +4,7 @@ import { useEffect, useRef, type KeyboardEvent } from "react";
 import type { UiAction } from "../messages";
 import { t } from "../ui/i18n";
 import type { View, ViewAction } from "../ui/view";
-import { Alert, Button, Icon, Mark, Progress, StatusPill, Working } from "./components";
+import { Alert, Button, Icon, Logo, Progress, StatusPill, Working } from "./components";
 
 export type PopupViewProps = { view: View; onAction: (action: UiAction) => void; reducedMotion?: boolean };
 
@@ -43,8 +43,7 @@ export function PopupView({ view, onAction, reducedMotion = false }: PopupViewPr
   return (
     <div data-view={view.kind} data-view-number={view.n} onKeyDown={onKeyDown} className="flex max-h-[560px] w-[360px] flex-col overflow-y-auto bg-background text-foreground">
       <header className="flex min-h-12 items-center gap-2 border-b border-border px-4 py-2">
-        <Mark />
-        <span className="text-sm font-semibold">{t("brand")}</span>
+        <Logo />
         {view.workspace ? <span data-slot="workspace" className="min-w-0 flex-1 text-[13px] break-words text-muted-foreground">{view.workspace}</span> : <span className="flex-1" />}
         {view.showSettings ? (
           <Button variant="ghost" size="icon" aria-label={t("settingsButton")} data-action="openSettings" onClick={() => onAction("openSettings")}><Icon name="settings" /></Button>

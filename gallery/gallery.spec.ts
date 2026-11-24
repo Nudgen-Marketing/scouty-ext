@@ -29,6 +29,17 @@ test("shows all 27 states in both themes, plus the overlay", async ({ page }) =>
   // The two themes really differ: the dark frame has a dark background.
   const backgrounds = await page.evaluate(() => ["light", "dark"].map((theme) => getComputedStyle(document.querySelector(`[data-frame='popup'][data-theme='${theme}']`)!).backgroundColor));
   expect(backgrounds[0]).not.toBe(backgrounds[1]);
+  // The header logo is the app's, in the text colour of each theme, sized like the old mark row.
+  await expect(page.locator("[data-frame='popup'] header svg[data-slot='logo'][aria-label='Scouty']")).toHaveCount(54);
+  const logo = await page.evaluate(() => ["light", "dark"].map((theme) => {
+    const frame = document.querySelector(`[data-frame='popup'][data-theme='${theme}']`)!;
+    const svg = frame.querySelector("header svg[data-slot='logo']")!;
+    const box = svg.getBoundingClientRect();
+    return { fill: getComputedStyle(svg).fill, text: getComputedStyle(frame).color, height: box.height, width: Math.round(box.width) };
+  }));
+  for (const theme of logo) expect(theme).toMatchObject({ fill: theme.text, height: 28, width: 87 });
+  expect(logo[0]!.fill).not.toBe(logo[1]!.fill);
+  await expect(page.locator("[data-frame='popup'] [data-slot='mark']")).toHaveCount(0);
 });
 
 test("axe reports no violation in any state, colour contrast included", async ({ page }) => {
