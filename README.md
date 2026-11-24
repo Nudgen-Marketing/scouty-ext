@@ -49,7 +49,8 @@ PopupView.tsx                   session.ts    capture state machine      ──�
 | View model | `src/ui/state.ts`, `src/ui/view.ts` | `viewFor(state)` is pure and framework-free; every string comes from `_locales/en/messages.json`. |
 | Popup | `src/popup/` | React 19 + Tailwind CSS 4, the same majors as the Scouty app. Thin renderer of the view model. |
 | Overlay | `src/overlay/` | Plain DOM in a closed shadow root with a small static stylesheet built from the same tokens. |
-| Tokens | `src/ui/tokens.json`, `src/ui/tokens.source.json`, `src/ui/tokens.css` | `tokens.json` is byte for byte the app's `extension-tokens.json`; `tokens.css` is generated from it and holds the only colour values in the repository. |
+| Tokens | `src/ui/tokens.json`, `src/ui/tokens.source.json`, `src/ui/tokens.css` | `tokens.json` is byte for byte the app's `extension-tokens.json`; `tokens.css` is generated from it and holds the only colour values the extension's code uses. |
+| Brand | `src/ui/brand.ts`, `icons/` | The Scouty mark and outlined wordmark, copied byte for byte from the app's `src/lib/brand-mark.ts` by `npm run brand`; the popup header draws the app's logo and the overlay its mark, both in the text colour. The toolbar icons are the app's `src/app/icon.svg`, rendered by `npm run icons`. |
 
 ### Why the popup uses React and Tailwind (a deviation from the original plan)
 
@@ -87,7 +88,8 @@ Built popup size, per target (identical across targets apart from the build cons
 | `npm run package` | `release/scouty-ext-<version>-{chrome,edge,firefox}.zip` and the source archive |
 | `npm run check` | typecheck, lint, build, test, test:e2e, lint:firefox |
 | `npm run sanitize -- <saved.html> <out.html>` | The allow-list sanitizer for saved pages (owner task E0 only) |
-| `npm run tokens` / `npm run icons` | Regenerate `tokens.css` from `tokens.json`; regenerate the placeholder icons |
+| `npm run tokens` / `npm run icons` | Regenerate `tokens.css` from `tokens.json`; render `icons/*.png` from the app icon with Playwright's Chromium (byte-stable across runs on one machine; the committed PNGs are the source of truth) |
+| `npm run brand [-- <app checkout>]` | Re-copy the brand path data from the app (default `../scouty`) into `src/ui/brand.ts`; then run `npm run icons`. `npm run test:static` fails while the copy and the app differ |
 
 ## Load the unpacked build
 

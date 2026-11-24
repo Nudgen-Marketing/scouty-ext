@@ -52,7 +52,13 @@ THIS SOFTWARE.
 ## Design tokens
 
 `src/ui/tokens.json` holds colour and radius values copied from the Scouty app. They are Scouty's
-own. No font file and no Scouty logo is included in this repository.
+own. No font file is included in this repository.
+
+## Scouty brand
+
+`src/ui/brand.ts` (the Scouty mark and outlined wordmark, as SVG path data) and the toolbar icons in
+`icons/` are Scouty's own, copied from the Scouty app. The owner decided on 2026-11-24 that they
+may be published here.
 
 ## Development tools
 

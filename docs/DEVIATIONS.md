@@ -134,6 +134,15 @@ one API client, least-privilege manifests, nothing reduced submitted as complete
       "empty" when the list or root is there with nothing in it), the Vietnamese header-line and
       section wording beyond the labels above, and whether the screen names change across UI
       languages.
+18. **The Scouty brand, as in the app (owner decision 2026-11-24).** The plan (12.1, open question
+    12) kept the Scouty logo out of this public repository, so the extension used a letter tile.
+    The owner decided the logo may be published. `src/ui/brand.ts` is a byte-for-byte copy of the
+    app's `src/lib/brand-mark.ts` path data (`npm run brand`; a static test compares the two when
+    the app is checked out next to this repository). The popup header shows the app's `Logo`
+    (mark and outlined wordmark, `currentColor`, `role="img"`, named "Scouty") in place of the tile
+    and the separate "Scouty" text; the overlay shows the mark (decorative) beside "Scouty"; the
+    toolbar icons are the app's `src/app/icon.svg` rendered at 16, 32, 48 and 128 px by
+    `npm run icons`. The static test still forbids font files and any other brand or image file.
 
 ## Contract decisions (to reconcile with the app)
 
@@ -227,7 +236,7 @@ extension follows the app's `src/lib/linkedin/protocol.ts`:
 ## Open points for the owner
 
 - Run E0 (live LinkedIn) again with selectors version 2 (deviation 17) and record the click log.
-- Decide the licence; confirm whether the Scouty mark may replace the letter tile.
+- Decide the licence.
 - Rebuild on Node 24 on a clean machine and record the hashes in BUILD.md.
 - CI now runs `npm run smoke:firefox` (Firefox installed by `browser-actions/setup-firefox`, under
   `xvfb-run`); it has not yet been seen to pass on GitHub. Run the manual steps of
