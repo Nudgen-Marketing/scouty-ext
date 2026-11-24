@@ -32,7 +32,7 @@ agreed, referred to by its label (P1); record no name, URL, text or screenshot o
    `validation/VALIDATION.md`, Local setup) or `npm run build` (against Scouty).
 2. Open `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on…** → choose
    `dist/firefox/manifest.json`.
-   Expected: "Scouty LinkedIn Capture" is listed with no error and no warning banner. Note the
+   Expected: "Scouty Extension" is listed with no error and no warning banner. Note the
    Internal UUID.
 3. On its entry press **Inspect**, open the Console.
    Expected: no error.
@@ -67,7 +67,7 @@ agreed, referred to by its label (P1); record no name, URL, text or screenshot o
     and **Capture here**, and nothing more from the Firefox run reaches the app.
 12. Popup → settings (gear) → **Disconnect**, then click the icon again.
     Expected: "Connect to Scouty" with **Connect**. In Scouty, Settings → Connected Apps no longer lists an active
-    "Scouty LinkedIn Capture (Firefox)" connection.
+    "Scouty Extension (Firefox)" connection.
 13. Back in `about:debugging`, check the extension's Console once more.
     Expected: no error was logged during the run.
 

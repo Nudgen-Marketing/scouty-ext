@@ -127,12 +127,12 @@ export function createStubApi(options = {}) {
     const version = headers["x-scouty-extension-version"];
     const protocol = headers["x-scouty-protocol"];
     if (!version || protocol !== String(PROTOCOL_VERSION) || olderThan(version, state.minVersion)) {
-      return { fail: error(426, "Update the Scouty extension to continue.", "LINKEDIN_EXTENSION_OUTDATED", { minVersion: state.minVersion, storeUrl: state.storeUrl }) };
+      return { fail: error(426, "Update the Scouty Extension to continue.", "LINKEDIN_EXTENSION_OUTDATED", { minVersion: state.minVersion, storeUrl: state.storeUrl }) };
     }
     const bearer = /^Bearer (.+)$/.exec(headers.authorization ?? "")?.[1];
     const entry = bearer ? state.access.get(bearer) : null;
     const grant = entry ? state.grants.get(entry.grantId) : null;
-    if (!entry || !grant || grant.revoked || entry.expiresAt <= state.now()) return { fail: error(401, "Connect the Scouty extension again.", "LINKEDIN_AUTH_REQUIRED") };
+    if (!entry || !grant || grant.revoked || entry.expiresAt <= state.now()) return { fail: error(401, "Connect the Scouty Extension again.", "LINKEDIN_AUTH_REQUIRED") };
     const requestOrigin = headers.origin;
     if (requestOrigin && /^https?:/.test(requestOrigin)) return { fail: error(403, "Origin not allowed.", "LINKEDIN_ORIGIN_REFUSED") };
     if (!state.available) return { fail: error(403, "LinkedIn capture isn't available for this account.", "LINKEDIN_NOT_AVAILABLE") };
@@ -359,7 +359,7 @@ export function createStubApi(options = {}) {
         route(method, parsed, headers, body);
         return "drop";
       }
-      if (fault.kind === "401") return error(401, "Connect the Scouty extension again.", "LINKEDIN_AUTH_REQUIRED");
+      if (fault.kind === "401") return error(401, "Connect the Scouty Extension again.", "LINKEDIN_AUTH_REQUIRED");
     }
     const response = route(method, parsed, headers, body);
     record.status = response.status;

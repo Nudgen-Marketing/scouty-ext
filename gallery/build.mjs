@@ -36,7 +36,7 @@ try {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Scouty LinkedIn Capture: state gallery</title>
+<title>Scouty Extension: state gallery</title>
 <style>${css}\n${frame}</style>
 </head>
 <body>

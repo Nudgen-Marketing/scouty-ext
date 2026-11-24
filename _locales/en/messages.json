@@ -1,6 +1,6 @@
 {
   "extName": {
-    "message": "Scouty LinkedIn Capture"
+    "message": "Scouty Extension"
   },
   "extDescription": {
     "message": "Captures the LinkedIn profile you choose, when you press Capture, and sends it to your Scouty workspace. Never acts on LinkedIn."

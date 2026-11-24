@@ -1,6 +1,6 @@
 # Store listings
 
-What to type into each store for **Scouty LinkedIn Capture**. Click paths are in the app plan
+What to type into each store for **Scouty Extension**. Click paths are in the app plan
 (`docs/plans/linkedin-outreach-coach.md` §15.10), the rejection playbook in §15.11, and the source of
 the disclosures in §16.1 and `PRIVACY.md`. Every listing says the same thing; the Edge text names no
 other browser.
@@ -9,7 +9,7 @@ other browser.
 
 | Field | Value |
 | --- | --- |
-| Name | Scouty LinkedIn Capture (from `_locales/en/messages.json` `extName`) |
+| Name | Scouty Extension (from `_locales/en/messages.json` `extName`) |
 | Short description / summary (≤ 132) | Captures the LinkedIn profile you choose, when you press Capture, and sends it to your Scouty workspace. Never acts on LinkedIn. (128, `extDescription`) |
 | Category | Chrome: **Productivity → Workflow & Planning**; Edge: **Productivity**; Firefox: **Social & Communication** |
 | Language | English |
@@ -23,7 +23,7 @@ other browser.
 ## Description (all three stores, about 1,000 characters)
 
 ```
-Scouty LinkedIn Capture helps you prepare a first message to a lead.
+Scouty Extension helps you prepare a first message to a lead.
 
 Open the lead's LinkedIn profile in your browser and press Capture. The extension reads that one person's profile, experience and skills, and their recent posts, comments and reactions, as LinkedIn shows them to you. It sends what it read to your Scouty workspace, where Scouty writes a step-by-step plan: what to look at, when to connect, and a note and first message in their language, ready to copy.
 

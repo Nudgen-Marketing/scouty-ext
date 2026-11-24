@@ -20,7 +20,7 @@ const SHARED = {
   homepage_url: "https://scouty.to/linkedin-extension",
   permissions: ["scripting", "storage", "identity"],
   host_permissions: ["https://www.linkedin.com/in/*", "https://scouty.to/*"],
-  action: { default_title: "Scouty LinkedIn Capture", default_popup: "popup.html" },
+  action: { default_title: "Scouty Extension", default_popup: "popup.html" },
   content_security_policy: { extension_pages: CSP },
   icons: { "16": "icons/16.png", "48": "icons/48.png", "128": "icons/128.png" },
   version,
@@ -69,7 +69,7 @@ describe("manifests", () => {
 
   it("the name and description come from the locale file", () => {
     const messages = JSON.parse(read("dist/chrome/_locales/en/messages.json")) as Record<string, { message: string }>;
-    expect(messages.extName!.message).toBe("Scouty LinkedIn Capture");
+    expect(messages.extName!.message).toBe("Scouty Extension");
     expect(messages.extDescription!.message).toBe("Captures the LinkedIn profile you choose, when you press Capture, and sends it to your Scouty workspace. Never acts on LinkedIn.");
     expect(messages.extDescription!.message.length).toBeLessThanOrEqual(132);
   });

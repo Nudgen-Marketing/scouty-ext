@@ -22,7 +22,7 @@ this is done by hand for every release (release gate 9). About ten minutes.
    **Got it, capture**. Expected: a small Scouty panel at the bottom-left of the page with a
    progress bar and **Stop**; the tab visits six pages; the panel ends with "Done" and the counts.
 9. Press **Open in Scouty**. Expected: the app opens on that profile.
-10. In Scouty, Settings → Connected Apps. Expected: "Scouty LinkedIn Capture (Edge)" with a
+10. In Scouty, Settings → Connected Apps. Expected: "Scouty Extension (Edge)" with a
     recent last-used time. Press Revoke, then click the extension icon. Expected: "Connect to
     Scouty" with **Connect** again.
 

@@ -1,6 +1,6 @@
 # Privacy
 
-Scouty LinkedIn Capture does one thing: when you press Capture on a LinkedIn profile, it reads that
+Scouty Extension does one thing: when you press Capture on a LinkedIn profile, it reads that
 person's profile and their recent posts, comments and reactions from the tab in front of you, and
 sends that content to your Scouty workspace so Scouty can suggest how to approach them.
 

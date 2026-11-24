@@ -6,7 +6,7 @@
   "homepage_url": "https://scouty.to/linkedin-extension",
   "permissions": ["scripting", "storage", "identity"],
   "host_permissions": ["<LINKEDIN_PATTERN>", "<API_PATTERN>"],
-  "action": { "default_title": "Scouty LinkedIn Capture", "default_popup": "popup.html" },
+  "action": { "default_title": "Scouty Extension", "default_popup": "popup.html" },
   "content_security_policy": {
     "extension_pages": "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src <API_ORIGIN>; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
   },

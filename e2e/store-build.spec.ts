@@ -30,7 +30,7 @@ for (const target of ["chrome", "edge"] as const) {
         locks: typeof navigator.locks?.request,
         sessionStorage: typeof chrome.storage.session?.get,
       }));
-      expect(facts.name).toBe("Scouty LinkedIn Capture");
+      expect(facts.name).toBe("Scouty Extension");
       expect(facts.permissions).toEqual(["identity", "scripting", "storage"]);
       // Chromium grants host permissions per host: it drops the /in/ path of the manifest pattern.
       // The extension therefore never relies on the permission to stay on /in/ pages; the background
@@ -50,7 +50,7 @@ for (const target of ["chrome", "edge"] as const) {
       await expect(popup.getByRole("button", { name: "Connect", exact: true })).toBeVisible();
       // No developer disclosure in a store build.
       await expect(popup.getByText("Developer")).toHaveCount(0);
-      await expect(popup).toHaveTitle("Scouty LinkedIn Capture");
+      await expect(popup).toHaveTitle("Scouty Extension");
       // The compiled Tailwind stylesheet applied: the primary button is the app's near-black.
       expect(await popup.getByRole("button", { name: "Connect", exact: true }).evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(24, 24, 27)");
       expect(await popup.evaluate(() => document.body.getBoundingClientRect().width)).toBe(360);

@@ -1,4 +1,4 @@
-# Scouty LinkedIn Capture
+# Scouty Extension
 
 A Manifest V3 browser extension for Chrome, Edge and Firefox (desktop). When you press **Capture**
 on a `linkedin.com/in/<slug>` profile, it reads that person's profile and recent posts, comments
