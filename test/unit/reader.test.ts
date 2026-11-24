@@ -167,6 +167,39 @@ describe("reader", () => {
       expect(page.clicks).toHaveLength(0);
     });
 
+  it("on the profile, waits for the top card LinkedIn draws late after a navigation", async () => {
+    const page = load("sdui-profile-nested");
+    const marker = page.doc.querySelector("[id$='Topcard']")!;
+    const held = marker.innerHTML;
+    marker.innerHTML = "";
+    marker.id = "pending";
+    let waits = 0;
+    const e = env(page, {
+      wait: async () => {
+        waits += 1;
+        // Later than the scroll loop alone would wait (it ends after three idle steps).
+        if (waits === 8) {
+          marker.id = "com.linkedin.sdui.profile.card.ref0000001Topcard";
+          marker.innerHTML = held;
+        }
+      },
+    });
+    const result = await readSection(args("profile"), e);
+    if (result.kind !== "read") throw new Error(result.kind);
+    expect(result.payload.profile).toMatchObject({ name: "Synthetic Person One", headline: "Head of Placeholder Operations at Example Fabrication Co" });
+  });
+
+  it("on the profile, reads on without a name when the top card never comes", async () => {
+    const page = load("sdui-profile-nested");
+    page.doc.querySelector("[id$='Topcard']")!.remove();
+    let waits = 0;
+    const result = await readSection(args("profile"), env(page, { wait: async () => { waits += 1; } }));
+    if (result.kind !== "read") throw new Error(result.kind);
+    expect(result.payload.profile?.name).toBeNull();
+    expect(result.payload.profile?.sections.map((s) => s.label)).toEqual(["About", "Experience"]);
+    expect(waits).toBeGreaterThanOrEqual(20);
+  });
+
   it("waits while LinkedIn's loader shows and reads the items it brings", async () => {
     const page = load("sdui-activity-posts", PATHS.posts);
     const main = page.doc.querySelector("main")!;

@@ -143,6 +143,18 @@ describe("capture controller", () => {
     expect(manifest.stop).toBeNull();
   });
 
+  it("started from another page of the profile: opens the main profile page first and reads it", async () => {
+    const r = await rig();
+    const activity = "https://www.linkedin.com/in/synthetic-person-one/recent-activity/all/";
+    r.tab.info = { url: activity, status: "complete" };
+    expect(await r.controller.start({ tabId: TAB, url: activity, recapture: false })).toBe("started");
+    await r.readAll();
+    expect(r.tab.updates[0]).toBe("https://www.linkedin.com/in/synthetic-person-one/");
+    const manifest = manifestOf(r);
+    expect(manifest.sections.find((e) => e.section === "profile")).toMatchObject({ state: "complete" });
+    expect(manifest.sections.every((e) => e.state === "complete")).toBe(true);
+  });
+
   it("start is idempotent: a second press is a no-op, and another profile is told a capture is running", async () => {
     const r = await rig();
     await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });

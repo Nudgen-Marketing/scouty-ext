@@ -30,6 +30,31 @@ describe("profile (SDUI)", () => {
     expect(out.content.sections.some((s) => /contact|analytics|suggested|people you may know|ad options|activity/i.test(s.label))).toBe(false);
   });
 
+  it("live nesting: reads the name inside the profile link, the headline after the degree, and the cards inside the page wrapper", () => {
+    const page = load("sdui-profile-nested");
+    const ctx = context(page.doc);
+    expect(topCard(page.doc)!.id).toBe("com.linkedin.sdui.profile.card.ref0000001Topcard");
+    expandProfile(ctx, "profile");
+    const out = readProfile(ctx, "profile")!;
+    expect(out.read).toBe("ok");
+    expect(out.content.name).toBe("Synthetic Person One");
+    expect(out.content.headline).toBe("Head of Placeholder Operations at Example Fabrication Co");
+    expect(out.content.sections.map((s) => s.label)).toEqual(["About", "Experience"]);
+    expect(out.content.sections[0]!.text).toBe("I build placeholder widgets for imaginary factories. And write invented sentences.");
+    expect(JSON.stringify(out.content)).not.toMatch(NEVER);
+  });
+
+  it("a top card without the heading falls back to its own section, never to a section holding other cards", () => {
+    const page = load("sdui-profile-nested");
+    const marker = page.doc.querySelector("[id$='Topcard']")!;
+    marker.querySelector("h2")!.remove();
+    // The section around the marker is the page wrapper (it holds the About card): the inner one is used.
+    expect(topCard(page.doc)!.getAttribute("componentkey")).toBe("synthetic-topcard-inner");
+    const flat = load("sdui-profile");
+    flat.doc.querySelector("[id$='Topcard'] h2")!.remove();
+    expect(topCard(flat.doc)!.getAttribute("componentkey")).toBe("synthetic-topcard");
+  });
+
   it("the section allow-list", () => {
     for (const label of ["About", "Experience", "Education", "Skills", "Licenses & certifications", "Licenses and certifications", "Languages", "Recommendations", "Featured", "Volunteering", "Projects", "Honors & awards", "Courses", "Giới thiệu", "Kinh nghiệm", "Học vấn", "Kỹ năng"]) {
       expect(isProfileSectionLabel(label), label).toBe(true);
@@ -42,7 +67,7 @@ describe("profile (SDUI)", () => {
 
   it("the top card is found by its id, on the element itself or inside the section", () => {
     const page = load("sdui-profile");
-    expect(topCard(page.doc)!.getAttribute("componentkey")).toBe("synthetic-topcard");
+    expect(topCard(page.doc)!.id).toBe("com.linkedin.sdui.profile.card.ref0000001Topcard");
     const marker = page.doc.querySelector("[id$='Topcard']")!;
     marker.id = "com.linkedin.sdui.profile.card.somethingElse";
     expect(topCard(page.doc)).toBeNull();

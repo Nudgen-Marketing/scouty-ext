@@ -201,6 +201,24 @@ one API client, least-privilege manifests, nothing reduced submitted as complete
     back to the app tab that opened LinkedIn, past another app tab on the same page; "recently
     captured" reuses an app tab on the target page). Firefox behaviour is **not verified** in a
     browser here (no Firefox on the build machine); MDN documents the same rules.
+21. **Profile page fixes from the staging e2e (2026-11-24).** Four faults, each seen on a live
+    profile and each reproduced by a test first:
+    - **Start page.** A capture started from an activity or detail page read the profile section on
+      that page, failed the address check and declared the profile `unavailable`. The first page is
+      now opened when the tab is not on it (`readCurrent` in `src/background/session.ts`; test
+      "started from another page of the profile" in `test/unit/session.test.ts`).
+    - **Top card.** Live LinkedIn wraps every profile card (top card, About, Featured, Activity) in
+      one outer section, so "the section around the Topcard marker" held them all and About was never
+      read. `topCard` now returns the marker when it holds the name heading, and a section only when
+      it holds no other card; section picking keeps the innermost labelled section.
+    - **Headline.** The name heading sits inside the profile link, which is never read as text, so
+      the headline (the line after the name) was never found. With the name not among the read
+      lines, the headline is the first line that is not the degree or pronoun line.
+    - **Late top card.** After a navigation the screen name is set before the top card is drawn; the
+      reader now waits for it (bounded, 20 × 400 ms) and reads on without a name if it never comes.
+    The nesting is in `fixtures/synthetic/sdui-profile-nested.html`, modelled on the live survey;
+    tests in `test/unit/profile.test.ts` and `test/unit/reader.test.ts`. Verified on staging: a
+    capture started from the activity page now carries the name, the headline and About.
 
 ## Contract decisions (to reconcile with the app)
 

@@ -18,13 +18,22 @@ const oneLine = (el: Element, ctx: ReadContext): string => readText(el, ctx).rep
 
 type RawSection = { label: string; text: string; el: Element };
 
-/** The top card: the section holding the element whose id is "com.linkedin.sdui.profile.card.…Topcard". */
+/**
+ * The top card: the element whose id is "com.linkedin.sdui.profile.card.…Topcard" when it holds the
+ * name heading (live LinkedIn: the card wraps its own section, and one outer section wraps every
+ * card, so that outer section is never the top card); else the section around it, unless that
+ * section also holds other profile cards; else the section inside it.
+ */
 export function topCard(doc: Document): Element | null {
   const { topCardIdPrefix, topCardIdSuffix } = selectors.profile;
   const main = queryFirst(doc, selectors.mainColumn);
-  const marker = main ? Array.from(main.querySelectorAll(`[id^='${topCardIdPrefix}']`)).find((el) => el.id.endsWith(topCardIdSuffix)) : undefined;
+  const cards = main ? Array.from(main.querySelectorAll(`[id^='${topCardIdPrefix}']`)) : [];
+  const marker = cards.find((el) => el.id.endsWith(topCardIdSuffix));
   if (!marker) return null;
-  return marker.closest("section") ?? marker.querySelector("section") ?? marker;
+  if (queryFirst(marker, selectors.profile.nameHeading)) return marker;
+  const around = marker.closest("section");
+  if (around && !cards.some((card) => card !== marker && around.contains(card))) return around;
+  return marker.querySelector("section") ?? marker;
 }
 
 function sectionLabel(el: Element, ctx: ReadContext): string {
@@ -41,8 +50,9 @@ function mainPageSections(ctx: ReadContext): RawSection[] {
     if (!label || !isProfileSectionLabel(label)) continue;
     picked.push({ el, label });
   }
-  const outermost = picked.filter((p) => !picked.some((other) => other !== p && other.el.contains(p.el)));
-  return outermost.map(({ el, label }) => {
+  // Innermost: on live LinkedIn one outer section wraps every card, and its first h2 is a card's label.
+  const innermost = picked.filter((p) => !picked.some((other) => other !== p && p.el.contains(other.el)));
+  return innermost.map(({ el, label }) => {
     const lines = readText(el, ctx).split("\n");
     if (lines[0] === label) lines.shift();
     return { label, text: lines.join("\n").trim(), el };
@@ -114,8 +124,11 @@ function nameAndHeadline(ctx: ReadContext): { name: string | null; headline: str
   const heading = queryFirst(card, selectors.profile.nameHeading);
   const name = heading ? oneLine(heading, ctx) : "";
   const lines = visibleText(card, { isVisible: ctx.isVisible, skip: [...textSkip(), "a"], duplicates: selectors.hiddenDuplicate }).split("\n");
-  const after = name ? lines.indexOf(name) : -1;
-  const headline = after >= 0 ? (lines.slice(after + 1).find((line) => line !== name && !/^\(?[\p{L}]+\/[\p{L}]+\)?$/u.test(line) && !/^[·•]/.test(line)) ?? "") : "";
+  // Links are not read, and on live LinkedIn the name heading sits inside the profile link: then the
+  // headline is looked for from the first line (the degree line "· 3rd" is passed over below).
+  const at = name ? lines.indexOf(name) : -1;
+  const start = at >= 0 ? at + 1 : name ? 0 : -1;
+  const headline = start >= 0 ? (lines.slice(start).find((line) => line !== name && !/^\(?[\p{L}]+\/[\p{L}]+\)?$/u.test(line) && !/^[·•]/.test(line)) ?? "") : "";
   return {
     name: name ? clampHead(name, HARD_LIMITS.nameChars).text || null : null,
     headline: headline ? clampHead(headline, HARD_LIMITS.headlineChars).text || null : null,

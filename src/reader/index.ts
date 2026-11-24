@@ -10,7 +10,7 @@ import { fitByteBudget, utf8Length } from "./clamp";
 import { createInteractions } from "./interactions";
 import { runScrollLoop } from "./pacing";
 import { detectPageState, pageStateFromPath, stopReasonFor, type PageState } from "./page-state";
-import { expandProfile, profileProgress, readProfile } from "./profile";
+import { expandProfile, profileProgress, readProfile, topCard } from "./profile";
 import { SELECTORS_VERSION, selectors } from "./selectors";
 import { domIsVisible, type IsVisible } from "./visible-text";
 
@@ -58,6 +58,11 @@ export async function readSection(args: ReaderArgs, env: ReaderEnv): Promise<Rea
     state = detectPageState(doc, section);
   }
   if (state !== "ok") return { kind: "stopped", reason: stopReasonFor(state), address: null, clickLog };
+  // After a navigation LinkedIn names the screen before it draws the top card: give the name a moment
+  // (bounded like the settle above); without it the read goes on and the name is left out.
+  for (let i = 0; section === "profile" && topCard(doc) === null && i < SETTLE_TRIES; i += 1) {
+    await env.wait(SETTLE_MS);
+  }
 
   const activity = ACTIVITY_SECTIONS.includes(args.section);
   const cap = activity ? Math.max(0, Math.min(args.cap, HARD_LIMITS.maxCap)) : 0;

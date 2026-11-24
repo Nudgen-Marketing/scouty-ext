@@ -350,7 +350,10 @@ export class CaptureController {
     this.aux.navigating = true;
     await this.saveAux();
     try {
-      if (navigate) await this.deps.tabs.update(state.tabId, expectedUrl);
+      // The first page is read where the user pressed Capture only when that is already this
+      // section's page: a capture started from the activity or a detail page opens the profile first.
+      const open = navigate ? null : await this.deps.tabs.get(state.tabId);
+      if (navigate || (open?.url && !samePage(open.url, expectedUrl))) await this.deps.tabs.update(state.tabId, expectedUrl);
     } catch {
       return this.stop("tab_closed", null);
     }
