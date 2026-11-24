@@ -38,6 +38,7 @@ PopupView.tsx                   session.ts    capture state machine      ──�
   draws viewFor(state)          auth.ts       OAuth code + PKCE, tokens          overlay.js  (closed shadow root)
                                 api.ts        THE ONLY fetch, Scouty only
                                 outbox.ts     storage.session, resume
+                                app-tab.ts    "Open in Scouty": back to the app tab
                                 permissions.ts, ui-state.ts
 ```
 
@@ -45,7 +46,7 @@ PopupView.tsx                   session.ts    capture state machine      ──�
 | --- | --- | --- |
 | Protocol | `src/protocol.ts`, `protocol-v1/` | Types, builders and a mirror of the server's schema. `protocol-v1/` is byte-identical to the app's copy. |
 | Reader | `src/reader/` | `selectors.ts` is the only file with LinkedIn selectors; `interactions.ts` the only file that may click or scroll. |
-| Background | `src/background/` | `api.ts` is the only file that calls `fetch`, and only for the Scouty origin and a fixed path list. |
+| Background | `src/background/` | `api.ts` is the only file that calls `fetch`, and only for the Scouty origin and a fixed path list. `app-tab.ts` shows **Open in Scouty** in the user's existing Scouty tab (the one that opened LinkedIn, else one on that page, else the latest in the window), else a new tab; it navigates only Scouty tabs and needs no `tabs` permission (docs/DEVIATIONS.md 20). |
 | View model | `src/ui/state.ts`, `src/ui/view.ts` | `viewFor(state)` is pure and framework-free; every string comes from `_locales/en/messages.json`. Copy rule: one short title, at most one short sentence, one clear primary action, no technical words. |
 | Popup | `src/popup/` | React 19 + Tailwind CSS 4, the same majors as the Scouty app. Thin renderer of the view model. |
 | Overlay | `src/overlay/` | Plain DOM in a closed shadow root with a small static stylesheet built from the same tokens. |

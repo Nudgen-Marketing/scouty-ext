@@ -169,6 +169,37 @@ one API client, least-privilege manifests, nothing reduced submitted as complete
     signed-out screen used to show. Store builds contain none of it (the `__SCOUTY_DEV__` build
     constant; `test/static` checks the store bundles and the catalog).
 
+20. **Open in Scouty returns to the app tab (owner request 2026-11-24).** The plan opens every
+    Scouty page in a new tab. The owner's flow starts in the app: a campaign's lead list opens a
+    LinkedIn profile in a new tab, the user captures it, and **Open in Scouty** should take them
+    back to the app, on that campaign and lead list, without piling up tabs. The page is still the
+    `appUrl` the server returns (falling back to the extension's own Scouty addresses as before);
+    what changed is the tab. `src/background/app-tab.ts` picks, in order: (a) the tab that opened
+    the LinkedIn tab (`openerTabId`), if it still exists and is on the Scouty origin; (b) a Scouty
+    tab whose path equals the target's (query ignored), in any window; (c) the most recently used
+    (`lastAccessed`) Scouty tab in the LinkedIn tab's window, or the last focused window when no
+    LinkedIn tab is known; (d) a new tab, as before. A reused tab gets `tabs.update(id, { url,
+    active: true })` and its window `windows.update(id, { focused: true })`; the LinkedIn tab stays
+    open and is never navigated. A tab is only navigated when its own address has exactly the
+    Scouty origin (scheme, host and port); a tab on LinkedIn or any other site never is, and an
+    address off the Scouty origin (the store page) always gets a new tab. This applies to **Open in
+    Scouty** (`openAnalysis`) and **Open Scouty** (`openScouty`); the privacy page and the store
+    page still open a new tab, so they never replace the user's place in the app. No permission was
+    added (the exact-manifest tests are unchanged): it relies on the existing Scouty host
+    permission, which makes `tab.url` visible for Scouty tabs only. If that permission is not
+    granted (Firefox treats host permissions as optional; `permissions.contains` is checked first)
+    no tab is read or reused and a new tab opens. Chromium ignores the `url` filter of
+    `tabs.query` without a matching host permission, so the code never trusts the filter: it checks
+    each tab's own `url`, which is absent without the permission (docs/BROWSER-FACTS.md). In the
+    Chromium run, a profile opened from the app through a `target="_blank" rel="noopener"` link has
+    the app tab as `openerTabId`, but Chromium records the opener as the tab that was active when
+    the new one opened and can drop it later, so (b) and (c) are the fallbacks. Tested in
+    `test/unit/app-tab.test.ts` (each choice, an opener on LinkedIn or another site, a missing
+    permission, the LinkedIn tab never navigated) and in `e2e/capture.spec.ts` (the happy path goes
+    back to the app tab that opened LinkedIn, past another app tab on the same page; "recently
+    captured" reuses an app tab on the target page). Firefox behaviour is **not verified** in a
+    browser here (no Firefox on the build machine); MDN documents the same rules.
+
 ## Contract decisions (to reconcile with the app)
 
 `protocol-v1/` is the app's directory, copied byte for byte. Where the plan left a shape open, the
