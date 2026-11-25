@@ -53,7 +53,8 @@ for (const target of ["chrome", "edge"] as const) {
       await expect(popup.getByText("Developer")).toHaveCount(0);
       await expect(popup).toHaveTitle("Scouty Extension");
       // The compiled Tailwind stylesheet applied: the primary button is the app's near-black.
-      expect(await popup.getByRole("button", { name: "Create account", exact: true }).evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(24, 24, 27)");
+      // Sign in is the primary button.
+      expect(await popup.getByRole("button", { name: "Sign in", exact: true }).evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(24, 24, 27)");
       expect(await popup.evaluate(() => document.body.getBoundingClientRect().width)).toBe(360);
       expect(problems).toEqual([]);
     } finally {

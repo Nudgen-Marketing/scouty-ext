@@ -17,7 +17,7 @@ import { viewFor } from "../../src/ui/view";
 /** Title, primary and secondary action of every screen (short, plain copy: owner feedback 2026-11-24). */
 const EXPECTED: [string, string | null, string | null][] = [
   ["Allow access", "Allow", "What Scouty reads"],
-  ["Get started with Scouty", "Create account", "Sign in"],
+  ["Get started with Scouty", "Sign in", "Create account"],
   ["Connecting…", null, "Cancel"],
   ["Open a LinkedIn profile", "Open Scouty", null],
   ["Before you start", "Got it, capture", "Cancel"],
@@ -113,7 +113,7 @@ describe("the 27 screens", () => {
   it("the exact copy of the screens with fixed text", () => {
     const text = (i: number): string => mount(SAMPLES[i]!).querySelector("main")!.textContent!;
     expect(text(0)).toContain("Scouty only reads the LinkedIn profiles you choose.");
-    expect(text(1)).toContain("Create an account, or sign in, to capture profiles.");
+    expect(text(1)).toContain("Sign in, or create an account, to capture profiles.");
     expect(text(3)).toContain("Then click the Scouty icon again.");
     expect(text(4)).toContain("It never clicks, likes, connects, messages or posts for you.");
     expect(text(4)).toContain("LinkedIn doesn't allow tools like this and may limit your account.");

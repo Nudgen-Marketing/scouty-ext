@@ -20,8 +20,8 @@ test("someone new creates their account from the popup: the app is asked for sig
   const { tabId } = await rig.openProfile("synthetic-person-0001");
   const popup = await rig.openPopup(tabId);
   await expect(heading(popup)).toHaveText("Get started with Scouty");
-  await expect(popup.getByText("Create an account, or sign in, to capture profiles.")).toBeVisible();
-  await expect(popup.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
+  await expect(popup.getByText("Sign in, or create an account, to capture profiles.")).toBeVisible();
+  await expect(popup.getByRole("button", { name: "Create account", exact: true })).toBeVisible();
   await rig.connect(popup, { create: true });
   await expect(heading(popup)).toHaveText("Before you start");
   // "Create account" asked for sign-up (prompt=create); "Sign in" asks for nothing more.
