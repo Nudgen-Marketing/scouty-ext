@@ -47,13 +47,13 @@ for (const target of ["chrome", "edge"] as const) {
       await popup.addInitScript(() => document.addEventListener("securitypolicyviolation", (event) => console.error(`CSP violation: ${event.violatedDirective} ${event.blockedURI}`)));
       await popup.goto(`chrome-extension://${extensionId}/popup.html`);
       await expect(popup.getByRole("heading", { level: 1 })).toHaveText("Get started with Scouty");
-      await expect(popup.getByRole("button", { name: "Create free account", exact: true })).toBeVisible();
+      await expect(popup.getByRole("button", { name: "Create account", exact: true })).toBeVisible();
       await expect(popup.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
       // No developer disclosure in a store build.
       await expect(popup.getByText("Developer")).toHaveCount(0);
       await expect(popup).toHaveTitle("Scouty Extension");
       // The compiled Tailwind stylesheet applied: the primary button is the app's near-black.
-      expect(await popup.getByRole("button", { name: "Create free account", exact: true }).evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(24, 24, 27)");
+      expect(await popup.getByRole("button", { name: "Create account", exact: true }).evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(24, 24, 27)");
       expect(await popup.evaluate(() => document.body.getBoundingClientRect().width)).toBe(360);
       expect(problems).toEqual([]);
     } finally {

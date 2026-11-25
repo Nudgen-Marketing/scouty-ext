@@ -33,10 +33,10 @@
     "message": "Get started with Scouty"
   },
   "signedOutBody": {
-    "message": "Create a free account, or sign in, to capture profiles."
+    "message": "Create an account, or sign in, to capture profiles."
   },
   "actionSignUp": {
-    "message": "Create free account"
+    "message": "Create account"
   },
   "actionSignIn": {
     "message": "Sign in"

@@ -55,7 +55,7 @@ LinkedIn is a trademark of LinkedIn Corporation. Scouty is not affiliated with o
 ```
 Test account: <reviewer email> / <password set for the review>  (a Scouty account with its own workspace and LinkedIn coach access)
 Steps:
-1. Install the extension and click its icon. Choose "Sign in" and sign in with the test account ("Create free account" starts the same flow on Scouty's sign-up page).
+1. Install the extension and click its icon. Choose "Sign in" and sign in with the test account ("Create account" starts the same flow on Scouty's sign-up page).
 2. Open a public LinkedIn profile, for example <a public profile URL>, while signed in to LinkedIn.
 3. Click the extension icon, read the one-time notice, and press Capture. The window shows what it reads; you can press Stop.
 4. When it says Done, press "Open in Scouty": the plan for that person opens in the Scouty app.
