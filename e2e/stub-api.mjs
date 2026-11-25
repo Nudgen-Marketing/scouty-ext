@@ -32,6 +32,8 @@ export function createStubApi(options = {}) {
     minVersion: options.minVersion ?? "0.1.0",
     storeUrl: options.storeUrl ?? "https://example.invalid/store",
     caps: { posts: 50, comments: 50, reactions: 50, ...(options.caps ?? {}) },
+    /** The `prompt` of every authorization request, in order (null when absent). */
+    prompts: [],
     capsBySlug: options.capsBySlug ?? {},
     capturesLeftToday: options.capturesLeftToday ?? 40,
     accessTtlMs: options.accessTtlMs ?? 15 * 60_000,
@@ -69,6 +71,7 @@ export function createStubApi(options = {}) {
     if (state.clients && state.clients[client] !== redirectUri) return error(400, "Unknown client or redirect.", "invalid_request");
     if (p.get("response_type") !== "code" || p.get("code_challenge_method") !== "S256" || !p.get("code_challenge")) return error(400, "Bad request.", "invalid_request");
     if (p.get("scope") !== EXTENSION_SCOPE || p.get("resource") !== resource) return error(400, "Bad scope or resource.", "invalid_scope");
+    state.prompts.push(p.get("prompt"));
     const code = opaque();
     state.codes.set(code, { client, redirectUri, challenge: p.get("code_challenge"), used: false });
     const back = new URL(redirectUri);

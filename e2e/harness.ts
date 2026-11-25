@@ -28,8 +28,8 @@ export type Browser = {
   openApp(path: string): Promise<Page>;
   /** Opens the popup (as a tab) for a given tab. */
   openPopup(tabId: number | null): Promise<Page>;
-  /** Connect to Scouty through the browser's web-auth flow against the stub. */
-  connect(popup: Page): Promise<void>;
+  /** Connect to Scouty through the browser's web-auth flow against the stub: "Sign in", or "Create free account" with `create`. */
+  connect(popup: Page, options?: { create?: boolean }): Promise<void>;
   /** Every click the mock pages saw in this tab. */
   clicks(page: Page): Promise<Click[]>;
   /** Text inside the overlay's closed shadow root, read through the DevTools protocol. */
@@ -108,9 +108,11 @@ async function launch(extensionId: string, linkedinPort: number, stubPort: numbe
       await popup.goto(`chrome-extension://${extensionId}/popup.html${tabId === null ? "" : `?tabId=${tabId}`}`);
       return popup;
     },
-    async connect(popup) {
-      await popup.getByRole("button", { name: "Connect", exact: true }).click();
-      await expect(popup.getByRole("heading", { level: 1 })).not.toHaveText(/^(Connect to Scouty|Connecting…)$/, { timeout: 30_000 });
+    async connect(popup, options = {}) {
+      // Signed out shows "Create free account" and "Sign in"; a connection that ended shows "Connect".
+      const name = options.create ? "Create free account" : (await popup.getByRole("button", { name: "Sign in", exact: true }).count()) ? "Sign in" : "Connect";
+      await popup.getByRole("button", { name, exact: true }).click();
+      await expect(popup.getByRole("heading", { level: 1 })).not.toHaveText(/^(Get started with Scouty|Connect to Scouty again|Connecting…)$/, { timeout: 30_000 });
     },
     async clicks(page) {
       return page.evaluate(() => JSON.parse(sessionStorage.getItem("__mock_clicks") ?? "[]") as Click[]);

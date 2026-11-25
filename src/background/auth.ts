@@ -43,7 +43,7 @@ export function redirectUri(): string {
   return ext.identity.getRedirectURL();
 }
 
-export function authorizeUrl(input: { redirectUri: string; challenge: string; state: string }): string {
+export function authorizeUrl(input: { redirectUri: string; challenge: string; state: string; create?: boolean }): string {
   const url = new URL("/oauth/authorize", API_ORIGIN);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("client_id", CLIENT_ID);
@@ -53,6 +53,8 @@ export function authorizeUrl(input: { redirectUri: string; challenge: string; st
   url.searchParams.set("code_challenge", input.challenge);
   url.searchParams.set("code_challenge_method", "S256");
   url.searchParams.set("state", input.state);
+  // OpenID Connect "prompt=create": the app shows sign-up first to someone who is signed out.
+  if (input.create) url.searchParams.set("prompt", "create");
   return url.toString();
 }
 
@@ -112,13 +114,16 @@ export async function isConnected(): Promise<boolean> {
 
 let attempt = 0;
 
-/** Opens the browser's web-auth window on the app's consent page and stores the tokens it yields. */
-export async function connect(): Promise<void> {
+/**
+ * Opens the browser's web-auth window on the app's consent page and stores the tokens it yields.
+ * `create`: the person has no Scouty account yet, so the app starts them on sign-up.
+ */
+export async function connect(options: { create?: boolean } = {}): Promise<void> {
   const mine = (attempt += 1);
   const verifier = randomToken(48);
   const state = randomToken(24);
   const redirect = redirectUri();
-  const url = authorizeUrl({ redirectUri: redirect, challenge: await challengeFor(verifier), state });
+  const url = authorizeUrl({ redirectUri: redirect, challenge: await challengeFor(verifier), state, create: options.create });
   const returned = await ext.identity.launchWebAuthFlow({ interactive: true, url });
   if (mine !== attempt) throw new Error("Sign-in was cancelled.");
   const code = codeFromRedirect(returned, { redirectUri: redirect, state });

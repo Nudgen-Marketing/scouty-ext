@@ -19,7 +19,7 @@ export type ReaderMessage =
   | { type: "reader:result"; section: SectionName; seq: number; result: ReaderResult };
 
 export type UiAction =
-  | "allow" | "whatItReads" | "connect" | "cancelConnect" | "openScouty" | "acceptConsent" | "cancel"
+  | "allow" | "whatItReads" | "connect" | "signUp" | "cancelConnect" | "openScouty" | "acceptConsent" | "cancel"
   | "capture" | "captureAgain" | "openAnalysis" | "stop" | "dismiss" | "retryNow" | "openStore"
   | "showCapture" | "openSettings" | "closeSettings" | "disconnect" | "switchWorkspace";
 

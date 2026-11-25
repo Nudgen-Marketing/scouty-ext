@@ -9,12 +9,24 @@ const campaignPath = (key: string): string => `/dashboard/proj_1/campaigns/camp_
 async function startCapture(rig: Browser, slug: string, from?: Page) {
   const { page, tabId } = await rig.openProfile(slug, "", from);
   const popup = await rig.openPopup(tabId);
-  await expect(heading(popup)).toHaveText("Connect to Scouty");
+  await expect(heading(popup)).toHaveText("Get started with Scouty");
   await rig.connect(popup);
   await expect(heading(popup)).toHaveText("Before you start");
   await popup.getByRole("button", { name: "Got it, capture" }).click();
   return { page, popup, tabId };
 }
+
+test("someone new creates their account from the popup: the app is asked for sign-up first, then it connects", async ({ rig }) => {
+  const { tabId } = await rig.openProfile("synthetic-person-0001");
+  const popup = await rig.openPopup(tabId);
+  await expect(heading(popup)).toHaveText("Get started with Scouty");
+  await expect(popup.getByText("Create a free account, or sign in, to capture profiles.")).toBeVisible();
+  await expect(popup.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
+  await rig.connect(popup, { create: true });
+  await expect(heading(popup)).toHaveText("Before you start");
+  // "Create free account" asked for sign-up (prompt=create); "Sign in" asks for nothing more.
+  expect(rig.stub.state.prompts).toEqual(["create"]);
+});
 
 test("happy path: connect, consent, six pages read, finalize, back to the app tab with the analysis", async ({ rig }) => {
   rig.stub.state.caps = { posts: 5, comments: 5, reactions: 5 };

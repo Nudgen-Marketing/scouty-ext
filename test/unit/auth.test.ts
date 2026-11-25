@@ -32,6 +32,19 @@ async function connectWith(redirect: (authorizeUrl: URL) => string | undefined):
 const approve = (u: URL): string => `${fake.redirectUrl}?code=the-code&state=${u.searchParams.get("state")}&iss=${encodeURIComponent("https://scouty.to")}`;
 
 describe("auth", () => {
+  it("asks the app for sign-up first (prompt=create) only when the person creates an account", async () => {
+    const plain = new URL(auth.authorizeUrl({ redirectUri: "https://x.chromiumapp.org/", challenge: "c", state: "s" }));
+    expect(plain.searchParams.has("prompt")).toBe(false);
+    const create = new URL(auth.authorizeUrl({ redirectUri: "https://x.chromiumapp.org/", challenge: "c", state: "s", create: true }));
+    expect(create.searchParams.get("prompt")).toBe("create");
+    expect(create.searchParams.get("code_challenge_method")).toBe("S256");
+    let seen: URL | null = null;
+    fake.launchWebAuthFlow.mockImplementation(async (details) => { seen = new URL(details.url); return approve(seen); });
+    respond = () => tokenJson(1);
+    await auth.connect({ create: true });
+    expect(seen!.searchParams.get("prompt")).toBe("create");
+    expect(await auth.isConnected()).toBe(true);
+  });
   it("the PKCE challenge is S256 of the verifier, base64url without padding", async () => {
     const verifier = auth.randomToken(48);
     expect(verifier).toMatch(/^[A-Za-z0-9_-]{43,128}$/);

@@ -104,7 +104,8 @@ function draft(state: UiState): Draft {
       return { title: t("permissionTitle"), body: [t("permissionBody")], primary: action("allow", "actionAllow"), secondary: action("whatItReads", "actionWhatScoutyReads", "link", "external") };
     case "signedOut":
       return {
-        title: t("signedOutTitle"), body: [t("signedOutBody")], primary: action("connect", "actionConnect"),
+        // Someone new creates their Scouty account right here; someone with one signs in.
+        title: t("signedOutTitle"), body: [t("signedOutBody")], primary: action("signUp", "actionSignUp"), secondary: action("connect", "actionSignIn", "outline"),
       };
     case "connecting":
       return { title: t("connectingTitle"), body: [t("connectingBody")], working: true, secondary: action("cancelConnect", "actionCancel", "outline") };

@@ -230,6 +230,16 @@ one API client, least-privilege manifests, nothing reduced submitted as complete
       reading, the second finishes, one finalized capture. It fails when the stub opens a second
       capture instead of handing the open one over.
 
+### 22. Signed out: create an account or sign in (2026-11-25)
+
+The signed-out popup was "Connect to Scouty" with one **Connect** button, which assumed an existing
+Scouty account. It is now "Get started with Scouty" with **Create free account** (primary) and
+**Sign in**. Both run the same PKCE flow; **Create free account** adds `prompt=create` (OpenID
+Connect Initiating User Registration), so the app shows its sign-up page to someone signed out and
+then returns to consent. "Connect to Scouty again" (connection ended) is unchanged. Tested in
+`test/unit/auth.test.ts`, `test/ui/states.test.tsx` and `e2e/capture.spec.ts` (the stub records
+the `prompt` of each authorization request).
+
 ## Contract decisions (to reconcile with the app)
 
 `protocol-v1/` is the app's directory, copied byte for byte. Where the plan left a shape open, the

@@ -30,10 +30,16 @@
     "message": "Allow"
   },
   "signedOutTitle": {
-    "message": "Connect to Scouty"
+    "message": "Get started with Scouty"
   },
   "signedOutBody": {
-    "message": "Sign in once to start capturing profiles."
+    "message": "Create a free account, or sign in, to capture profiles."
+  },
+  "actionSignUp": {
+    "message": "Create free account"
+  },
+  "actionSignIn": {
+    "message": "Sign in"
   },
   "actionConnect": {
     "message": "Connect"
@@ -42,7 +48,7 @@
     "message": "Connecting…"
   },
   "connectingBody": {
-    "message": "Finish signing in in the new window."
+    "message": "Finish in the new window."
   },
   "actionCancel": {
     "message": "Cancel"

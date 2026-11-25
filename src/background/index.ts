@@ -100,12 +100,12 @@ async function tabUrl(tabId: number | null): Promise<string | null> {
   }
 }
 
-async function connect(): Promise<void> {
+async function connect(options: { create?: boolean } = {}): Promise<void> {
   if (connecting) return;
   connecting = true;
   void broadcast(await controller.current());
   try {
-    await auth.connect();
+    await auth.connect(options);
     await forgetSessionInfo();
     const state = await controller.current();
     if (state.phase === "finalizing" && state.blocked === "auth") void controller.resume();
@@ -135,6 +135,7 @@ async function act(action: UiAction, tabId: number | null): Promise<void> {
   const state = await controller.current();
   switch (action) {
     case "connect": void connect(); return;
+    case "signUp": void connect({ create: true }); return;
     case "cancelConnect":
       auth.cancelConnect();
       connecting = false;
