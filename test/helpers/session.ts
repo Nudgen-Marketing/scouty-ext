@@ -12,6 +12,8 @@ export type Rig = Wired & {
   controller: CaptureController;
   tab: { info: TabInfo | null; updates: string[] };
   injected: string[];
+  /** Whether a reader is still at work in the tab's document (the readerAlive probe). */
+  reader: { alive: boolean; probes: number };
   states: CaptureState[];
   /** Resolvers of sleeps the controller is waiting on, by duration. */
   timers: { ms: number; fire: () => void }[];
@@ -32,6 +34,7 @@ export async function rig(options: Record<string, unknown> = {}): Promise<Rig> {
   wired.stub.state.requests.length = 0;
   const tab: Rig["tab"] = { info: { url: PROFILE_URL, status: "complete" }, updates: [] };
   const injected: string[] = [];
+  const reader: Rig["reader"] = { alive: false, probes: 0 };
   const states: CaptureState[] = [];
   const timers: Rig["timers"] = [];
   let n = 0;
@@ -42,6 +45,7 @@ export async function rig(options: Record<string, unknown> = {}): Promise<Rig> {
       update: async (_tabId, url) => { tab.updates.push(url); if (tab.info) tab.info = { url, status: "complete" }; },
     },
     inject: async (_tabId, file) => { injected.push(file); return true; },
+    readerAlive: async () => { reader.probes += 1; return reader.alive; },
     store: {
       get: async (key) => (await fake.session.get(key))[key],
       set: (key, value) => fake.session.set({ [key]: value }),
@@ -53,7 +57,7 @@ export async function rig(options: Record<string, unknown> = {}): Promise<Rig> {
     changed: (state) => { states.push(state); },
   });
   const self: Rig = {
-    ...wired, controller: make(), tab, injected, states, timers,
+    ...wired, controller: make(), tab, injected, reader, states, timers,
     newController() { self.controller = make(); return self.controller; },
     async read(result = okResult) {
       await self.controller.settledWork();

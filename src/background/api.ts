@@ -130,6 +130,7 @@ async function call<T>(c: Call): Promise<T> {
   let token = c.tokens ? await c.tokens.current() : null;
   if (c.tokens && !token) throw new SignedOutError("Not connected to Scouty.");
   let refreshed = false;
+  const refreshFailure: { set: boolean; error: unknown } = { set: false, error: undefined };
   let attempt = 0;
   for (;;) {
     attempt += 1;
@@ -148,7 +149,11 @@ async function call<T>(c: Call): Promise<T> {
       }
       if (response.status === 401 && c.tokens && token && !refreshed) {
         refreshed = true;
-        token = await c.tokens.refreshAfter401(token);
+        token = await c.tokens.refreshAfter401(token).catch((failed: unknown) => {
+          refreshFailure.set = true;
+          refreshFailure.error = failed;
+          throw failed;
+        });
         if (!token) throw new SignedOutError("The connection to Scouty ended.");
         attempt -= 1; // the one retry after a refresh is not a backoff attempt
         continue;
@@ -158,6 +163,9 @@ async function call<T>(c: Call): Promise<T> {
       failure = answer;
       if (!retryable(answer)) throw answer;
     } catch (error) {
+      // A token refresh that failed without ending the connection (no answer, or a 5xx from the token
+      // endpoint; auth.ts) keeps the tokens: the call fails with that error, not repeated here.
+      if (refreshFailure.set && error === refreshFailure.error) throw error;
       if (error instanceof ApiError || error instanceof SignedOutError) {
         if (!(error instanceof ApiError) || !retryable(error)) throw error;
         failure = error;

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { setApiDeps } from "../../src/background/api";
+import { createApi, NetworkError, setApiDeps } from "../../src/background/api";
 import * as auth from "../../src/background/auth";
 import { fake } from "../helpers/fake-ext";
 
@@ -170,14 +170,63 @@ describe("auth", () => {
     expect(await auth.isConnected()).toBe(false);
   });
 
-  it("a refresh whose answer is lost is not repeated: the user is signed out", async () => {
+  it("a refresh that gets no answer is not repeated and keeps the tokens: offline, not signed out", async () => {
     await connectWith(approve);
     calls = [];
     clock += 2_000_000;
+    const ended = vi.fn();
+    auth.onConnectionEnded(ended);
     respond = () => { throw new TypeError("network down"); };
-    expect(await auth.tokenSource.current()).toBeNull();
+    await expect(auth.tokenSource.current()).rejects.toBeInstanceOf(NetworkError);
     expect(calls).toHaveLength(1);
+    expect(await auth.isConnected()).toBe(true);
+    expect(fake.local.data.get("auth.refresh")).toBe("refresh-1");
+    expect(ended).not.toHaveBeenCalled();
+    // Back online: the same refresh token is used once, and the connection carries on.
+    respond = () => tokenJson(2);
+    expect(await auth.tokenSource.current()).toBe("access-2");
+    expect(body(calls[1]!).get("refresh_token")).toBe("refresh-1");
+  });
+
+  it("while the browser says it is offline, no refresh is sent and the tokens are kept", async () => {
+    await connectWith(approve);
+    calls = [];
+    clock += 2_000_000;
+    Object.defineProperty(globalThis.navigator, "onLine", { value: false, configurable: true });
+    try {
+      await expect(auth.tokenSource.current()).rejects.toBeInstanceOf(NetworkError);
+      expect(calls).toHaveLength(0);
+      expect(await auth.isConnected()).toBe(true);
+    } finally {
+      delete (globalThis.navigator as { onLine?: boolean }).onLine;
+    }
+  });
+
+  it("a 5xx from the token endpoint keeps the tokens; a 401 from it (refused client) ends the connection", async () => {
+    await connectWith(approve);
+    calls = [];
+    clock += 2_000_000;
+    respond = () => new Response(JSON.stringify({ error: "server_error" }), { status: 503 });
+    await expect(auth.tokenSource.current()).rejects.toMatchObject({ status: 503 });
+    expect(calls).toHaveLength(1);
+    expect(await auth.isConnected()).toBe(true);
+    respond = () => new Response(JSON.stringify({ error: "invalid_client" }), { status: 401 });
+    expect(await auth.tokenSource.current()).toBeNull();
     expect(await auth.isConnected()).toBe(false);
+  });
+
+  it("an API call whose refresh gets no answer fails as offline (NetworkError), with the tokens kept", async () => {
+    await connectWith(approve);
+    calls = [];
+    respond = (call) => {
+      if (call.url.endsWith("/oauth/token")) throw new TypeError("network down");
+      return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 });
+    };
+    const api = createApi(auth.tokenSource);
+    await expect(api.session()).rejects.toBeInstanceOf(NetworkError);
+    // One API call, one refresh, nothing repeated.
+    expect(calls.map((c) => new URL(c.url).pathname)).toEqual(["/api/linkedin/ext/session", "/oauth/token"]);
+    expect(await auth.isConnected()).toBe(true);
   });
 
   it("sign-out revokes the refresh token, then forgets everything", async () => {

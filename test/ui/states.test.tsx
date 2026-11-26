@@ -168,6 +168,16 @@ describe("the 27 screens", () => {
     expect(await audit(node)).toEqual([]);
   });
 
+  it("the tab leaving the profile reads neutrally, not as a sign-in", async () => {
+    const node = mount({ kind: "linkedinSignIn", workspace: "W", left: true, onProfile: true });
+    expect(node.querySelector("h1")!.textContent).toBe("The page changed");
+    expect(node.textContent).toContain("Open the profile again and press Capture.");
+    expect(node.textContent).not.toMatch(/sign in/i);
+    expect(viewFor({ kind: "linkedinSignIn", workspace: "W" }).title).toBe("Sign in to this site");
+    expect(viewFor({ kind: "linkedinSignIn", workspace: "W", left: true }).body[0]).not.toMatch(JARGON);
+    expect(await audit(node)).toEqual([]);
+  });
+
   // No dead ends: every screen with a Capture action. On a profile it is enabled and sends its
   // action; off a profile it is disabled and says what to do, so pressing it never silently fails.
   const CAPTURE_SCREENS: [UiState, string, UiAction][] = [
@@ -177,6 +187,7 @@ describe("the 27 screens", () => {
     [SAMPLES[6]!, "Capture again", "captureAgain"],
     [SAMPLES[10]!, "Capture again", "captureAgain"],
     [{ kind: "linkedinSignIn", workspace: "W" }, "Try again", "captureAgain"],
+    [{ kind: "linkedinSignIn", workspace: "W", left: true }, "Capture", "captureAgain"],
     [SAMPLES[14]!, "Capture this page", "capture"],
     [{ kind: "notAnswering", retryAt: null, sending: false, workspace: "W" }, "Try now", "capture"],
   ];
@@ -410,6 +421,14 @@ describe("view model", () => {
 });
 
 describe("in-page overlay", () => {
+  it("replaces an overlay left by an earlier copy of the extension: one per page", () => {
+    const left = mountOverlay(document, () => undefined);
+    const fresh = mountOverlay(document, () => undefined);
+    expect(document.querySelectorAll(HOST_TAG)).toHaveLength(1);
+    expect(left.host.isConnected).toBe(false);
+    expect(fresh.host.isConnected).toBe(true);
+    fresh.remove();
+  });
   it("lives in a closed shadow root on one host element and adds no style to the host document", () => {
     const sheets = document.styleSheets.length;
     const styles = document.querySelectorAll("style, link[rel='stylesheet']").length;

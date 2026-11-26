@@ -12,6 +12,7 @@ import {
   ACTIVITY_SECTIONS,
   type Caps, type Completeness, type Counts, type CreateCreated, type FinalizeResponse, type SectionName, type StopReason,
 } from "../protocol";
+import { pageStateFromPath } from "../reader/page-state";
 import { sectionPaths } from "../reader/selectors";
 import type { SectionLine } from "../ui/state";
 import { ApiError, NetworkError, SignedOutError, isRetryableStatus, type Api, type CaptureRef } from "./api";
@@ -54,7 +55,10 @@ export type CaptureState =
   | { phase: "stopped"; tabId: number; reason: StopReason; address: string | null }
   | {
     phase: "finalizing"; tabId: number; stop: StopReason | null; address: string | null; blocked: null | Blocked; slow: boolean;
-    /** While blocked by "server": when the next automatic try is due (ms), and whether a rate limit (429) said so. */
+    /**
+     * While blocked by "server": when the next automatic try is due (ms), and whether a rate limit
+     * (429) said so. While blocked by "offline": the earliest next try when the state is asked for.
+     */
     retryAt?: number | null; rateLimited?: boolean;
   }
   | { phase: "done"; tabId: number; result: DoneResult };
@@ -135,9 +139,10 @@ export function transition(state: CaptureState, event: CaptureEvent): CaptureSta
     case "finalizing":
       if (event.type === "blocked") {
         const { retryAt: _retryAt, rateLimited: _rateLimited, ...rest } = state;
-        return event.by === "server"
-          ? { ...rest, blocked: "server", retryAt: event.retryAt ?? null, rateLimited: event.rateLimited ?? false }
-          : { ...rest, blocked: event.by };
+        if (event.by === "server") return { ...rest, blocked: "server", retryAt: event.retryAt ?? null, rateLimited: event.rateLimited ?? false };
+        // Offline: the earliest time the popup or the overlay asking for the state tries again.
+        if (event.by === "offline" && typeof event.retryAt === "number") return { ...rest, blocked: "offline", retryAt: event.retryAt };
+        return { ...rest, blocked: event.by };
       }
       if (event.type === "slow") return { ...state, slow: true };
       if (event.type === "resume") {
@@ -170,6 +175,8 @@ export type SessionDeps = {
   };
   /** Injects one of the extension's own bundles into the capture tab. False when not permitted. */
   inject(tabId: number, file: "reader.js" | "overlay.js"): Promise<boolean>;
+  /** True when a reader injected into the tab's current document is still working (it is gone after a reload). */
+  readerAlive(tabId: number): Promise<boolean>;
   store: { get(key: string): Promise<unknown>; set(key: string, value: unknown): Promise<void>; remove(key: string): Promise<void> };
   sleep(ms: number): Promise<void>;
   now(): number;
@@ -188,8 +195,10 @@ type Aux = {
   notExpanded: boolean;
   degraded: SectionName[];
   minutesLeft: number | null;
+  /** Sections the watchdog read again after their reader went silent (once each). */
+  rereads: Partial<Record<SectionName, number>>;
 };
-const freshAux = (): Aux => ({ stopRequested: false, readerActive: false, navigating: false, seq: {}, deferred: false, clickLog: [], notExpanded: false, degraded: [], minutesLeft: null });
+const freshAux = (): Aux => ({ stopRequested: false, readerActive: false, navigating: false, seq: {}, deferred: false, clickLog: [], notExpanded: false, degraded: [], minutesLeft: null, rereads: {} });
 
 const STATE_KEY = "capture.state";
 const AUX_KEY = "capture.aux";
@@ -203,6 +212,20 @@ const STOP_GRACE_MS = 6000;
  * a timer that is lost anyway is picked up on the next wake (recover, or the popup asking).
  */
 export const SERVER_RETRY_MS = 20_000;
+/**
+ * After a network failure ("You're offline") sending is tried again when the popup or the overlay
+ * asks for the state and at least this long has passed since the last try (the popup asks every
+ * 1.5 s; this keeps it from sending a request each time).
+ */
+export const OFFLINE_RETRY_MS = 15_000;
+/**
+ * A running reader reports progress on every scroll step. After this long without a word from it the
+ * background checks that it is still there: a reader that is gone (the page was replaced without a
+ * load event the extension could act on) is started again once, and the capture ends as partial
+ * when it goes silent a second time on the same page. Under the 30 s a Chromium service worker may
+ * idle, so the timer is not lost.
+ */
+export const READER_WATCHDOG_MS = 15_000;
 
 export type StartOutcome = "started" | "busy" | "not_profile";
 
@@ -211,6 +234,8 @@ export class CaptureController {
   private aux: Aux = freshAux();
   private loaded = false;
   private queue: Promise<unknown> = Promise.resolve();
+  /** When the reader of the current section was last heard from (or started). Memory only. */
+  private readerSeenAt = 0;
 
   constructor(private readonly deps: SessionDeps) {}
 
@@ -365,7 +390,7 @@ export class CaptureController {
     if (loaded.kind === "left") return this.stop("left_linkedin", null);
     // Target check before every read.
     const profile = profileFromUrl(loaded.url, LINKEDIN_ORIGIN);
-    if (!profile) return this.stop("left_linkedin", null);
+    if (!profile) return this.stop(leftReason(loaded.url), null);
     if (profile.key !== state.profileKey) return this.stop("wrong_profile", profile.url);
     if (!samePage(loaded.url, expectedUrl)) {
       // LinkedIn sent the tab somewhere else on this profile: the profile has no such page.
@@ -373,11 +398,39 @@ export class CaptureController {
       return this.advance(state.section);
     }
     await this.deps.inject(state.tabId, "overlay.js");
-    this.aux.seq[state.section] = (this.aux.seq[state.section] ?? 0) + 1;
+    const seq = (this.aux.seq[state.section] ?? 0) + 1;
+    this.aux.seq[state.section] = seq;
     this.aux.readerActive = true;
     await this.saveAux();
     if (!(await this.deps.inject(state.tabId, "reader.js"))) return this.stop("permission_missing", null);
+    this.readerSeenAt = this.deps.now();
+    this.watch(state.section, seq);
     await this.dispatch({ type: "loaded" });
+  }
+
+  /** Starts the watchdog for this reader (READER_WATCHDOG_MS). */
+  private watch(section: SectionName, seq: number, ms = READER_WATCHDOG_MS): void {
+    void this.deps.sleep(ms).then(() => this.enqueue(() => this.checkReader(section, seq)));
+  }
+
+  /** The watchdog: is the reader of this section still working? */
+  private async checkReader(section: SectionName, seq: number): Promise<void> {
+    await this.ready();
+    if (await this.expireIfDue()) return;
+    const state = this.state;
+    if (state.phase !== "running" || state.section !== section || !this.aux.readerActive) return;
+    if ((this.aux.seq[section] ?? 1) !== seq) return;
+    const quiet = this.deps.now() - this.readerSeenAt;
+    if (quiet < READER_WATCHDOG_MS) return this.watch(section, seq, READER_WATCHDOG_MS - quiet);
+    // Still there, only slow (a page that takes long to draw): keep waiting; its own time budget ends it.
+    if (await this.deps.readerAlive(state.tabId)) {
+      this.readerSeenAt = this.deps.now();
+      return this.watch(section, seq);
+    }
+    if ((this.aux.rereads[section] ?? 0) >= 1) return this.stop("timeout", null);
+    this.aux.rereads[section] = (this.aux.rereads[section] ?? 0) + 1;
+    await this.saveAux();
+    return this.readCurrent(false);
   }
 
   /** The reader asks what to read. Only the capture tab, in the running state, gets an answer. */
@@ -385,6 +438,7 @@ export class CaptureController {
     await this.ready();
     const state = this.state;
     if (state.phase !== "running" || tabId !== state.tabId || !this.aux.readerActive) return { args: null };
+    this.readerSeenAt = this.deps.now();
     const cap = ACTIVITY_SECTIONS.includes(state.section) ? state.caps[state.section as keyof Caps] : 0;
     return { args: { section: state.section, profileKey: state.profileKey, seq: this.aux.seq[state.section] ?? 1, cap, browser: BROWSER } };
   }
@@ -394,6 +448,7 @@ export class CaptureController {
     if (await this.expireIfDue()) return { stop: true };
     const state = this.state;
     if (state.phase !== "running" || tabId !== state.tabId) return { stop: true };
+    if (section === state.section) this.readerSeenAt = this.deps.now();
     await this.dispatch({ type: "progress", section, count });
     return { stop: this.aux.stopRequested };
   }
@@ -506,6 +561,8 @@ export class CaptureController {
   /**
    * The capture tab finished loading. If the user took it somewhere else while a capture was
    * running, the capture stops. The tab is asked where it is now; the event's own address may be old.
+   * A load of the page being read that the extension did not start (the user reloaded it) replaced
+   * the document and its reader: the section is read again, with a new sequence number.
    */
   tabLoaded(tabId: number): Promise<void> {
     return this.enqueue(async () => {
@@ -516,10 +573,14 @@ export class CaptureController {
       if (!tab) return this.stop("tab_closed", null);
       if (tab.status !== "complete") return;
       const profile = profileFromUrl(tab.url, LINKEDIN_ORIGIN);
-      if (!profile) return this.stop("left_linkedin", null);
+      if (!profile) return this.stop(leftReason(tab.url), null);
       if (profile.key !== state.profileKey) return this.stop("wrong_profile", profile.url);
       const expectedUrl = sectionUrl(LINKEDIN_ORIGIN, state.profileKey, sectionPaths[state.section]);
       if (!samePage(tab.url ?? "", expectedUrl)) return this.stop("left_linkedin", null);
+      // Events are handled in order, so this one may be the load the extension itself started and
+      // already read; then the reader it injected is still at work and nothing is done.
+      if (this.aux.readerActive && (await this.deps.readerAlive(tabId))) return;
+      return this.readCurrent(false);
     });
   }
 
@@ -655,7 +716,9 @@ export class CaptureController {
    */
   private async waitOut(error: unknown): Promise<void> {
     if (!(error instanceof ApiError)) {
-      await this.dispatch({ type: "blocked", by: "offline" });
+      // No timer: the next try comes from Try now, or when the popup or the overlay asks for the
+      // state after OFFLINE_RETRY_MS (retryIfDue).
+      await this.dispatch({ type: "blocked", by: "offline", retryAt: this.deps.now() + OFFLINE_RETRY_MS });
       return;
     }
     const wait = Math.max(SERVER_RETRY_MS, error.retryAfterMs ?? 0);
@@ -668,14 +731,15 @@ export class CaptureController {
   }
 
   /**
-   * Tries again when sending waits on Scouty and the wait is over. Called by the timer, on a restart
-   * of the background context, and whenever the popup or the overlay asks for the state.
+   * Tries again when sending waits on Scouty or on the network and the wait is over. Called by the
+   * timer (server only), on a restart of the background context, and whenever the popup or the
+   * overlay asks for the state.
    */
   retryIfDue(): Promise<void> {
     return this.enqueue(async () => {
       await this.ready();
       const state = this.state;
-      if (state.phase !== "finalizing" || state.blocked !== "server") return;
+      if (state.phase !== "finalizing" || (state.blocked !== "server" && state.blocked !== "offline")) return;
       if ((state.retryAt ?? 0) > this.deps.now()) return;
       return this.resumeNow();
     });
@@ -693,6 +757,10 @@ export class CaptureController {
         void this.resume();
         return;
       }
+      if (state.phase === "finalizing" && state.blocked === "offline") {
+        void this.retryIfDue();
+        return;
+      }
       if (state.phase === "finalizing" && state.blocked === "server") {
         // A restart lost the timer: try now if the wait is over, else when it is.
         const left = (state.retryAt ?? 0) - this.deps.now();
@@ -703,6 +771,11 @@ export class CaptureController {
       if (state.phase === "running" && !this.aux.readerActive) {
         this.aux.navigating = false;
         return this.readCurrent(true);
+      }
+      if (state.phase === "running") {
+        // A reader was at work when the context stopped: watch it from now on.
+        this.readerSeenAt = this.deps.now();
+        this.watch(state.section, this.aux.seq[state.section] ?? 1);
       }
     });
   }
@@ -742,6 +815,22 @@ export class CaptureController {
 function clampCaps(created: CreateCreated): CreateCreated {
   const clamp = (value: unknown): number => (typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(HARD_LIMITS.maxCap, Math.floor(value))) : HARD_LIMITS.defaultCap);
   return { ...created, caps: { posts: clamp(created.caps?.posts), comments: clamp(created.caps?.comments), reactions: clamp(created.caps?.reactions) } };
+}
+
+/**
+ * Why the tab is no longer on the capture's pages. A sign-in or security-check address of the site
+ * (visible to the extension) keeps that page state; anything else (another site, an address the
+ * extension cannot see, another page of the site) is "left the page".
+ */
+function leftReason(url: string | undefined): StopReason {
+  if (!url) return "left_linkedin";
+  try {
+    const at = new URL(url);
+    if (at.origin === LINKEDIN_ORIGIN) return pageStateFromPath(at.pathname) ?? "left_linkedin";
+  } catch {
+    // not an address: left
+  }
+  return "left_linkedin";
 }
 
 function samePage(actual: string, expected: string): boolean {

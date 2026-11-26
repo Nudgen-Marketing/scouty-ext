@@ -32,11 +32,16 @@ one API client, least-privilege manifests, nothing reduced submitted as complete
    finalize succeeds and are the first to go when the 8 MB bound is reached.
 7. **`invalid_grant` and the outbox.** The plan says a failed refresh "clears everything" and also
    that a capture in flight is kept so reconnecting can finish it. Tokens are always cleared; the
-   outbox is cleared unless a capture is in flight, and always on Disconnect.
+   outbox is cleared unless a capture is in flight, and always on Disconnect. Since 2026-11-26 (24)
+   only the token endpoint's refusal (400, such as `invalid_grant`, or 401) counts as a failed
+   refresh; a refresh that got no answer keeps the tokens.
 8. **Uploads do not block reading.** If the Scouty API is unreachable while LinkedIn is still
    readable, the remaining sections are read and everything is sent when the connection returns
    ("You're offline", **Try now**, after a network failure; "Scouty isn't answering right now",
    **Try now**, when Scouty answered but could not take it). A section is never dropped for it.
+   Since 2026-11-26 (24) "You're offline" is also tried again without **Try now**: whenever the
+   popup or the overlay asks for the state and 15 s (`OFFLINE_RETRY_MS`) have passed since the last
+   try, as the server-error state already was (that one also has its own timer; offline has none).
 9. **Sanitizer keeps a few things the plan's list drops:** the bare attribute names `hidden`,
    `disabled` and `href` (no value), and the ids `global-nav` and `captcha-internal`, because the
    page-state and click rules depend on their presence. Every other id and every value is dropped.
@@ -73,7 +78,8 @@ one API client, least-privilege manifests, nothing reduced submitted as complete
     whole `www.linkedin.com` host. The manifest still declares the narrowest pattern (the stores
     show it and Firefox may honour it), and the restriction to `/in/<slug>/` pages is enforced in
     code: `profileFromUrl` in the background before every injection, and the slug check in the
-    reader. A LinkedIn page outside `/in/` stops the capture with `left_linkedin`.
+    reader. A LinkedIn page outside `/in/` stops the capture with `left_linkedin`, except a sign-in
+   or checkpoint address, which stops it with `logged_out` or `checkpoint` (since 24).
 
 17. **LinkedIn SDUI markup (2026-11-24).** The first live run stopped with "This profile can't be
     read": LinkedIn now serves profiles and activity pages with its server-driven UI, whose class
@@ -260,6 +266,39 @@ profiles: an owner decision (keep R2 as is, or measure it on the items that expo
 Tested in `test/unit/urn.test.ts`, `test/unit/blocks.test.ts`, `e2e/capture.spec.ts`, and the app's
 `deep-links.test.ts` and `normalize.test.ts`.
 
+### 24. Review fixes, 2026-11-26
+
+- **Reload mid-capture.** A load of the page being read that the extension did not start (the user
+  reloads) replaced the reader, and the capture sat until its 20 minutes ran out. `tabLoaded` now
+  asks the tab whether a reader still works in its document (`readerAlive`, a one-line
+  `scripting.executeScript` that reads the reader's busy flag in its isolated world) and, if not,
+  reads the section again with a new `seq` (a late result of the old reader is ignored). A
+  watchdog (`READER_WATCHDOG_MS`, 15 s) checks a reader it has not heard from: one still there is
+  left alone, one that is gone is started again once, and a second silence on the same page ends
+  the capture as partial (`timeout`). Tests: `test/unit/session.test.ts` ("a reader that is
+  gone"), e2e "reloading the page mid-capture".
+- **Wrong person.** The reader checked the slug only when it started; an in-page navigation to
+  another profile mid-read would have been sent as the first one. The slug is now checked on every
+  step and once more before anything is built (`wrong_profile`, or `left_linkedin` off the profile
+  pages). Tests: `test/unit/reader.test.ts`.
+- **Offline refresh.** A token refresh that got no answer, or that is not sent because
+  `navigator.onLine` is false, keeps the tokens and fails as a `NetworkError` ("You're offline");
+  a 5xx from the token endpoint keeps them too. Only a 400 (`invalid_grant`) or 401 from the token
+  endpoint clears them (deviation 7). If the lost request did reach Scouty, the next refresh is
+  answered `invalid_grant` and ends the connection then. Tests: `test/unit/auth.test.ts`.
+- **Left the page.** A tab that left the profile pages without a sign-in or checkpoint address
+  (another site, an address the extension cannot see, another page of the site) no longer says
+  "Sign in to this site": it is the same screen 12 with neutral copy, "The page changed" / "Open the
+  profile again and press Capture." (`left: true`; no new screen, the gallery keeps 27). A sign-in
+  or checkpoint address the background can see keeps its own stop (`logged_out`, `checkpoint`).
+  Tests: `test/unit/session.test.ts`, `test/ui/states.test.tsx`.
+- **Firefox add-on id** is `prospector@scouty.to` (was `linkedin-capture@scouty.to`): permanent once
+  published, so it must not name the site. The Firefox OAuth redirect URL derives from the id, so
+  the app's `scouty-ext-firefox` client entry must be updated (validation/FIREFOX-SMOKE.md, BUILD.md).
+- **PRIVACY.md and README** no longer say nothing runs in the background: nothing is read there, and
+  the only background work is finishing sending a capture the user started.
+- **Offline retry** on the popup or overlay asking (deviation 8).
+
 ## Contract decisions (to reconcile with the app)
 
 `protocol-v1/` is the app's directory, copied byte for byte. Where the plan left a shape open, the
@@ -356,6 +395,12 @@ extension follows the app's `src/lib/linkedin/protocol.ts`:
   profile is open. Other actions on the screen stay usable (`onProfile` in `src/ui/state.ts`,
   `targetIsProfile` in `src/background/ui-state.ts`; tested in `test/ui/states.test.tsx`,
   `test/unit/ui-state.test.ts` and the gallery's "off a profile" frames).
+
+- **Overlay after an update.** Once the extension is reloaded or updated, an overlay script already in
+  the page is cut off and `runtime.sendMessage` throws at once ("Extension context invalidated"),
+  which Chrome listed as an uncaught error (seen on staging). The overlay now treats that as "cut off"
+  and removes itself, and a new overlay first removes any left by an earlier copy, so a page never
+  shows two (`src/overlay/overlay.ts`; tested in `test/ui/states.test.tsx`).
 
 ## Open points for the owner
 

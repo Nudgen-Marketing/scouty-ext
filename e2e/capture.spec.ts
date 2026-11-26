@@ -174,6 +174,24 @@ test("the user presses Stop: the section being read is sent as partial, later on
   expectOnlyExpandClicks(await rig.clicks(page));
 });
 
+test("reloading the page mid-capture: that page is read again and the capture finishes", async ({ rig }) => {
+  rig.stub.state.caps = { posts: 8, comments: 5, reactions: 5 };
+  const { page, popup } = await startCapture(rig, "slow-person");
+  await expect(heading(popup)).toHaveText("Reading posts…");
+  await expect(popup.getByRole("progressbar")).toHaveAttribute("aria-valuetext", /^[1-7] of 8 posts$/, { timeout: 60_000 });
+  // The user reloads the tab: the reader's document is gone; the extension did not start this load.
+  await page.reload();
+  await expect(heading(popup)).toHaveText("Done", { timeout: 90_000 });
+  const posts = "/in/slow-person/recent-activity/all/";
+  expect(rig.linkedin.requests.filter((r) => r.path === posts)).toHaveLength(2);
+  const capture = [...rig.stub.state.captures.values()][0]!;
+  expect(capture.result).toMatchObject({ completeness: "complete" });
+  // The posts page was read again from the start, as a new sequence.
+  expect(capture.sections.get("posts")!.payload).toMatchObject({ seq: 2, blockCount: 8 });
+  expectReadOnly(rig, ["slow-person"]);
+  expectOnlyExpandClicks(await rig.clicks(page));
+});
+
 test("network cut during upload, then restored: resumes without loading any LinkedIn page again", async ({ rig }) => {
   const { page, popup } = await startCapture(rig, SLUG);
   await expect.poll(() => rig.stub.state.captures.size).toBe(1);

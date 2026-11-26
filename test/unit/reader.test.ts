@@ -109,6 +109,39 @@ describe("reader", () => {
     expect(await readSection(args("posts"), e)).toMatchObject({ kind: "stopped", reason: "checkpoint" });
   });
 
+  it("an in-page navigation to another profile mid-read stops with wrong_profile and keeps nothing", async () => {
+    const page = load("sdui-activity-posts", PATHS.posts);
+    let steps = 0;
+    const e = env(page, {
+      onProgress: async () => {
+        steps += 1;
+        // The screen name stays the same: only the address says it is someone else now.
+        if (steps === 2) page.dom.window.history.pushState({}, "", "/in/someone-else/recent-activity/all/");
+        return "continue";
+      },
+    });
+    const result = await readSection(args("posts"), e);
+    expect(result).toEqual({ kind: "stopped", reason: "wrong_profile", address: "https://www.linkedin.com/in/someone-else/", clickLog: expect.any(Array) });
+    expect(steps).toBe(2);
+  });
+
+  it("the final check catches a navigation to another profile during the last step", async () => {
+    const page = load("sdui-activity-posts", PATHS.posts);
+    const e = env(page, {
+      onProgress: async () => {
+        page.dom.window.history.pushState({}, "", "/in/someone-else/recent-activity/all/");
+        return "stop";
+      },
+    });
+    expect(await readSection(args("posts"), e)).toMatchObject({ kind: "stopped", reason: "wrong_profile", address: "https://www.linkedin.com/in/someone-else/" });
+  });
+
+  it("a navigation off the profile pages mid-read stops with left_linkedin", async () => {
+    const page = load("sdui-activity-posts", PATHS.posts);
+    const e = env(page, { onProgress: async () => { page.dom.window.history.pushState({}, "", "/feed/"); return "continue"; } });
+    expect(await readSection(args("posts"), e)).toMatchObject({ kind: "stopped", reason: "left_linkedin", address: null });
+  });
+
   it("a user stop keeps what was read, as partial", async () => {
     const page = load("sdui-activity-posts", PATHS.posts);
     const result = await readSection(args("posts"), env(page, { onProgress: async () => "stop" }));

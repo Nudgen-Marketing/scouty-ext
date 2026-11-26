@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import * as auth from "../../src/background/auth";
 import * as outbox from "../../src/background/outbox";
 import {
-  EVENT_TYPES, EXPIRED, IDLE, PAGE_STATE_STOPS, PHASES, SERVER_RETRY_MS, isTransient, noticeFor, transition,
+  EVENT_TYPES, EXPIRED, IDLE, OFFLINE_RETRY_MS, PAGE_STATE_STOPS, PHASES, READER_WATCHDOG_MS, SERVER_RETRY_MS, isTransient, noticeFor, transition,
   type CaptureEvent, type CaptureState, type DoneResult, type EventType, type Phase,
 } from "../../src/background/session";
 import { ApiError, NetworkError } from "../../src/background/api";
@@ -278,7 +278,7 @@ describe("capture controller", () => {
     await r.controller.tabRemoved(12345);
   });
 
-  it("leaving /in/ (sign-in or checkpoint pages live elsewhere) stops with left_linkedin", async () => {
+  it("leaving /in/ for an address the extension cannot see stops with left_linkedin: 'The page changed', not a sign-in", async () => {
     const r = await rig();
     await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
     await r.read();
@@ -286,6 +286,16 @@ describe("capture controller", () => {
     r.tab.info = { url: undefined, status: "complete" };
     await r.controller.tabLoaded(TAB);
     expect(await r.controller.current()).toMatchObject({ phase: "done", result: { stop: "left_linkedin" } });
+    expect(captureUi(await r.controller.current(), { minutesLeft: null }, "W", 0)).toEqual({ kind: "linkedinSignIn", workspace: "W", left: true });
+  });
+
+  it("a sign-in page the tab was sent to keeps its own screen (logged_out), apart from leaving", async () => {
+    const r = await rig();
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    await r.read();
+    r.tab.info = { url: "https://www.linkedin.com/authwall?trk=x", status: "complete" };
+    await r.controller.tabLoaded(TAB);
+    expect(await r.controller.current()).toMatchObject({ phase: "done", result: { stop: "logged_out" } });
     expect(captureUi(await r.controller.current(), { minutesLeft: null }, "W", 0)).toEqual({ kind: "linkedinSignIn", workspace: "W" });
   });
 
@@ -298,7 +308,8 @@ describe("capture controller", () => {
     const injectedBefore = r.injected.length;
     r.tab.info = { url: "https://www.linkedin.com/checkpoint/challenge/", status: "complete" };
     await r.controller.tabLoaded(TAB);
-    expect(await r.controller.current()).toMatchObject({ phase: "done", result: { stop: "left_linkedin" } });
+    // The address says what it is: the security check, not "left the page".
+    expect(await r.controller.current()).toMatchObject({ phase: "done", result: { stop: "checkpoint" } });
     expect(r.injected.length).toBe(injectedBefore);
     expect(await r.controller.start({ tabId: TAB, url: "https://www.linkedin.com/feed/", recapture: false })).toBe("not_profile");
   });
@@ -413,6 +424,95 @@ describe("capture controller", () => {
     await restarted.recover();
     expect(r.tab.updates.at(-1)).toBe("https://www.linkedin.com/in/synthetic-person-one/details/experience/");
     expect((await restarted.readerHello(TAB)).args).toMatchObject({ section: "experience", seq: 2 });
+  });
+
+  describe("a reader that is gone", () => {
+    const flush = async (r: Awaited<ReturnType<typeof rig>>): Promise<void> => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await r.controller.settledWork();
+    };
+
+    it("a reload of the page being read (not started by the extension) reads that section again, with a new seq", async () => {
+      const r = await rig();
+      await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+      await r.read();
+      await r.controller.settledWork();
+      const hello = await r.controller.readerHello(TAB);
+      expect(hello.args).toMatchObject({ section: "experience", seq: 1 });
+      const opened = r.tab.updates.length;
+      // The user reloads: same address, the reader's document is gone.
+      r.reader.alive = false;
+      await r.controller.tabLoaded(TAB);
+      expect(r.tab.updates).toHaveLength(opened); // not navigated: it is already the right page
+      expect(r.injected.filter((f) => f === "reader.js")).toHaveLength(3);
+      expect((await r.controller.readerHello(TAB)).args).toMatchObject({ section: "experience", seq: 2 });
+      // A result of the old reader is ignored; the new one carries on to the end.
+      await r.controller.readerResult(TAB, "experience", 1, okResult("experience", 1));
+      expect(await r.controller.current()).toMatchObject({ phase: "running", section: "experience" });
+      await r.readAll();
+      expect(await r.controller.current()).toMatchObject({ phase: "done", result: { completeness: "complete" } });
+    });
+
+    it("the load the extension started itself, handled after its reader began, changes nothing", async () => {
+      const r = await rig();
+      await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+      await r.read();
+      r.reader.alive = true;
+      const injected = r.injected.length;
+      await r.controller.tabLoaded(TAB);
+      expect(r.reader.probes).toBe(1);
+      expect(r.injected).toHaveLength(injected);
+      expect((await r.controller.readerHello(TAB)).args).toMatchObject({ section: "experience", seq: 1 });
+    });
+
+    it("watchdog: a reader silent for 15 s that is gone is started again once; silent again, the capture ends as partial", async () => {
+      const r = await rig();
+      await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+      await r.read();
+      await r.controller.settledWork();
+      const fire = async (): Promise<void> => {
+        const timer = r.timers.filter((tm) => tm.ms === READER_WATCHDOG_MS).at(-1)!;
+        expect(timer).toBeDefined();
+        r.timers.splice(r.timers.indexOf(timer), 1);
+        r.clock.now += READER_WATCHDOG_MS;
+        timer.fire();
+        await flush(r);
+      };
+      r.reader.alive = false;
+      await fire();
+      expect((await r.controller.readerHello(TAB)).args).toMatchObject({ section: "experience", seq: 2 });
+      expect(await r.controller.current()).toMatchObject({ phase: "running", section: "experience" });
+      await fire();
+      const state = await r.controller.current();
+      expect(state).toMatchObject({ phase: "done", result: { stop: "timeout", completeness: "partial" } });
+      expect(line(manifestOf(r)).slice(0, 2)).toEqual(["profile:complete:null", "experience:skipped:timeout"]);
+      expect(captureUi(state, { minutesLeft: null }, "W", 0)).toMatchObject({ kind: "donePartial" });
+    });
+
+    it("watchdog: a reader that is still there (or still reporting) is left alone", async () => {
+      const r = await rig();
+      await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+      await r.controller.settledWork();
+      const timer = r.timers.find((tm) => tm.ms === READER_WATCHDOG_MS)!;
+      // Progress 10 s in: the check 15 s in waits for the rest of the quiet time.
+      r.clock.now += 10_000;
+      await r.controller.readerProgress(TAB, "profile", 1);
+      r.clock.now += 5_000;
+      timer.fire();
+      await flush(r);
+      expect(r.reader.probes).toBe(0);
+      expect(r.timers.map((tm) => tm.ms)).toContain(10_000);
+      // Quiet but alive: probed, and watched again.
+      r.reader.alive = true;
+      r.clock.now += 10_000;
+      r.timers.find((tm) => tm.ms === 10_000)!.fire();
+      await flush(r);
+      expect(r.reader.probes).toBe(1);
+      expect(await r.controller.current()).toMatchObject({ phase: "running", section: "profile" });
+      expect((await r.controller.readerHello(TAB)).args).toMatchObject({ seq: 1 });
+      await r.readAll();
+      expect(await r.phase()).toBe("done");
+    });
   });
 
   it("401 after a refresh: reading stops, the outbox is kept, and reconnecting finishes the capture", async () => {
@@ -664,18 +764,43 @@ describe("waiting on Scouty is not being offline", () => {
     expect(await r.phase()).toBe("done");
   });
 
-  it("a network failure still shows 'You're offline' and is not tried again on its own", async () => {
+  it("a network failure shows 'You're offline' with no timer; asking for the state tries again once the wait is over", async () => {
     const r = await rig({ capsBySlug: NO_NETWORK_SECTIONS });
     await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
     r.stub.fail(/POST .*\/finalize$/, "drop", 6);
     await r.readAll();
     const state = await r.controller.current();
-    expect(state).toMatchObject({ phase: "finalizing", blocked: "offline" });
-    expect(state).not.toHaveProperty("retryAt");
+    expect(state).toMatchObject({ phase: "finalizing", blocked: "offline", retryAt: r.clock.now + OFFLINE_RETRY_MS });
     expect(ui(state)).toEqual({ kind: "offline", workspace: "W" });
     expect(r.timers.map((tm) => tm.ms)).not.toContain(SERVER_RETRY_MS);
+    // No timer for it: only the readers' watchdogs (one per page read) are waiting.
+    expect(r.timers.filter((tm) => tm.ms === OFFLINE_RETRY_MS)).toHaveLength(r.injected.filter((f) => f === "reader.js").length);
+    // The popup asks before the wait is over: nothing is sent.
+    const before = r.stub.state.requests.length;
     await r.controller.retryIfDue();
+    expect(r.stub.state.requests).toHaveLength(before);
     expect(await r.controller.current()).toMatchObject({ blocked: "offline" });
+    // Asked again after the wait, with the network back: sent, done; nothing of the site opened again.
+    const opened = r.tab.updates.length;
+    r.clock.now += OFFLINE_RETRY_MS;
+    await r.controller.retryIfDue();
+    await r.controller.settledWork();
+    expect(await r.phase()).toBe("done");
+    expect(r.tab.updates).toHaveLength(opened);
+  });
+
+  it("still offline when asked again: stays on 'You're offline' and waits another OFFLINE_RETRY_MS", async () => {
+    const r = await rig({ capsBySlug: NO_NETWORK_SECTIONS });
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    r.stub.fail(/(GET|POST) \/api\/linkedin\/ext\/captures\/.*/, "drop", 100);
+    await r.readAll();
+    expect(await r.controller.current()).toMatchObject({ blocked: "offline" });
+    r.clock.now += OFFLINE_RETRY_MS;
+    const before = r.stub.state.requests.length;
+    await r.controller.retryIfDue();
+    await r.controller.settledWork();
+    expect(r.stub.state.requests.length).toBeGreaterThan(before);
+    expect(await r.controller.current()).toMatchObject({ phase: "finalizing", blocked: "offline", retryAt: r.clock.now + OFFLINE_RETRY_MS });
   });
 
   it("a create that spends its retries on 503: screen 26 with Try now (start again), not 22; a 429 says roughly when", async () => {

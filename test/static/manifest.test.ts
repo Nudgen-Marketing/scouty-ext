@@ -31,7 +31,7 @@ const FIREFOX = {
   ...SHARED,
   background: { scripts: ["background.js"], type: "module" },
   browser_specific_settings: {
-    gecko: { id: "linkedin-capture@scouty.to", strict_min_version: "140.0", data_collection_permissions: { required: ["websiteContent", "personallyIdentifyingInfo", "authenticationInfo"] } },
+    gecko: { id: "prospector@scouty.to", strict_min_version: "140.0", data_collection_permissions: { required: ["websiteContent", "personallyIdentifyingInfo", "authenticationInfo"] } },
   },
 };
 

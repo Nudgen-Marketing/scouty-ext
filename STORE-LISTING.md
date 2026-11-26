@@ -62,6 +62,9 @@ Steps:
 The extension never clicks, posts or sends anything on the network; it only loads that person's profile and activity pages in your tab.
 ```
 
+Firefox add-on id: `prospector@scouty.to` (permanent once published; the OAuth redirect URL derives
+from it, so the app's Firefox client entry must list that redirect before the listing goes live).
+
 Firefox only (Notes to Reviewer, with the source archive): "Bundled with esbuild; the popup (React) is minified. Build: Node 24, `npm ci && npm run build && npm run package` (BUILD.md). Test account: as above."
 
 ## After approval

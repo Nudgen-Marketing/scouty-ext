@@ -209,6 +209,12 @@
   "linkedinSignInBody": {
     "message": "Sign in on this site, then try again."
   },
+  "leftPageTitle": {
+    "message": "The page changed"
+  },
+  "leftPageBody": {
+    "message": "Open the profile again and press Capture."
+  },
   "actionTryAgain": {
     "message": "Try again"
   },

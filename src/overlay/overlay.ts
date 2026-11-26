@@ -78,6 +78,8 @@ export type Overlay = { host: HTMLElement; update(state: UiState): void; remove(
 
 /** Mounts the overlay: one host on <html>, a closed shadow root, all styles inside it. */
 export function mountOverlay(doc: Document, onAction: (action: UiAction) => void, theme?: "light" | "dark"): Overlay {
+  // One overlay per page: one left by an earlier copy of the extension (reloaded or updated) goes.
+  for (const stale of doc.querySelectorAll(HOST_TAG)) stale.remove();
   const host = doc.createElement(HOST_TAG);
   host.setAttribute("role", "region");
   host.setAttribute("aria-label", t("overlayRegion"));
@@ -99,12 +101,34 @@ export function mountOverlay(doc: Document, onAction: (action: UiAction) => void
   };
 }
 
+/** The error a content script gets once its extension was reloaded, updated or removed. */
+export function cutOff(error: unknown): boolean {
+  return /context invalidated|extension context|receiving end does not exist/i.test(error instanceof Error ? error.message : String(error)) && !ext.runtime?.id;
+}
+
 function main(): void {
   const scope = globalThis as unknown as { __scoutyOverlay?: boolean };
   if (scope.__scoutyOverlay) return;
   scope.__scoutyOverlay = true;
   let overlay: Overlay | null = null;
-  const send = (message: Message): Promise<unknown> => ext.runtime.sendMessage(message).catch(() => null);
+  let orphaned = false;
+  // After the extension is reloaded or updated this script is cut off: sendMessage then throws at
+  // once ("Extension context invalidated") instead of rejecting. The overlay leaves the page quietly;
+  // the new copy of the extension shows its own.
+  const leave = (): null => {
+    orphaned = true;
+    overlay?.remove();
+    overlay = null;
+    return null;
+  };
+  const send = (message: Message): Promise<unknown> => {
+    if (orphaned) return Promise.resolve(null);
+    try {
+      return ext.runtime.sendMessage(message).catch((error: unknown) => (cutOff(error) ? leave() : null));
+    } catch (error) {
+      return Promise.resolve(cutOff(error) ? leave() : null);
+    }
+  };
   const onAction = (action: UiAction): void => void send({ type: "ui:action", action, tabId: null });
   const show = (state: UiState | null): void => {
     if (!state) {
@@ -116,6 +140,7 @@ function main(): void {
     overlay.update(state);
   };
   ext.runtime.onMessage.addListener((message: Message) => {
+    if (orphaned) return undefined;
     if (message?.type === "overlay:state") show(message.state as UiState);
     if (message?.type === "overlay:remove") show(null);
     return undefined;

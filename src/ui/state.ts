@@ -23,7 +23,12 @@ type UiScreen =
   | { kind: "sending"; slow: boolean; workspace: string }
   | { kind: "doneComplete"; counts: Counts; workspace: string }
   | { kind: "donePartial"; sections: SectionLine[]; notExpanded: boolean; workspace: string }
-  | { kind: "linkedinSignIn"; workspace: string }
+  /**
+   * left: the tab went somewhere the extension could not follow (another site, an address it cannot
+   * see, a page outside the profile), as opposed to a sign-in page it actually saw. Same screen,
+   * neutral copy.
+   */
+  | { kind: "linkedinSignIn"; workspace: string; left?: boolean }
   | { kind: "verification"; workspace: string }
   | { kind: "unavailable"; workspace: string }
   | { kind: "addressChanged"; address: string; workspace: string }

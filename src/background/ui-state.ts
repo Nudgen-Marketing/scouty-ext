@@ -109,7 +109,9 @@ export function captureUi(state: CaptureState, extras: { minutesLeft: number | n
       return { kind: "sending", slow: state.slow, workspace };
     case "done": {
       const r = state.result;
-      if (r.stop === "logged_out" || r.stop === "left_linkedin") return { kind: "linkedinSignIn", workspace };
+      if (r.stop === "logged_out") return { kind: "linkedinSignIn", workspace };
+      // The tab left the profile pages without showing where: not a sign-in page, so neutral words.
+      if (r.stop === "left_linkedin") return { kind: "linkedinSignIn", workspace, left: true };
       if (r.stop === "checkpoint") return { kind: "verification", workspace };
       if (r.stop === "reduced_profile" || r.stop === "not_found" || r.stop === "unknown_page") return { kind: "unavailable", workspace };
       if (r.stop === "wrong_profile") return { kind: "addressChanged", address: r.address ?? "", workspace };

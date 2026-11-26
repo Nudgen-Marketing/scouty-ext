@@ -33,6 +33,11 @@ npm run package    # writes release/scouty-ext-<version>-{chrome,edge,firefox}.z
    the source archive itself) it holds every file except `node_modules/`, `dist/` and `release/`.
 
 The Firefox package is `release/scouty-ext-<version>-firefox.zip`; its contents equal `dist/firefox/`.
+Its add-on id (`browser_specific_settings.gecko.id` in `manifest.firefox.json`) is
+`prospector@scouty.to`. The id is permanent once the add-on is published, and Firefox derives the
+OAuth redirect URL from it, so the app's `scouty-ext-firefox` client entry must list the redirect of
+this id (validation/FIREFOX-SMOKE.md, step 7). It was `linkedin-capture@scouty.to` before
+2026-11-26 (docs/DEVIATIONS.md, 24); hashes recorded before that date are of the old manifest.
 
 ## Checking that the build is reproducible
 

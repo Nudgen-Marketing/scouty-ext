@@ -40,6 +40,19 @@ const controller = new CaptureController({
       return false;
     }
   },
+  async readerAlive(tabId) {
+    // Runs in the reader's own isolated world: its busy flag is there only while a reader works in
+    // the tab's current document (a reload drops it).
+    try {
+      const [first] = await ext.scripting.executeScript({
+        target: { tabId },
+        func: () => (globalThis as unknown as { __scoutyReaderBusy?: boolean }).__scoutyReaderBusy === true,
+      });
+      return first?.result === true;
+    } catch {
+      return false;
+    }
+  },
   store: {
     get: async (key) => (await ext.storage.session.get(key))[key],
     set: (key, value) => ext.storage.session.set({ [key]: value }),

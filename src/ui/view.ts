@@ -159,6 +159,10 @@ function draft(state: UiState): Draft {
       };
     }
     case "linkedinSignIn":
+      if (state.left) {
+        // Not a sign-in page the reader saw: the tab simply left the profile.
+        return { tone: "alert", icon: "alert", title: t("leftPageTitle"), body: [t("leftPageBody")], primary: action("captureAgain", "actionCapture") };
+      }
       return { tone: "alert", icon: "alert", title: t("linkedinSignInTitle"), body: [t("linkedinSignInBody")], primary: action("captureAgain", "actionTryAgain") };
     case "verification":
       return { tone: "alert", icon: "alert", title: t("verificationTitle"), body: [t("verificationBody")], primary: action("dismiss", "actionOk") };

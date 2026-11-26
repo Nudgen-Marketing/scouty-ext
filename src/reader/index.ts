@@ -42,13 +42,19 @@ export async function readSection(args: ReaderArgs, env: ReaderEnv): Promise<Rea
   const byPath = pageStateFromPath(address?.pathname ?? "");
   if (byPath) return { kind: "stopped", reason: byPath, address: null, clickLog };
 
-  // Target check: the page must be the profile this capture was created for.
-  const slug = slugFromPath(address?.pathname ?? "");
-  const key = slug ? profileKeyFromSlug(slug) : null;
-  if (!slug || !key) return { kind: "stopped", reason: "left_linkedin", address: null, clickLog };
-  if (key !== args.profileKey) {
-    return { kind: "stopped", reason: "wrong_profile", address: `${address.origin}/in/${slug}/`, clickLog };
-  }
+  // Target check: the page must be the profile this capture was created for. It is made again on
+  // every step and once more before anything is built: an in-page navigation to another profile
+  // must never have its text sent as this one's.
+  const offTarget = (): ReaderResult | null => {
+    const now = slugFromPath(address?.pathname ?? "");
+    const key = now ? profileKeyFromSlug(now) : null;
+    if (!now || !key) return { kind: "stopped", reason: "left_linkedin", address: null, clickLog };
+    if (key !== args.profileKey) return { kind: "stopped", reason: "wrong_profile", address: `${address.origin}/in/${now}/`, clickLog };
+    return null;
+  };
+  const moved = offTarget();
+  if (moved) return moved;
+  const slug = slugFromPath(address?.pathname ?? "") ?? "";
 
   // The application may still be drawing: give an unrecognised page a moment before failing closed.
   const section = args.section;
@@ -68,8 +74,16 @@ export async function readSection(args: ReaderArgs, env: ReaderEnv): Promise<Rea
   const cap = activity ? Math.max(0, Math.min(args.cap, HARD_LIMITS.maxCap)) : 0;
   const limits = activity ? PACING.activity : PACING.profile;
 
+  // Set when a step finds the tab on another profile (or off the profile pages): that ends the loop.
+  const drift: { result: ReaderResult | null } = { result: null };
   const loop = await runScrollLoop({
-    pageState: () => detectPageState(doc, section),
+    pageState: () => {
+      // Page state first: a sign-in or checkpoint address keeps its own outcome.
+      const state = detectPageState(doc, section);
+      if (state !== "ok") return state;
+      drift.result = offTarget();
+      return drift.result ? "unknown" : "ok";
+    },
     scrollStep: () => interactions.scrollStep(),
     expandNew: () => {
       if (activity) expandWithin(findBlocks(doc).flatMap((block) => textContainersOf(block)), ctx);
@@ -87,11 +101,14 @@ export async function readSection(args: ReaderArgs, env: ReaderEnv): Promise<Rea
     budgetMs: limits.budgetMs,
   });
   if (loop.end === "state" && loop.state !== "ok") {
-    return { kind: "stopped", reason: stopReasonFor(loop.state), address: null, clickLog };
+    return drift.result ?? { kind: "stopped", reason: stopReasonFor(loop.state), address: null, clickLog };
   }
-  // Once more before anything is built: content from a page in a bad state is never kept.
+  // Once more before anything is built: content from a page in a bad state, or of another profile,
+  // is never kept.
   const last = detectPageState(doc, section);
   if (last !== "ok") return { kind: "stopped", reason: stopReasonFor(last), address: null, clickLog };
+  const away = offTarget();
+  if (away) return away;
 
   const meta = {
     seq: args.seq, pageSlug: slug, capturedAt: new Date(env.now()).toISOString(), selectorsVersion: SELECTORS_VERSION,

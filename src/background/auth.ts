@@ -3,7 +3,7 @@
 // storage.local. Nothing goes to storage.sync, cookies, logs or any injected script.
 import { API_ORIGIN, CLIENT_ID, OAUTH_RESOURCE, OAUTH_SCOPE, REFRESH_MARGIN_MS } from "../config";
 import { ext } from "../ext";
-import { ApiError, revokeRequest, tokenRequest, type TokenResponse, type TokenSource } from "./api";
+import { ApiError, NetworkError, revokeRequest, tokenRequest, type TokenResponse, type TokenSource } from "./api";
 
 const ACCESS_KEY = "auth.access";
 const REFRESH_KEY = "auth.refresh";
@@ -162,10 +162,27 @@ function withLock<T>(task: () => Promise<T>): Promise<T> {
   return run;
 }
 
+/** The browser says it has no network: a request now would only fail. */
+const offline = (): boolean => (globalThis.navigator as Navigator | undefined)?.onLine === false;
+
+/**
+ * True when the token endpoint itself refused the refresh token (invalid_grant and the like answer
+ * 400; a refused client 401): the grant is gone and the user has to connect again.
+ */
+export function refreshRefused(error: unknown): boolean {
+  return error instanceof ApiError && (error.status === 400 || error.status === 401);
+}
+
 /**
  * One refresh at a time, and never a second request with the same refresh token: the server
  * revokes the whole grant when a refresh token is presented twice. Inside the lock storage is
  * read again, so a caller that waited uses the token the first caller obtained.
+ *
+ * Only the token endpoint's own refusal (400/401) ends the connection. A refresh that got no answer
+ * (offline, connection dropped, timed out) keeps the tokens and throws a NetworkError, which the
+ * capture shows as "You're offline"; any other answer (a 5xx) keeps them too and is thrown as is.
+ * If the lost request did reach the server, the stored refresh token was already used and the next
+ * refresh is answered invalid_grant, which ends the connection then.
  */
 async function refresh(failed: string | null): Promise<string | null> {
   return withLock(async () => {
@@ -173,16 +190,20 @@ async function refresh(failed: string | null): Promise<string | null> {
     if (access && access.token !== failed && access.expiresAt - now() > REFRESH_MARGIN_MS) return access.token;
     const refreshToken = await readRefresh();
     if (!refreshToken) return null;
+    // Not sent at all while the browser knows it is offline: the refresh token stays unused.
+    if (offline()) throw new NetworkError("offline");
     try {
       const tokens = await tokenRequest({ grant_type: "refresh_token", refresh_token: refreshToken, client_id: CLIENT_ID, resource: OAUTH_RESOURCE });
       return await store(tokens);
     } catch (error) {
-      // A refresh is never retried. Whatever went wrong, the stored refresh token may already be
-      // consumed, so the connection is treated as ended and the user connects again.
-      void (error instanceof ApiError);
-      await clearTokens();
-      await connectionEnded();
-      return null;
+      // A refresh is never retried here.
+      if (refreshRefused(error)) {
+        await clearTokens();
+        await connectionEnded();
+        return null;
+      }
+      if (error instanceof ApiError) throw error;
+      throw error instanceof NetworkError ? error : new NetworkError(error instanceof Error ? error.message : "network error");
     }
   });
 }

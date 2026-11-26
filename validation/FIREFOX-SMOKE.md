@@ -49,7 +49,12 @@ agreed, referred to by its label (P1); record no name, URL, text or screenshot o
 7. Development build only: open the collapsed **Developer** disclosure under the popup's first
    screen and copy the "Redirect URL" line. Make sure the app's
    `scouty-ext-firefox` entry of `SCOUTY_EXTENSION_CLIENTS` has that redirect URL and
-   `"origin":"moz-extension"`, and restart the app.
+   `"origin":"moz-extension"`, and restart the app. The add-on id is `prospector@scouty.to`
+   (`manifest.firefox.json`, permanent once published); Firefox derives the redirect from it, so it
+   is expected to be `https://99f3ffe746980f1238823f6d099893a1b35df764.extensions.allizom.org/`
+   (the SHA-1 of the id, docs/BROWSER-FACTS.md). An entry made for the earlier id
+   `linkedin-capture@scouty.to` (`https://1460999172d43ef9d38bb8711f3226dbe730ff04.extensions.allizom.org/`)
+   no longer matches and must be replaced.
 8. Press **Sign in**.
    Expected: a window opens on Scouty's consent page; after approving, the popup shows "Open a
    LinkedIn profile", with the workspace name in its header. Record whether the window was

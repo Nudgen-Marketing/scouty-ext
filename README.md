@@ -17,7 +17,7 @@ them to your Scouty workspace for analysis.
   information it handles is its own Scouty access token and the refresh token that renews it,
   kept in the browser's extension storage and sent only to Scouty (PRIVACY.md).
 - **One network destination.** Requests go only to the Scouty API, from one module.
-- **User-started, one profile at a time.** Nothing runs in the background.
+- **User-started, one profile at a time.** Nothing is read in the background; the only background work is finishing sending a capture you started.
 
 Using automated tools on LinkedIn is against LinkedIn's User Agreement and LinkedIn may restrict
 accounts that use them. See [PRIVACY.md](PRIVACY.md).
