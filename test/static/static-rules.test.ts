@@ -95,6 +95,13 @@ describe("source rules (src/)", () => {
 describe.each(TARGETS)("built bundles: dist/%s", (target) => {
   const bundle = (file: string): string => read(`dist/${target}/${file}`);
 
+  it("never contains the folder it was built in, so the same source builds the same bytes anywhere", () => {
+    // A store reviewer rebuilds the source archive in another folder (RELEASE.md gate 8): any absolute
+    // path that esbuild or a plugin writes into a bundle would make that package differ.
+    const files = walk(`dist/${target}`).filter((file) => /\.(js|css|html|json)$/.test(file));
+    for (const file of files) expect(read(file).includes(root), file).toBe(false);
+  });
+
   it("exists", () => {
     for (const file of [...OWN_BUNDLES, "popup.js", "popup.css", "popup.html", "manifest.json", "_locales/en/messages.json", "icons/16.png", "icons/48.png", "icons/128.png", "THIRD_PARTY.md"]) {
       expect(existsSync(path.join(root, "dist", target, file)), file).toBe(true);

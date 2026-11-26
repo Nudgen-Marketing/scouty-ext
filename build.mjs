@@ -33,12 +33,20 @@ async function devApiOrigin() {
   return origin;
 }
 
-/** `import css from "./x.css?inline"` gives the file's text (the overlay styles its shadow root with it). */
+/**
+ * `import css from "./x.css?inline"` gives the file's text (the overlay styles its shadow root with it).
+ * The module path is relative to the project, with forward slashes: esbuild writes it as a comment in
+ * the unminified bundle, and an absolute path would make every build folder produce different bytes
+ * (a store reviewer rebuilding the source archive elsewhere would not get the published package).
+ */
 const inlineCss = {
   name: "inline-css",
   setup(b) {
-    b.onResolve({ filter: /\.css\?inline$/ }, (a) => ({ path: path.resolve(a.resolveDir, a.path.replace(/\?inline$/, "")), namespace: "inline-css" }));
-    b.onLoad({ filter: /.*/, namespace: "inline-css" }, async (a) => ({ contents: await readFile(a.path, "utf8"), loader: "text" }));
+    b.onResolve({ filter: /\.css\?inline$/ }, (a) => ({
+      path: path.relative(root, path.resolve(a.resolveDir, a.path.replace(/\?inline$/, ""))).split(path.sep).join("/"),
+      namespace: "inline-css",
+    }));
+    b.onLoad({ filter: /.*/, namespace: "inline-css" }, async (a) => ({ contents: await readFile(path.join(root, a.path), "utf8"), loader: "text" }));
   },
 };
 

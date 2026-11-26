@@ -45,13 +45,16 @@ shasum -a 256 release/*.zip  # compare with the hashes published with the releas
 
 | | |
 | --- | --- |
-| Date | 2026-11-23 |
+| Date | 2026-11-26 |
 | OS | macOS (Darwin 27.2, arm64) |
-| Node / npm | v26.12.1 / 11.20.0 (see the note below) |
-| Result | `node tools/repro-check.mjs` reported identical files across two builds |
+| Node / npm | v24.0.2 / 11.3.0 (the pinned major) |
+| Result | Two fresh folders: A from a git clone, B from A's `scouty-ext-0.1.0-source.zip` only (no git). `npm ci && npm run package` in each gave byte-identical `chrome`, `edge`, `firefox` and `source` zips, and `node tools/repro-check.mjs` passed in B |
 
-Note: the machine used had Node 26, not the pinned Node 24. Before the first store submission the
-build must be repeated on Node 24 on a clean machine and this table updated (release gate 8).
+Note: the first try of this check found that the overlay bundle embedded the absolute path of the
+build folder (the `inline-css` esbuild plugin passed it as the module path), so a build in any other
+folder differed. `build.mjs` now uses a project-relative path, and `test:static` fails if any built
+file contains the folder it was built in. It was a clean folder on the same machine, not a separate
+machine; repeating it on another machine before submission is still advised.
 
 ## Other builds (not for stores)
 

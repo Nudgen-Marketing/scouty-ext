@@ -43,14 +43,14 @@ agreed, referred to by its label (P1); record no name, URL, text or screenshot o
 5. Click the toolbar icon (pin it from the extensions menu first if needed).
    Expected: "Allow access" with **Allow** and "What Scouty reads".
 6. Press **Allow** and accept the Firefox permission prompt.
-   Expected: the prompt lists LinkedIn and Scouty only; after accepting, the popup shows "Connect
-   to Scouty" with **Connect** (reopen the popup if Firefox closed it for the prompt; note whether
-   it did).
+   Expected: the prompt lists LinkedIn and Scouty only; after accepting, the popup shows "Get
+   started with Scouty" with **Sign in** and **Create account** (reopen the popup if Firefox closed
+   it for the prompt; note whether it did).
 7. Development build only: open the collapsed **Developer** disclosure under the popup's first
    screen and copy the "Redirect URL" line. Make sure the app's
    `scouty-ext-firefox` entry of `SCOUTY_EXTENSION_CLIENTS` has that redirect URL and
    `"origin":"moz-extension"`, and restart the app.
-8. Press **Connect**.
+8. Press **Sign in**.
    Expected: a window opens on Scouty's consent page; after approving, the popup shows "Open a
    LinkedIn profile", with the workspace name in its header. Record whether the window was
    already signed in to Scouty.
@@ -66,7 +66,7 @@ agreed, referred to by its label (P1); record no name, URL, text or screenshot o
     Expected: the other browser's capture runs; Firefox shows "This capture stopped" with **OK**
     and **Capture here**, and nothing more from the Firefox run reaches the app.
 12. Popup → settings (gear) → **Disconnect**, then click the icon again.
-    Expected: "Connect to Scouty" with **Connect**. In Scouty, Settings → Connected Apps no longer lists an active
+    Expected: "Get started with Scouty" with **Sign in**. In Scouty, Settings → Connected Apps no longer lists an active
     "Scouty Extension (Firefox)" connection.
 13. Back in `about:debugging`, check the extension's Console once more.
     Expected: no error was logged during the run.
