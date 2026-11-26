@@ -1,28 +1,29 @@
 # Privacy
 
-Scouty Extension does one thing: when you press Capture on a LinkedIn profile, it reads that
+Scouty B2B Prospector does one thing: when you press Capture on a lead's profile on a supported social
+network, it reads that
 person's profile and their recent posts, comments and reactions from the tab in front of you, and
 sends that content to your Scouty workspace so Scouty can suggest how to approach them.
 
 It only reads. It loads only the chosen person's six profile pages in your tab (the profile, its
 experience and skills detail pages, and the posts, comments and reactions activity pages), as you
-would by clicking, and makes no other request to LinkedIn; it never posts, clicks a button that
+would by clicking, and makes no other request to the network; it never posts, clicks a button that
 changes anything (it never follows, likes, comments, connects or messages), or sends anything to
-LinkedIn. To read longer posts and lists it presses only inline "see more" and "show more results"
-controls, which LinkedIn's own page answers as it would for you. It does not read your LinkedIn
+the network. To read longer posts and lists it presses only inline "see more" and "show more results"
+controls, which the network's own page answers as it would for you. It does not read your
 password, cookies, messages, contacts or feed, and it does nothing until you press Capture. It reads one person at a
 time and has no background activity.
 
 To send captures to your workspace it signs you in to Scouty through your browser. This is the
 one piece of authentication information it handles: a Scouty access token (and the refresh token
 that renews it), stored only in the browser's extension storage and sent only to Scouty, for that
-purpose only. It never reads your LinkedIn credentials. You can disconnect in the extension or
+purpose only. It never reads your credentials for the network. You can disconnect in the extension or
 revoke the connection in Scouty under Settings, Connected Apps. While a capture is being sent, its
 content is held in the browser's memory so an interrupted upload can finish; it is never written to
 disk and is gone as soon as Scouty confirms it or you close the browser.
 
 Apart from that token, what it collects is about the person whose profile you capture: the text of their profile and
-activity as LinkedIn shows it to you. This is sent only to Scouty, stored in your workspace,
+activity as the network shows it to you. This is sent only to Scouty, stored in your workspace,
 processed by Scouty's AI provider to write suggestions, and deleted as described in Scouty's
 privacy policy.
 
@@ -41,9 +42,9 @@ The same commitments apply in every browser the extension is offered for. The da
 The extension follows the Chrome Web Store User Data Policy, including its Limited Use
 requirements, the Microsoft Edge Add-ons policies, and Mozilla's Add-on Policies.
 
-Opening a profile is a profile view the person may see. Using automated tools on LinkedIn is
-against LinkedIn's User Agreement, and LinkedIn may restrict accounts that use them. You use this
-extension at your own risk.
+Opening a profile is a profile view the person may see. Social networks
+often don't allow automated tools like this one and may restrict accounts that use them. You use
+this extension at your own risk.
 
 ## In detail
 

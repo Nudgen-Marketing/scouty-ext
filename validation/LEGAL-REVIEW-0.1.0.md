@@ -1,4 +1,4 @@
-# Legal review pack, Scouty Extension 0.1.0 (release gate 10, app plan §15.8 "M3")
+# Legal review pack, Scouty B2B Prospector 0.1.0 (release gate 10, app plan §15.8 "M3")
 
 Prepared on 2026-11-26 for the reviewer. It gathers every text and decision in scope, with where
 each lives, and the questions that need a written answer. **It is not the approval**: release gate 10
@@ -8,7 +8,7 @@ for any changed popup state.
 
 ## 1. What the product does (for context)
 
-- **Scouty Extension** (Chrome, Edge, Firefox; published by the company in a public repository and
+- **Scouty B2B Prospector - Lead Research & Outreach Coach** ("Scouty B2B Prospector"; renamed from "Scouty Extension" on 2026-11-26; Chrome, Edge, Firefox; published by the company in a public repository and
   three stores): when the user presses **Capture** on a LinkedIn profile, it loads that person's six
   profile pages in the user's own tab (profile, experience, skills, posts, comments, reactions),
   reads the text LinkedIn shows the user, and sends it to the user's Scouty workspace. It presses
@@ -30,9 +30,9 @@ for any changed popup state.
 | T3 | Store description and extension description | `scouty-ext` → `STORE-LISTING.md`; `_locales/en/messages.json` (`extDescription`) |
 | T4 | Store privacy disclosures: single purpose, permission justifications, data collected, certifications, Edge personal-information answer, Firefox data collection (`data_collection_permissions` in the manifest) | `scouty-ext` → `STORE-LISTING.md` "Privacy practices"; `manifest.firefox.json` |
 | T5 | Extension privacy statement (the store "privacy policy" text) | `scouty-ext` → `PRIVACY.md` |
-| T6 | App privacy page, section "Scouty Extension" (`/privacy#linkedin-extension`) | `scouty` → `src/app/(legal)/privacy/page.tsx` (marked `PENDING LEGAL SIGN-OFF`) |
+| T6 | App privacy page, section "Scouty B2B Prospector" (`/privacy#scouty-b2b`) | `scouty` → `src/app/(legal)/privacy/page.tsx` (marked `PENDING LEGAL SIGN-OFF`) |
 | T7 | App terms sentence (`/terms#linkedin-extension`) | `scouty` → `src/app/(legal)/terms/page.tsx` (marked `PENDING LEGAL SIGN-OFF`) |
-| T8 | Public page `/scouty-extension` (what it reads, what it never does, LinkedIn risk, trademark line, FAQ) and the two homepage FAQ items | `scouty` → `src/lib/scouty-extension-page.ts` |
+| T8 | Public page `/scouty-b2b` (was `/scouty-extension`, which redirects) (what it reads, what it never does, LinkedIn risk, trademark line, FAQ) and the two homepage FAQ items | `scouty` → `src/lib/scouty-extension-page.ts` |
 | T9 | "Can't capture this profile / Scouty doesn't keep data about this person" (a person who asked to be erased) | `scouty-ext` → `_locales/en/messages.json` (`suppressedTitle`, `suppressedBody`) |
 | T10 | Sign-up acceptance line ("By creating an account, you agree to our Terms and Privacy Policy") | `scouty` → `src/components/auth/sign-up-form.tsx` |
 
@@ -41,12 +41,23 @@ Current wording of the user-facing consent (T1, T2), quoted for convenience:
 > **Before you start**
 > - Scouty reads this profile and the person's recent posts, comments and reactions.
 > - It never clicks, likes, connects, messages or posts for you.
-> - The person may see that you viewed their profile. LinkedIn doesn't allow tools like this and may limit your account.
+> - The person may see that you viewed their profile. This site may not allow tools like this and may limit your account.
 
-> **Allow access**: Scouty only reads the LinkedIn profiles you choose.
+> **Allow access**: Scouty only reads the profiles you choose.
 
-Terms sentence (T7): "If you use the Scouty Extension, you are responsible for using it in line
-with LinkedIn's terms, and only on people you have a legitimate reason to contact."
+Terms sentence (T7): "If you use Scouty B2B Prospector, you are responsible for using it in line
+with the terms of each social network you use it on, and only on people you have a legitimate
+reason to contact."
+
+**Network-neutral wording (2026-11-26).** The extension was renamed Scouty B2B Prospector and its public texts
+(store description, `PRIVACY.md`, `/scouty-b2b`, the homepage FAQ, the privacy section now at
+`/privacy#scouty-b2b`, the terms sentence now at `/terms#scouty-b2b`) no longer name LinkedIn,
+because more social networks will follow. The risk notice is now "Social networks often don't allow
+automated tools like this one and may restrict accounts that use them. You use the extension at your
+own risk.", and the trademark line "Names of social networks are trademarks of their owners. Scouty
+is not affiliated with or endorsed by any of them." The popup now says "this site" (T1: "This site may not allow tools like this and may limit your
+account."), and the reviewer-only store fields say "the network"; only the manifest's host permission
+names the site. **Question 10 below** asks whether this is enough.
 
 ## 3. Data handling as built (to check against the texts)
 
@@ -84,10 +95,14 @@ with LinkedIn's terms, and only on people you have a legitimate reason to contac
 7. **AI processing.** Is the AI-provider disclosure in T6 ("sent to OpenAI through its API… we
    don't use it to train our own models") sufficient, and consistent with the main AI-processing
    section of the privacy page?
-8. **Trademark.** Is the LinkedIn trademark line on `/scouty-extension` (T8) and the use of the
+8. **Trademark.** Is the LinkedIn trademark line on `/scouty-b2b` (T8) and the use of the
    word "LinkedIn" in the store listings acceptable?
 9. **New accounts from the extension.** Is the sign-up acceptance line (T10) enough when someone
    creates their Scouty account from the extension's sign-in window?
+
+10. **Generic risk notice.** Is the network-neutral risk notice and trademark line on the public
+    page, store description and privacy texts enough, given that the extension reads only one network
+    today and its consent says "this site" rather than naming it?
 
 ## 5. Approval record
 

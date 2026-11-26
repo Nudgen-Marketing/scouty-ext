@@ -11,7 +11,7 @@ green.
 | 3 | Contract in sync | `diff -r protocol-v1 ../scouty/src/lib/linkedin/__fixtures__/protocol-v1`: empty; `cmp src/ui/tokens.json ../scouty/src/lib/linkedin/__fixtures__/extension-tokens.json`: no difference (2026-11-24) | |
 | 4 | S1–S8 against the real app | Run on staging 2026-11-24: S1, S2, S3, S4 (resume; the offline screen by e2e), S5, S7, S8 live; S6 by the two-profile e2e. Fixes found there are in deviation 21 | |
 | 5 | State gallery reviewed (light and dark) | Engineer review 2026-11-26 of all 27 states, 3 off-profile variants and 8 overlay states in both themes: no defects, two small notes (`RESULTS-0.1.0.md`, "Gallery review"). **Open: owner's initials** | |
-| 6 | Real-LinkedIn validation for this version's selectors | `RESULTS-0.1.0.md` started. **Blocking finding:** on the two staging captures, posts-page blocks with a URN are 63% (12/19) and 40% (8/20), below R2's 90%; needs a reader fix on live LinkedIn and a new `SELECTORS_VERSION`. **Open:** the mandatory rows, click logs and negative checks | |
+| 6 | Real-LinkedIn validation for this version's selectors | `RESULTS-0.1.0.md` started. R2 finding (63% and 40% with a URN) fixed in `SELECTORS_VERSION` 3 (deviation 23): on the live posts pages 18/20 (P1) and 13/20 (second profile); the 7 left expose no id in the page. **Owner decision:** R2's definition for such posts. **Open:** a v3 capture, the mandatory rows, click logs and negative checks | |
 | 7 | Live AI eval (app task A0) | 2026-11-26, app `e53d169`, model `gpt-6-sol`, two real-shape fixtures: **3 of 3 runs, 13/13 each** (`RESULTS-0.1.0.md`, "A0"). **Open:** tokens and cost per lead (no Langfuse here); owner signs | |
 | 8 | Firefox: smoke, walk-through, source rebuild on a clean machine (Node 24) | Start-up smoke passed in CI on `38b254a` (Firefox 161.0, run https://github.com/Nudgen-Marketing/scouty-ext/actions/runs/45580923347). Source rebuild on Node 24.0.2 in two fresh folders: identical packages after the build-path fix (`BUILD.md`). **Open:** the manual walk-through (Part B; Firefox is not installed here), and the hashes from the tagged commit | |
 | 9 | Edge walk-through | Automated part on 2026-11-26, Edge 158.0.4370.33, dev build against staging: steps 2–4 and 6 pass (loads, permissions `identity`, `scripting`, `storage`, origins LinkedIn and Scouty only, no console error, signed-out popup). **Open:** steps 7–10 by hand (Edge refuses the sign-in window under automation) | |
@@ -20,5 +20,5 @@ green.
 | 12 | Exit criteria of the rollout stage | **Open** | |
 | 13 | Store approvals | **Open** | |
 
-Package contents for this version: manifests carry `homepage_url: https://scouty.to/scouty-extension`.
+Package contents for this version: manifests carry `homepage_url: https://scouty.to/scouty-b2b`.
 Listing text, URLs and reviewer notes: `STORE-LISTING.md`.

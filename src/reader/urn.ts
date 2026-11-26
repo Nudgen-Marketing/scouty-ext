@@ -1,14 +1,15 @@
-// Activity URN parsing, permalink and timestamp decoding.
-// UNVERIFIED (owner task E0): that the high bits of the numeric activity id are a millisecond
-// timestamp. If that is wrong, set URN_TIME_ENABLED to false: dates then come only from the page.
+// Post URN parsing (activity, share, ugcPost), permalink and timestamp decoding.
+// Checked on live LinkedIn on 2026-11-26: for activity, share and ugcPost ids alike, the bits above
+// the low 22 are the post's time in milliseconds (a post's share and activity ids decode to the same
+// day, and every decoded date matched the age the page showed, from "1w" to "3yr").
 import { URN_PATTERN } from "../protocol";
 
 export const URN_TIME_ENABLED = true;
 const EARLIEST = Date.UTC(2003, 0, 1);
 const FUTURE_TOLERANCE_MS = 5 * 60_000;
 
-/** Returns the URN only when the whole value is "urn:li:activity:<digits>"; anything else is null. */
-export function parseActivityUrn(value: string | null | undefined): string | null {
+/** Returns the URN only when the whole value is a post URN (activity, share or ugcPost); anything else is null. */
+export function parsePostUrn(value: string | null | undefined): string | null {
   if (!value) return null;
   const trimmed = value.trim();
   return URN_PATTERN.test(trimmed) ? trimmed : null;
@@ -19,18 +20,28 @@ export type PostUrn = { kind: PostUrnKind; urn: string };
 
 const POST_PATHS = ["/feed/update/", "/analytics/post-summary/"];
 const POST_URN_IN_PATH = /^urn:li:(activity|share|ugcPost):(\d{6,25})\/?$/;
+const WHOLE_POST_URN = /^urn:li:(activity|share|ugcPost):(\d{6,25})$/;
+/** One's own posts carry a Boost link whose `content` parameter is the post's URN, often its only one. */
+const BOOST_PATH = "/campaignmanager/boost/";
 
 /**
- * The post URN a link names, for the two link forms LinkedIn uses on activity pages:
- * `/feed/update/<urn>/` and `/analytics/post-summary/<urn>/` (one's own posts). Anything else is null.
+ * The post URN a link names, for the link forms LinkedIn uses on activity pages:
+ * `/feed/update/<urn>/`, `/analytics/post-summary/<urn>/` (one's own posts) and the Boost link
+ * `/campaignmanager/boost/…?content=<urn>` (one's own posts). Anything else is null.
  */
 export function postUrnFromHref(href: string | null | undefined): PostUrn | null {
   if (!href) return null;
+  let url: URL;
   let path: string;
   try {
-    path = decodeURIComponent(new URL(href, "https://www.linkedin.com").pathname);
+    url = new URL(href, "https://www.linkedin.com");
+    path = decodeURIComponent(url.pathname);
   } catch {
     return null;
+  }
+  if (path.startsWith(BOOST_PATH)) {
+    const boosted = WHOLE_POST_URN.exec(url.searchParams.get("content") ?? "");
+    return boosted ? { kind: boosted[1] as PostUrnKind, urn: `urn:li:${boosted[1]}:${boosted[2]}` } : null;
   }
   const prefix = POST_PATHS.find((p) => path.startsWith(p));
   if (!prefix) return null;
@@ -45,16 +56,16 @@ export function postUrnFromLinks(hrefs: readonly (string | null)[]): PostUrn | n
   return found.find((u) => u.kind === "activity") ?? found[0] ?? null;
 }
 
-/** The public permalink of the post an activity URN names. Always on www.linkedin.com. */
+/** The public permalink of the post a post URN names. Always on www.linkedin.com. */
 export function permalinkFor(urn: string): string | null {
-  const parsed = parseActivityUrn(urn);
+  const parsed = parsePostUrn(urn);
   return parsed ? `https://www.linkedin.com/feed/update/${parsed}/` : null;
 }
 
-/** Decodes the time of the post from its activity id: the bits above the low 22 are milliseconds. */
+/** Decodes the time of the post from its id: the bits above the low 22 are milliseconds. */
 export function urnTime(urn: string, now: number = Date.now()): string | null {
   if (!URN_TIME_ENABLED) return null;
-  const parsed = parseActivityUrn(urn);
+  const parsed = parsePostUrn(urn);
   if (!parsed) return null;
   const id = BigInt(parsed.slice(parsed.lastIndexOf(":") + 1));
   const ms = Number(id >> 22n);

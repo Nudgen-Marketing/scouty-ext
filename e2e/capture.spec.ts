@@ -58,7 +58,7 @@ test("happy path: connect, consent, six pages read, finalize, back to the app ta
   expect(posts.pageSlug).toBe(SLUG);
   expect(posts.blocks[0]).toMatchObject({ urn: "urn:li:activity:7130316800000000000", urnTime: "2023-11-14T22:13:20.000Z" });
   expect(posts.blocks[1]!.text).toContain("THE-TAIL-OF-POST-TWO"); // expanded with the allowed control
-  expect(posts.blocks[2]).toMatchObject({ urn: null, urnTime: null }); // a ugcPost link: no activity URN to send
+  expect(posts.blocks[2]).toMatchObject({ urn: "urn:li:ugcPost:7131078450000000001", urnTime: "2023-11-17T00:39:51.510Z" }); // a ugcPost link is a post id too
   expect(posts.blocks[2]!.text.startsWith(`Synthetic Person One reposted this\n3d\n`)).toBe(true);
   const comments = capture.sections.get("comments")!.payload;
   expect(comments.blocks[0]!.urn).toBe("urn:li:activity:7127722905600000000");
@@ -108,7 +108,7 @@ test("signed out of LinkedIn: stops on the reduced profile and sends no content"
 
 test("checkpoint mid-scroll: that section is discarded, earlier ones are kept, capture stops", async ({ rig }) => {
   const { page, popup } = await startCapture(rig, "checkpoint-person");
-  await expect(heading(popup)).toHaveText("LinkedIn wants to check it's you");
+  await expect(heading(popup)).toHaveText("This site wants to check it's you");
   const capture = [...rig.stub.state.captures.values()][0]!;
   expect(capture.manifest!.stop).toBe("checkpoint");
   expect(capture.manifest!.sections.map((s) => `${s.section}:${s.state}:${s.reason}`)).toEqual([

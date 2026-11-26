@@ -7,7 +7,7 @@ everything marked **Open** needs the tester on real LinkedIn, and the owner sign
 - Tester (initials): **Open** (sections below marked "engineer" were run by Claude Code for the owner)
 - Date: 2026-11-26
 - Extension build: `npm run build:dev` at commit `38b254a` (plus the reproducible-build fix in this change)
-- `SELECTORS_VERSION`: 2
+- `SELECTORS_VERSION`: 2 for the staging captures below; 3 after the R2 fix (deviation 23)
 - App commit: `e53d169` (branch `feat/linkedin-coach`, PR #180)
 
 ## Activity pages (E0 step 2)
@@ -42,6 +42,21 @@ found on live LinkedIn pages (which posts-page items the reader reads without an
 whether LinkedIn's current markup carries it elsewhere) and fixed in `src/reader/urn.ts` /
 `src/reader/selectors.ts` with a new `SELECTORS_VERSION`. R2 does not cover the comments and
 reactions pages.
+
+**Fix (engineer, 2026-11-26, `SELECTORS_VERSION` 3, `docs/DEVIATIONS.md` §23).** Cause, seen live
+in the owner's Chrome: many posts carry only a share or ugcPost URN (sent as null before), and some
+of the owner's own posts carry their id only in the Boost link. The reader now sends all three kinds
+and reads the Boost link. Applied to the same live posts pages (first 20 items, counts only):
+
+| Profile | Items with an id, link and time, before | After | Without an id (why) |
+| --- | --- | --- | --- |
+| P1 (owner) | 12 / 20 | 18 / 20 (90%) | 2 |
+| Second test profile | 8 / 20 | 13 / 20 (65%) | 7 image posts with no post link or id attribute anywhere in the page |
+
+R2 passes on P1 at the threshold and still fails on the second profile: those 7 items expose no
+id the reader may read (only the post's menu, which it must not open). **Owner decision needed:**
+keep R2 at 90% of all blocks, or measure it on the blocks that carry a post link. A new capture
+with the v3 build is still needed to fill the matrix.
 
 The matrix below stays **Open** until the tester runs each profile with the click log and the
 manual checks (R1, R3–R9).
@@ -89,7 +104,8 @@ selector only).
 
 ## Selector changes made
 
-None in this version so far. The R2 finding above needs one.
+- `SELECTORS_VERSION` 2 → 3 (2026-11-26): share and ugcPost URNs are sent, and the Boost link's
+  `content` parameter is read (deviation 23).
 
 ## E15 real local app
 

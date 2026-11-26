@@ -1,4 +1,4 @@
-# Building Scouty Extension from source
+# Building Scouty B2B Prospector from source
 
 These are the exact steps that produce the published packages. The background script, the reader
 and the overlay are bundled but not minified; the popup script (which contains React) and the popup

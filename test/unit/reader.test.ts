@@ -26,7 +26,7 @@ describe("reader", () => {
     expect(validateSectionPayload(JSON.parse(JSON.stringify(result.payload)))).toMatchObject({ ok: true });
     expect(result.payload).toMatchObject({
       section: "posts", seq: 1, pageSlug: "synthetic-person-one", capturedAt: new Date(FIXED_NOW).toISOString(),
-      selectorsVersion: 2, browser: "chrome", locale: "en", read: "ok", expanded: true, reachedCap: false, blockCount: 3, profile: null,
+      selectorsVersion: 3, browser: "chrome", locale: "en", read: "ok", expanded: true, reachedCap: false, blockCount: 3, profile: null,
     });
     // One expand, nothing else (the SDUI list scrolls endlessly: no load-more control); stops after three idle steps.
     expect(page.clicks.map((el) => el.getAttribute("data-testid"))).toEqual(["expandable-text-button"]);

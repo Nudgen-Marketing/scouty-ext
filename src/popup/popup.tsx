@@ -85,7 +85,7 @@ function Popup() {
 }
 
 function mount(): void {
-  document.title = t("extName");
+  document.title = t("extTitle");
   const root = document.getElementById("root");
   if (root) createRoot(root).render(<Popup />);
 }

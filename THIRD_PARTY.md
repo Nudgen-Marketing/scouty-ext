@@ -1,6 +1,6 @@
 # Third-party notices
 
-Scouty Extension ships third-party code only in the popup (`popup.js`, `popup.css`).
+Scouty B2B Prospector ships third-party code only in the popup (`popup.js`, `popup.css`).
 The background script, the reader and the in-page overlay contain none.
 
 ## React and React DOM (bundled in `popup.js`, with the `scheduler` package React DOM depends on)

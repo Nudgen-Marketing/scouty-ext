@@ -19,7 +19,7 @@ const EXPECTED: [string, string | null, string | null][] = [
   ["Allow access", "Allow", "What Scouty reads"],
   ["Get started with Scouty", "Sign in", "Create account"],
   ["Connecting…", null, "Cancel"],
-  ["Open a LinkedIn profile", "Open Scouty", null],
+  ["Open a lead's profile", "Open Scouty", null],
   ["Before you start", "Got it, capture", "Cancel"],
   ["Capture this profile", "Capture", null],
   ["Captured 3 days ago", "Open in Scouty", "Capture again"],
@@ -27,8 +27,8 @@ const EXPECTED: [string, string | null, string | null][] = [
   ["Sending to Scouty…", null, null],
   ["Done", "Open in Scouty", "Close"],
   ["Partly done", "Open in Scouty", "Capture again"],
-  ["Sign in to LinkedIn", "Try again", null],
-  ["LinkedIn wants to check it's you", "OK", null],
+  ["Sign in to this site", "Try again", null],
+  ["This site wants to check it's you", "OK", null],
   ["Can't read this profile", "OK", null],
   ["This profile has moved", "Capture this page", null],
   ["You're offline", "Try now", null],
@@ -112,11 +112,11 @@ describe("the 27 screens", () => {
 
   it("the exact copy of the screens with fixed text", () => {
     const text = (i: number): string => mount(SAMPLES[i]!).querySelector("main")!.textContent!;
-    expect(text(0)).toContain("Scouty only reads the LinkedIn profiles you choose.");
+    expect(text(0)).toContain("Scouty only reads the profiles you choose.");
     expect(text(1)).toContain("Sign in, or create an account, to capture profiles.");
     expect(text(3)).toContain("Then click the Scouty icon again.");
     expect(text(4)).toContain("It never clicks, likes, connects, messages or posts for you.");
-    expect(text(4)).toContain("LinkedIn doesn't allow tools like this and may limit your account.");
+    expect(text(4)).toContain("This site may not allow tools like this and may limit your account.");
     expect(text(4)).toContain("The person may see that you viewed their profile.");
     expect(text(5)).toContain("38 captures left today");
     expect(text(7)).toContain("Scouty never clicks or posts for you.");
@@ -126,7 +126,7 @@ describe("the 27 screens", () => {
     expect(text(9)).toContain("Profile · 42 posts · 12 comments · 50 reactions");
     expect(text(10)).toContain("Profile · 23 posts");
     expect(text(10)).toContain("You stopped early, so some parts are missing.");
-    expect(text(11)).toContain("Sign in on linkedin.com, then try again.");
+    expect(text(11)).toContain("Sign in on this site, then try again.");
     expect(text(14)).toContain("Capture it from its new page.");
     expect(text(16)).toContain("Do it in the next few minutes to save what was already read.");
     expect(text(20)).toContain("Scouty doesn't keep data about this person.");
@@ -180,7 +180,7 @@ describe("the 27 screens", () => {
     [SAMPLES[14]!, "Capture this page", "capture"],
     [{ kind: "notAnswering", retryAt: null, sending: false, workspace: "W" }, "Try now", "capture"],
   ];
-  const HINT = "Open a LinkedIn profile in this tab first.";
+  const HINT = "Open a lead's profile in this tab first.";
 
   describe.each(["light", "dark"] as const)("capture actions (%s)", (theme) => {
     it.each(CAPTURE_SCREENS.map(([state, label, id]) => [state.kind, label, id, state] as const))("%s on a profile: %s is enabled and sends %s; axe", async (_kind, label, id, state) => {
@@ -379,7 +379,7 @@ describe("view model", () => {
     const messages = JSON.parse(readFileSync(path.join(process.cwd(), "_locales/en/messages.json"), "utf8")) as Record<string, { message: string }>;
     const sources = ["src/ui/view.ts", "src/popup/PopupView.tsx", "src/popup/popup.tsx", "src/overlay/overlay.ts"].map((f) => readFileSync(path.join(process.cwd(), f), "utf8")).join("\n");
     const named = new Set([...sources.matchAll(/"([a-z][A-Za-z0-9]+)"/g)].map((m) => m[1]!));
-    for (const key of Object.keys(messages)) expect(named.has(key) || key === "extName" || key === "extDescription", key).toBe(true);
+    for (const key of Object.keys(messages)) expect(named.has(key) || ["extName", "extShortName", "extTitle", "extDescription"].includes(key), key).toBe(true);
     for (const call of sources.matchAll(/\bt\("([A-Za-z0-9]+)"/g)) expect(messages[call[1]!], call[1]).toBeDefined();
     for (const value of Object.values(messages)) expect(value.message.trim().length).toBeGreaterThan(0);
   });

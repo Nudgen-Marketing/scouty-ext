@@ -1,9 +1,9 @@
 {
   "extName": {
-    "message": "Scouty Extension"
+    "message": "Scouty B2B Prospector - Lead Research & Outreach Coach"
   },
   "extDescription": {
-    "message": "Captures the LinkedIn profile you choose, when you press Capture, and sends it to your Scouty workspace. Never acts on LinkedIn."
+    "message": "Research the B2B leads you choose on social networks and get a step-by-step outreach plan in Scouty. Only reads; never acts for you."
   },
   "brand": {
     "message": "Scouty"
@@ -24,7 +24,7 @@
     "message": "Allow access"
   },
   "permissionBody": {
-    "message": "Scouty only reads the LinkedIn profiles you choose."
+    "message": "Scouty only reads the profiles you choose."
   },
   "actionAllow": {
     "message": "Allow"
@@ -54,7 +54,7 @@
     "message": "Cancel"
   },
   "notOnProfileTitle": {
-    "message": "Open a LinkedIn profile"
+    "message": "Open a lead's profile"
   },
   "notOnProfileBody": {
     "message": "Then click the Scouty icon again."
@@ -72,7 +72,7 @@
     "message": "It never clicks, likes, connects, messages or posts for you."
   },
   "consentPoint3": {
-    "message": "The person may see that you viewed their profile. LinkedIn doesn't allow tools like this and may limit your account."
+    "message": "The person may see that you viewed their profile. This site may not allow tools like this and may limit your account."
   },
   "actionAcceptConsent": {
     "message": "Got it, capture"
@@ -204,19 +204,19 @@
     "message": "Some long posts weren't opened in full."
   },
   "linkedinSignInTitle": {
-    "message": "Sign in to LinkedIn"
+    "message": "Sign in to this site"
   },
   "linkedinSignInBody": {
-    "message": "Sign in on linkedin.com, then try again."
+    "message": "Sign in on this site, then try again."
   },
   "actionTryAgain": {
     "message": "Try again"
   },
   "verificationTitle": {
-    "message": "LinkedIn wants to check it's you"
+    "message": "This site wants to check it's you"
   },
   "verificationBody": {
-    "message": "Finish LinkedIn's check, then wait a while before trying again."
+    "message": "Finish the site's check, then wait a while before trying again."
   },
   "actionOk": {
     "message": "OK"
@@ -225,7 +225,7 @@
     "message": "Can't read this profile"
   },
   "unavailableBody": {
-    "message": "LinkedIn isn't showing the full profile."
+    "message": "This site isn't showing the full profile."
   },
   "addressChangedTitle": {
     "message": "This profile has moved"
@@ -288,7 +288,7 @@
     "message": "Not available yet"
   },
   "notAvailableBody": {
-    "message": "LinkedIn capture isn't on for your account."
+    "message": "Capture isn't on for your account."
   },
   "suppressedTitle": {
     "message": "Can't capture this profile"
@@ -318,7 +318,7 @@
     "message": "It took too long, so nothing was saved."
   },
   "captureNeedsProfile": {
-    "message": "Open a LinkedIn profile in this tab first."
+    "message": "Open a lead's profile in this tab first."
   },
   "busyTitle": {
     "message": "Already capturing"
@@ -349,5 +349,13 @@
   },
   "actionDisconnect": {
     "message": "Disconnect"
+  },
+  "extShortName": {
+    "message": "Scouty B2B",
+    "description": "Short name shown where space is tight (12 characters at most)."
+  },
+  "extTitle": {
+    "message": "Scouty B2B Prospector",
+    "description": "Toolbar tooltip and popup window title."
   }
 }

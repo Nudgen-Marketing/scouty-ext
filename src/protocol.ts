@@ -44,7 +44,13 @@ export const LIMITS = {
   maxControlBodyBytes: 64_000,
 } as const;
 
-export const URN_PATTERN = /^urn:li:activity:\d{6,25}$/;
+/**
+ * A post's URN: `urn:li:activity:…`, `urn:li:share:…` or `urn:li:ugcPost:…` (LinkedIn names many posts
+ * on activity pages by their share or ugcPost URN only; all three open with /feed/update/<urn>/ and
+ * carry the post's time in their high bits). Accepted since selectors v3; an older server treats a
+ * share or ugcPost URN as absent.
+ */
+export const URN_PATTERN = /^urn:li:(activity|share|ugcPost):\d{6,25}$/;
 const SHA256_HEX = /^[0-9a-f]{64}$/;
 
 export type ProfileContent = {

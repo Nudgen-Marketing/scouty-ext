@@ -10,7 +10,7 @@ import {
   buildActivityPayload, buildManifest, buildProfilePayload, validateManifest, validateSectionPayload,
   type Counts, type FinalizeResponse,
 } from "../../src/protocol";
-import { parseActivityUrn, urnTime } from "../../src/reader/urn";
+import { parsePostUrn, urnTime } from "../../src/reader/urn";
 import { PROFILE_URL, rig, TAB } from "../helpers/session";
 import { samplePayload, unwire } from "../helpers/stub";
 
@@ -43,9 +43,9 @@ describe("payload shape", () => {
   });
 
   it("urn and urnTime are sent only when valid", () => {
-    expect(parseActivityUrn("urn:li:activity:7130316800000000000")).toBe("urn:li:activity:7130316800000000000");
-    for (const bad of ["urn:li:share:7130316800000000000", "urn:li:activity:12", "urn:li:activity:7130316800000000000x", " javascript:1", ""]) {
-      expect(parseActivityUrn(bad), bad).toBeNull();
+    for (const urn of ["urn:li:activity:7130316800000000000", "urn:li:share:7130316800000000000", "urn:li:ugcPost:7130316800000000000"]) expect(parsePostUrn(urn)).toBe(urn);
+    for (const bad of ["urn:li:comment:7130316800000000000", "urn:li:activity:12", "urn:li:activity:7130316800000000000x", " javascript:1", ""]) {
+      expect(parsePostUrn(bad), bad).toBeNull();
       expect(urnTime(bad), bad).toBeNull();
     }
     // An id whose time would be in the future or before LinkedIn's activity ids is not dated.

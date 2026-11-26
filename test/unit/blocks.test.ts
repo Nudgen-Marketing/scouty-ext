@@ -34,10 +34,12 @@ describe("blocks (SDUI activity pages)", () => {
     expect(blocks[1]!.urn).toBe("urn:li:activity:7131078450000000000");
     expect(blocks[1]!.truncated).toBe(false);
     expect(page.clicks.map((el) => el.getAttribute("data-testid"))).toEqual(["expandable-text-button"]);
-    // A repost: the header line is the kind hint. Its link names a ugcPost, which protocol v1 cannot carry.
+    // A repost: the header line is the kind hint. Its link names a ugcPost: sent as its URN, with its
+    // permalink and the time its id carries (selectors v3; it was dropped before).
     expect(blocks[2]!.text).toBe("Synthetic Person One reposted this\n3d\nA reposted invented post with a document and no activity id.");
-    expect(blocks[2]!.urn).toBeNull();
-    expect(blocks[2]!.urnTime).toBeNull();
+    expect(blocks[2]!.urn).toBe("urn:li:ugcPost:7131078450000000001");
+    expect(blocks[2]!.urnTime).toBe("2023-11-17T00:39:51.510Z");
+    expect(permalinkFor(blocks[2]!.urn!)).toBe("https://www.linkedin.com/feed/update/urn:li:ugcPost:7131078450000000001/");
   });
 
   it("never reads action controls, their labels, the 'Feed post' heading or page furniture", () => {
@@ -77,9 +79,10 @@ describe("blocks (SDUI activity pages)", () => {
     });
   });
 
-  it("reads the reactions page: kind hints, an activity URN, a share URN that stays off the wire, non-Latin text", () => {
+  it("reads the reactions page: kind hints, an activity URN, a share URN sent as it is, non-Latin text", () => {
     const { blocks } = read("sdui-activity-reactions", PATHS.reactions);
-    expect(blocks.map((b) => b.urn)).toEqual(["urn:li:activity:7125206220800000000", null]);
+    expect(blocks.map((b) => b.urn)).toEqual(["urn:li:activity:7125206220800000000", "urn:li:share:7122689536000000000"]);
+    expect(blocks[1]!.urnTime).toBe("2023-10-24T21:05:18.554Z");
     expect(blocks[0]!.text).toBe("Synthetic Person One likes this\n5h\nAn invented post the lead reacted to.");
     expect(blocks[1]!.text).toBe("Synthetic Person One liked a comment on this\n3d\nBài viết giả định bằng tiếng Việt để kiểm thử.");
   });

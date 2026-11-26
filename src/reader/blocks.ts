@@ -80,8 +80,9 @@ export function dateLabel(lines: readonly string[]): string | null {
 function itemUrn(item: Element): { wire: string | null; key: string | null } {
   const hrefs = queryAll(item, selectors.activity.urnLink).map((a) => a.getAttribute("href"));
   const found = postUrnFromLinks(hrefs);
-  // Protocol v1 carries activity URNs only; a share or ugcPost URN is kept for de-duplication.
-  return { wire: found?.kind === "activity" ? found.urn : null, key: found?.urn ?? null };
+  // Any post URN is sent (activity preferred when an item has several): many posts on activity pages
+  // are named only by their share or ugcPost URN, and dropping those left them without a permalink or date.
+  return { wire: found?.urn ?? null, key: found?.urn ?? null };
 }
 
 /** The item's lines outside its text boxes: where the header line and the date are. */

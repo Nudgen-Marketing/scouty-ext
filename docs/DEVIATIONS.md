@@ -95,8 +95,9 @@ one API client, least-privilege manifests, nothing reduced submitted as complete
       head-and-tail clamp); an item with no text box is read as its visible text. Action controls
       (named by `aria-label` or text: reactions, Like, Comment, Repost, Send, control menu,
       Follow, document paging) and "Feed post" are never read. The URN comes from a link inside
-      the item: `/feed/update/<urn>/` or `/analytics/post-summary/<urn>/`, activity first. The
-      exact time still comes only from an activity URN; the date label stays in the text.
+      the item: `/feed/update/<urn>/`, `/analytics/post-summary/<urn>/` or, since deviation 23,
+      the Boost link's `content=` parameter, activity first. The exact time comes from the URN's
+      id (any of the three kinds, deviation 23); the date label stays in the text.
       Infinite scroll: while `[data-testid=loader]` shows, a step waits up to three more pauses
       (within the section's time budget) before it counts as idle.
     - **Expand.** The only expand control is `button[data-testid=expandable-text-button]` inside an
@@ -123,9 +124,8 @@ one API client, least-privilege manifests, nothing reduced submitted as complete
     - **Single alternatives.** Plan 6.6 asks for two or three alternatives per selector. The SDUI
       hooks have no meaningful fallbacks, so most selectors now have one; the legacy class
       selectors remain only where they can stop a read or never match (load-more, empty states).
-    - **Protocol v1 carries activity URNs only.** A share or ugcPost URN is used to drop
-      duplicates but is sent as `urn: null` (no permalink, no time); on the comments and reactions
-      pages most items carry no post link at all.
+    - **Protocol v1 carried activity URNs only** until deviation 23, which also sends share and
+      ugcPost URNs. On the comments and reactions pages most items carry no post link at all.
     - **Sanitizer.** `tools/sanitize.mjs` also keeps `id="workspace"`, `data-sdui-screen` and
       `data-component-type` values, the `componentkey` name, the `expandable-text-*` and `loader`
       test ids, the detail-root test ids with the slug replaced by `x`, the top-card id as
@@ -240,6 +240,26 @@ then returns to consent. "Connect to Scouty again" (connection ended) is unchang
 `test/unit/auth.test.ts`, `test/ui/states.test.tsx` and `e2e/capture.spec.ts` (the stub records
 the `prompt` of each authorization request).
 
+### 23. Post ids: share and ugcPost URNs, and the Boost link (2026-11-26)
+
+R2 (at least 90% of posts-page blocks with a URN) failed on both staging captures (63% and 40%).
+Looked at live in the owner's Chrome on 2026-11-26 (structure and counts only): many posts link
+only to `/feed/update/urn:li:share:<id>/` or `urn:li:ugcPost:<id>`, which the reader sent as
+`urn: null`, and on the owner's own posts some ids appear only in the Boost link
+(`/campaignmanager/boost/…?content=urn:li:share:<id>`). The reader now sends all three kinds
+(activity still preferred), reads the Boost link's `content` parameter, and takes the post time
+from any of them (the id's high bits are the time for all three, checked live against the date
+labels). `SELECTORS_VERSION` is 3. The app's `POST_URN` (`src/lib/linkedin/deep-links.ts`) accepts
+the same kinds and builds `/feed/update/<urn>/` for each; older extensions are unaffected.
+
+Result on the same live pages: the owner's posts page 18 of 20 items with an id, a link and a time
+(was 12); a second test profile 13 of 20 (was 8). The 7 items still without one on that profile
+(image posts) carry no post link or id attribute anywhere in the page; the id is likely reachable
+only from the post's menu, which the reader may not open. R2 can therefore stay below 90% on such
+profiles: an owner decision (keep R2 as is, or measure it on the items that expose a link).
+Tested in `test/unit/urn.test.ts`, `test/unit/blocks.test.ts`, `e2e/capture.spec.ts`, and the app's
+`deep-links.test.ts` and `normalize.test.ts`.
+
 ## Contract decisions (to reconcile with the app)
 
 `protocol-v1/` is the app's directory, copied byte for byte. Where the plan left a shape open, the
@@ -249,8 +269,9 @@ extension follows the app's `src/lib/linkedin/protocol.ts`:
   sent only in the `profile` section (null in `experience` and `skills`).
 - The body sent is compact JSON in the builders' key order; the digest is over those exact bytes.
   Manifest `sha256` is lowercase hex; `Content-Digest` is `sha-256=:<base64>:`.
-- `urn` is sent only as a whole `urn:li:activity:<digits>`; `urnTime` only as an ISO time between
-  2003 and now. Otherwise null.
+- `urn` is sent only as a whole `urn:li:activity|share|ugcPost:<digits>` (deviation 23; the app
+  accepts the same three kinds and treats any other as absent); `urnTime` only as an ISO time
+  between 2003 and now. Otherwise null.
 - Lengths are clamped in Unicode code points, the unit the server counts (an emoji counts once);
   name ≤ 120 and headline ≤ 220 (the wire allows 300 and 500).
 - `pageSlug` is the raw slug from the tab's address, not normalized.

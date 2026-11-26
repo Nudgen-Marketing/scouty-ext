@@ -11,7 +11,7 @@
 
 import type { SectionName } from "../protocol";
 
-export const SELECTORS_VERSION = 2;
+export const SELECTORS_VERSION = 3;
 
 /** The page of each section, below /in/<slug>/. */
 export const sectionPaths: Record<SectionName, string> = {

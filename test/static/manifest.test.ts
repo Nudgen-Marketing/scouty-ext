@@ -15,12 +15,13 @@ const SHARED = {
   manifest_version: 3,
   default_locale: "en",
   name: "__MSG_extName__",
+  short_name: "__MSG_extShortName__",
   description: "__MSG_extDescription__",
   // The public page every store listing also names as homepage and support (app plan linkedin-extension-page.md).
-  homepage_url: "https://scouty.to/scouty-extension",
+  homepage_url: "https://scouty.to/scouty-b2b",
   permissions: ["scripting", "storage", "identity"],
   host_permissions: ["https://www.linkedin.com/in/*", "https://scouty.to/*"],
-  action: { default_title: "Scouty Extension", default_popup: "popup.html" },
+  action: { default_title: "__MSG_extTitle__", default_popup: "popup.html" },
   content_security_policy: { extension_pages: CSP },
   icons: { "16": "icons/16.png", "48": "icons/48.png", "128": "icons/128.png" },
   version,
@@ -69,8 +70,15 @@ describe("manifests", () => {
 
   it("the name and description come from the locale file", () => {
     const messages = JSON.parse(read("dist/chrome/_locales/en/messages.json")) as Record<string, { message: string }>;
-    expect(messages.extName!.message).toBe("Scouty Extension");
-    expect(messages.extDescription!.message).toBe("Captures the LinkedIn profile you choose, when you press Capture, and sends it to your Scouty workspace. Never acts on LinkedIn.");
+    expect(messages.extName!.message).toBe("Scouty B2B Prospector - Lead Research & Outreach Coach");
+    expect(messages.extName!.message.length).toBeLessThanOrEqual(75);
+    expect(messages.extShortName!.message).toBe("Scouty B2B");
+    expect(messages.extShortName!.message.length).toBeLessThanOrEqual(12);
+    expect(messages.extDescription!.message).toBe("Research the B2B leads you choose on social networks and get a step-by-step outreach plan in Scouty. Only reads; never acts for you.");
+    // The name and summary name no network: more than LinkedIn will follow.
+    expect(`${messages.extName!.message} ${messages.extShortName!.message} ${messages.extDescription!.message}`).not.toMatch(/linkedin/i);
+    // No message names a network either: they say "this site", the one the user is on.
+    for (const [key, { message }] of Object.entries(messages)) expect(message, key).not.toMatch(/linkedin/i);
     expect(messages.extDescription!.message.length).toBeLessThanOrEqual(132);
   });
 

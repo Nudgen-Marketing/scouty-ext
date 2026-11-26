@@ -2,7 +2,7 @@
   "name": "scouty-ext",
   "version": "0.1.0",
   "private": true,
-  "description": "Scouty Extension: a read-only browser extension that sends the LinkedIn profile you choose to your Scouty workspace.",
+  "description": "Scouty B2B Prospector - Lead Research & Outreach Coach: a read-only browser extension that sends the profile you choose to your Scouty workspace.",
   "license": "UNLICENSED",
   "type": "module",
   "engines": {
