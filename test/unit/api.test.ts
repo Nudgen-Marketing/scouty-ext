@@ -73,6 +73,25 @@ describe("api client", () => {
     expect(new Set(creates.map((r) => r.headers["idempotency-key"]))).toEqual(new Set(["idem-stable"]));
   });
 
+  it("putSection with maxAttempts 1 sends once and throws at once; the default retries up to RETRY.maxAttempts", async () => {
+    const ref = await created();
+    w.stub.fail(/PUT .*\/sections\/posts$/, "503", 99);
+    await expect(w.api.putSection(ref, upload(), { maxAttempts: 1 })).rejects.toMatchObject({ status: 503 });
+    expect(w.stub.state.requests.filter((r) => r.method === "PUT")).toHaveLength(1);
+    expect(w.sleeps).toEqual([]);
+    w.stub.clearFaults();
+    w.stub.fail(/PUT .*\/sections\/posts$/, "drop", 1);
+    await expect(w.api.putSection(ref, upload(), { maxAttempts: 1 })).rejects.toBeInstanceOf(NetworkError);
+    expect(w.sleeps).toEqual([]);
+    w.stub.clearFaults();
+    w.stub.state.requests.length = 0;
+    w.stub.fail(/PUT .*\/sections\/posts$/, "503", 2);
+    const retried: number[] = [];
+    await expect(w.api.putSection(ref, upload(), { onRetry: (n) => retried.push(n) })).resolves.toBeNull();
+    expect(w.stub.state.requests.filter((r) => r.method === "PUT")).toHaveLength(3);
+    expect(retried).toEqual([1, 2]);
+  });
+
   it("backs off with full jitter, doubling from 1 s and capped at 30 s", () => {
     expect([1, 2, 3, 4, 5, 6, 7].map((n) => backoffMs(n, () => 1))).toEqual([1000, 2000, 4000, 8000, 16000, 30000, 30000]);
     expect(backoffMs(3, () => 0)).toBe(0);
@@ -141,7 +160,7 @@ describe("api client", () => {
 
   it("the outdated answer carries the minimum version and the store link", async () => {
     w.stub.state.minVersion = "9.0.0";
-    await expect(w.api.session()).rejects.toMatchObject({ status: 426, body: { minVersion: "9.0.0", storeUrl: "https://example.invalid/store" } });
+    await expect(w.api.session()).rejects.toMatchObject({ status: 426, body: { minVersion: "9.0.0", storeUrl: "https://chromewebstore.google.com/detail/synthetic-store-entry" } });
   });
 
   it("on a 401, refreshes once and retries once", async () => {

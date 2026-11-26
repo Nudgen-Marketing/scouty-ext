@@ -32,6 +32,20 @@ export const domIsVisible: IsVisible = (el) => {
   return el.getClientRects().length > 0;
 };
 
+/** Where an element is against the viewport: "near" (in it, or within one viewport height above or below), "ahead" (further down) or "behind" (further up). */
+export type Reach = (el: Element) => "near" | "ahead" | "behind";
+
+/** Client rects against the window height. Used in the browser; tests inject a stub (jsdom has no layout). */
+export const domReach: Reach = (el) => {
+  const view = el.ownerDocument.defaultView;
+  const height = view?.innerHeight ?? 0;
+  if (!view || height <= 0) return "near";
+  const rect = el.getBoundingClientRect();
+  if (rect.bottom < -height) return "behind";
+  if (rect.top > 2 * height) return "ahead";
+  return "near";
+};
+
 function skipped(el: Element, options: VisibleTextOptions): boolean {
   if (SKIP_TAGS.has(el.tagName.toUpperCase())) return true;
   if (el.hasAttribute("hidden")) return true;

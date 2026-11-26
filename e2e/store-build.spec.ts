@@ -31,7 +31,7 @@ for (const target of ["chrome", "edge"] as const) {
         sessionStorage: typeof chrome.storage.session?.get,
       }));
       expect(facts.name).toBe("Scouty B2B Prospector - Lead Research & Outreach Coach");
-      expect(facts.permissions).toEqual(["identity", "scripting", "storage"]);
+      expect(facts.permissions).toEqual(["alarms", "identity", "scripting", "storage"]);
       // Chromium grants host permissions per host: it drops the /in/ path of the manifest pattern.
       // The extension therefore never relies on the permission to stay on /in/ pages; the background
       // and the reader both check the address themselves (see docs/BROWSER-FACTS.md).

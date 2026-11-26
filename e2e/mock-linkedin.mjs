@@ -40,6 +40,8 @@ export const SLUGS = {
   // LinkedIn answers with another slug.
   "redirect-person": { redirect: "renamed-person" },
   "renamed-person": {},
+  // Between two sections LinkedIn sends the tab to a security check (a 302 to its checkpoint address).
+  "checkpoint-redirect-person": { sectionRedirect: { "details/experience/": "/checkpoint/challenge/AgHsyntheticChallenge/" } },
   // More posts than the cap, loaded as the page scrolls.
   "many-posts-person": { body: { "recent-activity/all/": 'data-lazy-total="14" data-lazy-step="3"' } },
   // A long list, slow enough for the user to press Stop.
@@ -70,11 +72,13 @@ export function createMockLinkedin() {
       if (req.method !== "GET") return send(405, "text/plain", "The mock accepts GET only.");
       if (url.pathname === "/static/behaviour.js") return send(200, "text/javascript", await readFile(path.join(here, "mock-assets", "behaviour.js")));
       if (url.pathname === "/favicon.ico") return send(204, "image/x-icon", "");
+      if (url.pathname.startsWith("/checkpoint/")) return send(200, "text/html", await fixture("checkpoint"));
       const match = /^\/in\/([^/]+)\/(.*)$/.exec(url.pathname);
       if (!match) return send(200, "text/html", await fixture("unrelated"));
       const [, slug, rest] = match;
       const config = SLUGS[slug];
       if (!config || !(rest in SECTIONS)) return send(404, "text/html", page(await fixture("not-found"), slug, ""));
+      if (config.sectionRedirect?.[rest]) return send(302, "text/plain", "", { Location: config.sectionRedirect[rest] });
       if (config.redirect) return send(302, "text/plain", "", { Location: `/in/${config.redirect}/${rest}` });
       const name = config.all ?? config.pages?.[rest] ?? SECTIONS[rest];
       return send(200, "text/html; charset=utf-8", page(await fixture(name), slug, config.body?.[rest] ?? "", config.pages?.[rest] ? SCREENS[rest] : null));

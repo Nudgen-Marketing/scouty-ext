@@ -46,6 +46,8 @@ export const HARD_LIMITS = {
   labelChars: 80,
   nameChars: 120,
   headlineChars: 220,
+  /** Longest a capture's read data is kept and retried on this browser (PRIVACY.md: "for up to 20 minutes"). */
+  outboxWindowMs: 20 * 60_000,
 } as const;
 
 export const PACING = {
@@ -54,6 +56,10 @@ export const PACING = {
   idleSteps: 3,
   /** Extra pauses after a scroll step while LinkedIn's loader is showing, before the step counts as idle. */
   loaderWaits: 3,
+  /** "… more" presses: a jittered gap between two presses, and at most this many per scroll step (deviation 25). */
+  minClickGapMs: 300,
+  maxClickGapMs: 900,
+  maxClicksPerStep: 3,
   activity: { maxSteps: 40, budgetMs: 90_000 },
   profile: { maxSteps: 15, budgetMs: 45_000 },
 } as const;

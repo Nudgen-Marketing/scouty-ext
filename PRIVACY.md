@@ -5,14 +5,15 @@ network, it reads that
 person's profile and their recent posts, comments and reactions from the tab in front of you, and
 sends that content to your Scouty workspace so Scouty can suggest how to approach them.
 
-It only reads. It loads only the chosen person's six profile pages in your tab (the profile, its
-experience and skills detail pages, and the posts, comments and reactions activity pages), as you
-would by clicking, and makes no other request to the network; it never posts, clicks a button that
-changes anything (it never follows, likes, comments, connects or messages), or sends anything to
-the network. To read longer posts and lists it presses only inline "see more" and "show more results"
-controls, which the network's own page answers as it would for you. It does not read your
-password, cookies, messages, contacts or feed, and it does nothing until you press Capture. It reads one person at a
-time and has no background activity.
+It reads only the pages of the person you capture: that person's six profile pages in your tab (the
+profile, its experience and skills detail pages, and the posts, comments and reactions activity
+pages), loaded as you would by clicking, and it makes no other request to the network. To read
+longer posts and lists in full it presses only inline "see more" and "show more results" controls,
+which the network's own page answers as it would for you. It never posts, likes, comments, follows,
+connects or messages, and sends nothing to the network. It does not read your password, cookies,
+messages, contacts or feed, and it does nothing until you press Capture. It reads one person at a
+time. The only background work it does is finishing sending a capture you started (see "When"
+below).
 
 To send captures to your workspace it signs you in to Scouty through your browser. This is the
 one piece of authentication information it handles: a Scouty access token (and the refresh token
@@ -55,7 +56,7 @@ this extension at your own risk.
 | Where it is sent | Only to the Scouty app (`https://scouty.to`). The extension has no other network destination and sends no analytics. |
 | What is stored in the browser | Your Scouty connection, which is authentication information: a short-lived Scouty access token in memory and a refresh token in the extension's local storage, both in the browser's extension storage only and sent only to Scouty. Also the fact that you accepted the first-run notice. Captured content is held in memory only while it is being sent. |
 | Data types declared to the stores | Website content and personally identifying information (the captured person's profile and activity), and authentication information (the Scouty access token and refresh token above). Chrome Web Store data usage: "Personally identifiable information", "Website content" and "Authentication information". Firefox `data_collection_permissions`: `websiteContent`, `personallyIdentifyingInfo` and `authenticationInfo`. |
-| Permissions | `scripting` to read the page you chose; `storage` for the items above; `identity` to sign you in to Scouty; access to `linkedin.com/in/*` (the only pages read) and to the Scouty origin (the only place data is sent). |
+| Permissions | `scripting` to read the page you chose; `storage` for the items above; `identity` to sign you in to Scouty; `alarms` to try sending a capture you started again after a failure, even when the browser has paused the extension's background; access to the supported network's profile pages (`/in/*`, the only pages read; the manifest's host permission names the site) and to the Scouty origin (the only place data is sent). |
 | Remote code | None. Everything the extension runs is in the package. |
 
 This text needs legal sign-off before the extension is listed in a store (see RELEASE.md).

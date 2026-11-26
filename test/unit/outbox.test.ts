@@ -106,10 +106,67 @@ describe("outbox", () => {
     await outbox.addSection(samplePayload("profile"), "complete", null);
     await outbox.purgeOnStartup();
     expect(fake.session.data.size).toBe(0);
-    await outbox.begin(created({ expiresAt: new Date(1000).toISOString() }));
+    await outbox.begin(created({ expiresAt: new Date(1000).toISOString(), serverTime: new Date(0).toISOString() }), 0);
     expect(await outbox.purgeIfExpired(500)).toBe(false);
     expect(await outbox.purgeIfExpired(1000)).toBe(true);
     expect(await outbox.load()).toBeNull();
+  });
+});
+
+describe("capture expiry on this browser's clock (from Scouty's expiresAt - serverTime)", () => {
+  const MIN = 60_000;
+  const server = Date.UTC(2026, 10, 26, 12, 0, 0);
+  const answer = { expiresAt: new Date(server + 20 * MIN).toISOString(), serverTime: new Date(server).toISOString() };
+
+  it.each([["30 minutes behind", -30 * MIN], ["30 minutes ahead", 30 * MIN], ["right", 0]])("a browser clock %s still gets the full 20 minutes", async (_label, skew) => {
+    const local = server + skew;
+    expect(outbox.localExpiresAt(answer, local)).toBe(local + 20 * MIN);
+    const box = (await outbox.begin(created(answer), local))!;
+    expect(box.expiresAt).toBe(local + 20 * MIN);
+    expect(await outbox.purgeIfExpired(local + 20 * MIN - 1)).toBe(false);
+    expect(await outbox.purgeIfExpired(local + 20 * MIN)).toBe(true);
+  });
+
+  it("a longer window from the server is cut to 20 minutes (the privacy promise is kept on this browser)", async () => {
+    const long = { expiresAt: new Date(server + 6 * 60 * MIN).toISOString(), serverTime: new Date(server).toISOString() };
+    expect(outbox.localExpiresAt(long, server)).toBe(server + 20 * MIN);
+    const box = (await outbox.begin(created(long), server))!;
+    expect(await outbox.purgeIfExpired(server + 20 * MIN)).toBe(true);
+    expect(box.expiresAt).toBe(server + 20 * MIN);
+  });
+
+  it.each([
+    ["an unreadable expiresAt", { ...answer, expiresAt: "soon" }],
+    ["an unreadable serverTime", { ...answer, serverTime: "" }],
+    ["a missing serverTime", { ...answer, serverTime: undefined as unknown as string }],
+  ])("%s: nothing is kept (null)", async (_label, times) => {
+    expect(outbox.localExpiresAt(times, server)).toBeNull();
+    expect(await outbox.begin(created(times), server)).toBeNull();
+    expect(await outbox.load()).toBeNull();
+  });
+
+  it.each([["behind", -30 * 60_000], ["ahead", 30 * 60_000]])("with the controller: Scouty's clock 30 minutes %s of the browser's does not end the capture early or late", async (_label, skew) => {
+    const holder: { clock?: { now: number } } = {};
+    const r = await rig({ now: () => (holder.clock?.now ?? Date.UTC(2026, 10, 23, 9, 0, 0)) - skew });
+    holder.clock = r.clock;
+    const startedAt = r.clock.now;
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    expect(await r.phase()).toBe("running");
+    expect((await outbox.load())!.expiresAt).toBe(startedAt + 20 * MIN);
+    r.clock.now = startedAt + 20 * MIN - 1;
+    expect(await r.phase()).toBe("running");
+    r.clock.now = startedAt + 20 * MIN;
+    expect(await r.controller.current()).toEqual({ phase: "idle", notice: { kind: "expired" } });
+  });
+
+  it("with the controller: a create answer whose times cannot be read ends as 'couldn't receive', nothing kept", async () => {
+    const r = await rig();
+    const create = r.api.createCapture;
+    r.api.createCapture = async (...args) => ({ ...(await create(...args)), serverTime: "not a time" });
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    expect(await r.controller.current()).toEqual({ phase: "idle", notice: { kind: "failed" } });
+    expect(await outbox.load()).toBeNull();
+    expect(r.injected).toEqual([]);
   });
 });
 
@@ -119,16 +176,21 @@ describe("outbox with the controller", () => {
     await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
     const seenAtUpload: boolean[] = [];
     const original = r.stub.handle.bind(r.stub);
+    const pendingNow = (): string[] => outbox.pending(fake.session.data.get("outbox") as outbox.Outbox).map((e) => e.section);
     r.stub.handle = (request) => {
-      if (request.method === "PUT") seenAtUpload.push(fake.session.data.has("outbox.body.profile") && outbox.pending(fake.session.data.get("outbox") as outbox.Outbox).length === 1);
+      if (request.method === "PUT" && request.url.endsWith("/sections/profile")) seenAtUpload.push(fake.session.data.has("outbox.body.profile") && pendingNow().includes("profile"));
       return original(request);
     };
     r.stub.fail(/PUT .*sections\/profile/, "503", 1);
     await r.read();
-    expect(seenAtUpload).toEqual([true, true]); // present and pending at the failed attempt and at the retry
-    const box = (await outbox.load())!;
-    expect(outbox.pending(box)).toEqual([]);
-    expect(box.sections[0]).toMatchObject({ section: "profile", acked: true });
+    // One attempt during reading (DEVIATIONS 27): present and pending then; it failed, so it stays pending.
+    expect(seenAtUpload).toEqual([true]);
+    expect(pendingNow()).toEqual(["profile"]);
+    // Finalize sends it from the outbox, still pending at that PUT; the outbox is cleared only after it is acknowledged and finalized.
+    await r.readAll();
+    expect(seenAtUpload).toEqual([true, true]);
+    expect(await r.phase()).toBe("done");
+    expect(await outbox.load()).toBeNull();
   });
 
   it("resumes after a network drop: status fetched, only the missing sections re-sent, finalize sent, LinkedIn not re-read", async () => {
@@ -330,7 +392,7 @@ describe("outbox with the controller", () => {
     await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
     r.stub.state.minVersion = "9.9.9";
     await r.read();
-    expect(await r.controller.current()).toEqual({ phase: "idle", notice: { kind: "outdated", storeUrl: "https://example.invalid/store" } });
+    expect(await r.controller.current()).toEqual({ phase: "idle", notice: { kind: "outdated", storeUrl: "https://chromewebstore.google.com/detail/synthetic-store-entry" } });
     expect([...fake.session.data.keys()].filter((k) => k.startsWith("outbox"))).toEqual([]);
     // expiry
     unwire(); fake.session.data.clear(); fake.local.data.clear();

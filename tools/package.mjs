@@ -2,6 +2,10 @@
 //   release/scouty-ext-<version>-{chrome,edge,firefox}.zip   the contents of dist/<target>/
 //   release/scouty-ext-<version>-source.zip                  the tracked source tree
 // Always starts from a fresh store build, so a development or e2e build can never be packaged.
+// In a git checkout it refuses a working tree with changes (`git status --porcelain` not empty): the
+// source archive is `git ls-files` (the tracked files as they are on disk) while the store zips are
+// built from the whole working tree, so a change or an untracked file could reach one and not the
+// other. `--allow-dirty` packages anyway (a local try; never for a release).
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
@@ -38,6 +42,14 @@ async function sourceFiles() {
 }
 
 const zipOf = async (dir, files) => createZip(await Promise.all(files.map(async (name) => ({ name, data: await readFile(path.join(dir, name)) }))));
+
+if (existsSync(path.join(root, ".git")) && !process.argv.includes("--allow-dirty")) {
+  const changes = execFileSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" }).trimEnd();
+  if (changes) {
+    console.error(`The working tree has changes; commit or stash them first (or pass --allow-dirty for a local try):\n${changes}`);
+    process.exit(1);
+  }
+}
 
 execFileSync(process.execPath, [path.join(root, "build.mjs"), "--quiet"], { cwd: root, stdio: "inherit" });
 const { version } = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));

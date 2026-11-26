@@ -1,5 +1,6 @@
 import * as auth from "../../src/background/auth";
 import { CaptureController, type CaptureState, type TabInfo } from "../../src/background/session";
+import { clearWake, wakeAt } from "../../src/background/wake";
 import type { ReaderResult } from "../../src/messages";
 import type { SectionName } from "../../src/protocol";
 import { fake } from "./fake-ext";
@@ -10,7 +11,7 @@ export const PROFILE_URL = "https://www.linkedin.com/in/synthetic-person-one/";
 
 export type Rig = Wired & {
   controller: CaptureController;
-  tab: { info: TabInfo | null; updates: string[] };
+  tab: { info: TabInfo | null; updates: string[]; staleFor?: number; pending?: { url: string; reads: number }; hang?: boolean };
   injected: string[];
   /** Whether a reader is still at work in the tab's document (the readerAlive probe). */
   reader: { alive: boolean; probes: number };
@@ -41,8 +42,22 @@ export async function rig(options: Record<string, unknown> = {}): Promise<Rig> {
   const make = (): CaptureController => new CaptureController({
     api: wired.api,
     tabs: {
-      get: async () => (tab.info ? { ...tab.info } : null),
-      update: async (_tabId, url) => { tab.updates.push(url); if (tab.info) tab.info = { url, status: "complete" }; },
+      get: async () => {
+        if (tab.pending && tab.info) {
+          if (tab.pending.reads > 0) { tab.pending.reads -= 1; return { ...tab.info }; }
+          tab.info = { url: tab.pending.url, status: "complete" }; tab.pending = undefined;
+        }
+        return tab.info ? { ...tab.info } : null;
+      },
+      update: async (_tabId, url) => {
+        tab.updates.push(url);
+        if (!tab.info) return;
+        // `staleFor`: the browser keeps reporting the previous page as complete for that many reads.
+        if (tab.staleFor) { tab.pending = { url, reads: tab.staleFor }; tab.staleFor = 0; return; }
+        // `hang`: the page never finishes loading (a very slow network).
+        if (tab.hang) { tab.info = { url, status: "loading" }; return; }
+        tab.info = { url, status: "complete" };
+      },
     },
     inject: async (_tabId, file) => { injected.push(file); return true; },
     readerAlive: async () => { reader.probes += 1; return reader.alive; },
@@ -51,7 +66,9 @@ export async function rig(options: Record<string, unknown> = {}): Promise<Rig> {
       set: (key, value) => fake.session.set({ [key]: value }),
       remove: (key) => fake.session.remove(key),
     },
-    sleep: (ms) => new Promise<void>((resolve) => { timers.push({ ms, fire: resolve }); }),
+    // The page-load poll (250 ms) runs on its own; every other wait is fired by the test.
+    sleep: (ms) => new Promise<void>((resolve) => { if (ms === 250) { wired.clock.now += 250; setTimeout(resolve, 0); } else timers.push({ ms, fire: resolve }); }),
+    wake: { at: wakeAt, clear: clearWake },
     now: () => wired.clock.now,
     uuid: () => `uuid-0000-${(n += 1)}`,
     changed: (state) => { states.push(state); },

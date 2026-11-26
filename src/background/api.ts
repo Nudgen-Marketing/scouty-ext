@@ -111,6 +111,8 @@ type Call = {
   deadline?: number;
   /** False for calls that must never be repeated (token refresh). */
   retry?: boolean;
+  /** At most this many attempts (default RETRY.maxAttempts). 1 sends once and leaves the retry to the caller. */
+  maxAttempts?: number;
   onRetry?: (attempt: number) => void;
 };
 
@@ -173,7 +175,7 @@ async function call<T>(c: Call): Promise<T> {
         failure = new NetworkError(error instanceof Error ? error.message : "network error");
       }
     }
-    if (c.retry === false || attempt >= RETRY.maxAttempts) throw failure;
+    if (c.retry === false || attempt >= Math.min(c.maxAttempts ?? RETRY.maxAttempts, RETRY.maxAttempts)) throw failure;
     const hinted = failure instanceof ApiError ? failure.retryAfterMs : null;
     const delay = hinted ?? backoffMs(attempt, deps.random);
     // A wait longer than the backoff cap is not a retry, it is an answer (for example a daily limit).
@@ -210,6 +212,8 @@ const encoder = new TextEncoder();
 
 export type CaptureRef = { captureId: string; uploadToken: string; expiresAt: number };
 export type SectionUpload = { section: SectionName; body: string; digestBase64: string };
+/** How hard one section PUT tries. The upload during reading sends once (maxAttempts 1); finalize uses the full policy. */
+export type UploadOptions = { onRetry?: (attempt: number) => void; maxAttempts?: number };
 
 export function createApi(tokens: TokenSource) {
   return {
@@ -222,11 +226,12 @@ export function createApi(tokens: TokenSource) {
       }),
 
     /** One PUT per section. The digest is over the exact bytes sent. */
-    putSection: (capture: CaptureRef, upload: SectionUpload, onRetry?: (attempt: number) => void): Promise<null> =>
+    putSection: (capture: CaptureRef, upload: SectionUpload, options: UploadOptions = {}): Promise<null> =>
       call({
         method: "PUT", path: `/api/linkedin/ext/captures/${capture.captureId}/sections/${upload.section}`, tokens,
         headers: { ...JSON_TYPE, "X-Capture-Token": capture.uploadToken, "Content-Digest": `sha-256=:${upload.digestBase64}:` },
-        body: encoder.encode(upload.body), deadline: capture.expiresAt, onRetry,
+        body: encoder.encode(upload.body), deadline: capture.expiresAt,
+        onRetry: options.onRetry, maxAttempts: options.maxAttempts,
       }),
 
     finalize: (capture: CaptureRef, manifest: Manifest, idempotencyKey: string, onRetry?: (attempt: number) => void): Promise<FinalizeResponse> =>

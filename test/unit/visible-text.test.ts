@@ -1,6 +1,6 @@
 import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
-import { tidy, visibleText } from "../../src/reader/visible-text";
+import { domReach, tidy, visibleText } from "../../src/reader/visible-text";
 
 const dom = (html: string): Element => new JSDOM(`<main>${html}</main>`).window.document.querySelector("main")!;
 const opts = { isVisible: (el: Element) => !el.hasAttribute("data-test-invisible"), skip: [".skipme"], duplicates: [".visually-hidden"] };
@@ -30,5 +30,22 @@ describe("visibleText", () => {
 
   it("tidy drops empty lines", () => {
     expect(tidy("a\n\n\n\nb  \n   c\n\n")).toBe("a\nb\nc");
+  });
+});
+
+describe("domReach", () => {
+  it("is near within one viewport height of the viewport, ahead below that, behind above it", () => {
+    const win = new JSDOM("<main><button>x</button></main>").window;
+    Object.defineProperty(win, "innerHeight", { value: 800, configurable: true });
+    const el = win.document.querySelector("button")!;
+    const at = (top: number): string => {
+      el.getBoundingClientRect = () => ({ top, bottom: top + 20, left: 0, right: 10, width: 10, height: 20, x: 0, y: top, toJSON: () => ({}) });
+      return domReach(el);
+    };
+    expect(at(100)).toBe("near");
+    expect(at(1500)).toBe("near");
+    expect(at(-700)).toBe("near");
+    expect(at(1700)).toBe("ahead");
+    expect(at(-900)).toBe("behind");
   });
 });

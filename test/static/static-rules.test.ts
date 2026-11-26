@@ -86,7 +86,7 @@ describe("source rules (src/)", () => {
   });
 
   it("the extension API namespace is read only in ext.ts", () => {
-    const hits = SRC.filter((f) => /\b(chrome|browser)\.(runtime|tabs|storage|scripting|identity|permissions|i18n)\b/.test(code(f)));
+    const hits = SRC.filter((f) => /\b(chrome|browser)\.(runtime|tabs|storage|scripting|identity|permissions|i18n|alarms)\b/.test(code(f)));
     expect(hits).toEqual([]);
     expect(code("src/ext.ts")).toMatch(/scope\.browser \?\? scope\.chrome/);
   });

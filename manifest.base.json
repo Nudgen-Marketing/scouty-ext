@@ -5,7 +5,7 @@
   "short_name": "__MSG_extShortName__",
   "description": "__MSG_extDescription__",
   "homepage_url": "https://scouty.to/scouty-b2b",
-  "permissions": ["scripting", "storage", "identity"],
+  "permissions": ["scripting", "storage", "identity", "alarms"],
   "host_permissions": ["<LINKEDIN_PATTERN>", "<API_PATTERN>"],
   "action": { "default_title": "__MSG_extTitle__", "default_popup": "popup.html" },
   "content_security_policy": {

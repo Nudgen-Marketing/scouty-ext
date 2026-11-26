@@ -1,15 +1,47 @@
 import { describe, expect, it } from "vitest";
-import { activityListEmpty, dateLabel, degradedBlock, expandWithin, findBlocks, isLoading, kindHint, readBlocks, textContainersOf } from "../../src/reader/blocks";
+import { activityListEmpty, blockOrder, dateLabel, degradedBlock, expandWithin, findBlocks, isLoading, kindHint, readBlocks, textContainersOf } from "../../src/reader/blocks";
 import { CUT_MARKER } from "../../src/reader/clamp";
 import { permalinkFor } from "../../src/reader/urn";
-import { context, load, PATHS } from "../helpers/fixture";
+import { context, load, PATHS, pressAll } from "../helpers/fixture";
 
 function read(name: string, path: string, options: { expand?: boolean; clicksEnabled?: boolean } = {}) {
   const page = load(name, path);
   const ctx = context(page.doc, { clicksEnabled: options.clicksEnabled });
-  if (options.expand !== false) expandWithin(findBlocks(page.doc).flatMap((b) => textContainersOf(b)), ctx);
+  if (options.expand !== false) pressAll(() => expandWithin(findBlocks(page.doc).flatMap((b) => textContainersOf(b)), ctx));
   return { page, ctx, blocks: readBlocks(ctx) };
 }
+
+describe("expandWithin: one press at a time, near the viewport only", () => {
+  const item = (n: number, where: string): string =>
+    `<div role="listitem" data-where="${where}"><div><span data-testid="expandable-text-box">Post ${n}<span data-rest hidden> TAIL-${n}</span><button type="button" aria-hidden="true" data-testid="expandable-text-button">… more</button></span></div></div>`;
+
+  it("presses only the first visible control near the viewport, and counts those near or ahead as still to press", () => {
+    const page = load("sdui-activity-posts", PATHS.posts);
+    const list = page.doc.querySelector("[role='list']")!;
+    list.innerHTML = [item(1, "behind"), item(2, "near"), item(3, "near"), item(4, "ahead"), item(5, "ahead")].join("");
+    const ctx = { ...context(page.doc), reach: (el: Element) => el.closest("[data-where]")!.getAttribute("data-where") as "near" | "ahead" | "behind" };
+    const boxes = (): Element[] => findBlocks(page.doc).flatMap((b) => textContainersOf(b));
+    // One press per call: item 2, then item 3; the one scrolled past is never pressed; those ahead wait.
+    expect(expandWithin(boxes(), ctx)).toEqual({ clicked: true, pending: 3 });
+    expect(page.clicks).toHaveLength(1);
+    expect(expandWithin(boxes(), ctx)).toEqual({ clicked: true, pending: 2 });
+    expect(expandWithin(boxes(), ctx)).toEqual({ clicked: false, pending: 2 });
+    expect(page.clicks).toHaveLength(2);
+    // After a scroll step the ones ahead come near and are pressed in turn.
+    for (const el of page.doc.querySelectorAll("[data-where='ahead']")) el.setAttribute("data-where", "near");
+    expect(pressAll(() => expandWithin(boxes(), ctx))).toBe(2);
+    const text = readBlocks(ctx).map((b) => b.text).join("\n");
+    expect(text).toMatch(/TAIL-2[\s\S]*TAIL-3[\s\S]*TAIL-4[\s\S]*TAIL-5/);
+    expect(text).not.toContain("TAIL-1");
+  });
+
+  it("an invisible control is neither pressed nor counted", () => {
+    const page = load("sdui-activity-posts", PATHS.posts);
+    page.doc.querySelector("[data-testid='expandable-text-button']")!.setAttribute("data-test-invisible", "");
+    expect(expandWithin(findBlocks(page.doc).flatMap((b) => textContainersOf(b)), context(page.doc))).toEqual({ clicked: false, pending: 0 });
+    expect(page.clicks).toHaveLength(0);
+  });
+});
 
 describe("blocks (SDUI activity pages)", () => {
   it("a block is a listitem of the LazyColumn list inside main#workspace", () => {
@@ -69,6 +101,114 @@ describe("blocks (SDUI activity pages)", () => {
     expect(block.text.endsWith("THE-LEAD-COMMENT: an invented reply that must survive clamping.")).toBe(true);
     // The URN on this page names the post that was answered (the comment link's query is ignored).
     expect(block.urn).toBe("urn:li:activity:7127722905600000000");
+  });
+
+  it("two different comments by the lead on one post are both kept, in that post's block; the same item read twice is kept once", () => {
+    const page = load("sdui-activity-comments", PATHS.comments);
+    const first = findBlocks(page.doc)[0]!;
+    const second = first.cloneNode(true) as Element;
+    const lead = [...second.querySelectorAll("*")].find((el) => el.children.length === 0 && el.textContent?.includes("THE-LEAD-COMMENT"))!;
+    lead.textContent = "ANOTHER-LEAD-COMMENT on the same post.";
+    const repeat = first.cloneNode(true) as Element;
+    first.after(second, repeat);
+    expect(findBlocks(page.doc)).toHaveLength(4);
+    const blocks = readBlocks(context(page.doc));
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0]!.urn).toBe("urn:li:activity:7127722905600000000");
+    expect(blocks[0]!.text).toContain("THE-LEAD-COMMENT");
+    expect(blocks[0]!.text).toContain("ANOTHER-LEAD-COMMENT on the same post.");
+    expect(blocks[0]!.text.match(/THE-LEAD-COMMENT/g)).toHaveLength(1);
+    // The cap counts distinct posts: the three items on one post are one place.
+    expect(blockOrder(page.doc).map(({ place }) => place)).toEqual([0, 0, 0, 1]);
+  });
+
+  it("two comments of the lead on a 3,000-character post: both kept, the post once", () => {
+    const page = load("sdui-activity-comments", PATHS.comments);
+    page.doc.querySelector("[data-parent-post] span")!.textContent = "PARENT-START " + "x".repeat(2987);
+    const first = findBlocks(page.doc)[0]!;
+    const second = first.cloneNode(true) as Element;
+    [...second.querySelectorAll("*")].find((el) => el.children.length === 0 && el.textContent?.includes("THE-LEAD-COMMENT"))!.textContent = "ANOTHER-LEAD-COMMENT on the same post.";
+    first.after(second);
+    const block = readBlocks(context(page.doc))[0]!;
+    expect(block.text.length).toBeLessThanOrEqual(4000);
+    expect(block.text).toContain("THE-LEAD-COMMENT");
+    expect(block.text.endsWith("ANOTHER-LEAD-COMMENT on the same post.")).toBe(true);
+    expect(block.text.match(/PARENT-START/g)).toHaveLength(1);
+    expect(block.truncated).toBe(false); // the post once and both comments fit in 4,000
+  });
+
+  it("one item keeps all its lines: a short comment or a date label that also occurs in the post stays", () => {
+    const page = load("sdui-activity-comments", PATHS.comments);
+    page.doc.querySelector("[data-parent-post] span")!.textContent = "Our 1mo pilot is done. Congratulations to the whole team!";
+    [...findBlocks(page.doc)[0]!.querySelectorAll("*")].find((el) => el.children.length === 0 && el.textContent?.includes("THE-LEAD-COMMENT"))!.textContent = "Congratulations";
+    const block = readBlocks(context(page.doc))[0]!;
+    expect(block.text).toBe("Synthetic Person One commented on this\n1mo\nOur 1mo pilot is done. Congratulations to the whole team!\nCongratulations");
+  });
+
+  it("a cut read and a full read of the same item keep the full one; an equal comment twice is kept once", () => {
+    const page = load("sdui-activity-comments", PATHS.comments);
+    const first = findBlocks(page.doc)[0]!;
+    const cut = first.cloneNode(true) as Element;
+    const post = cut.querySelector("[data-parent-post] span")!;
+    post.textContent = `${post.textContent!.slice(0, 20)}…`;
+    first.before(cut);
+    const block = readBlocks(context(page.doc))[0]!;
+    expect(block.text).toBe(readBlocks(context(load("sdui-activity-comments", PATHS.comments).doc))[0]!.text);
+    expect(block.text.match(/THE-LEAD-COMMENT/g)).toHaveLength(1);
+  });
+
+  it("a later item with its post still collapsed keeps its own comment, even one the post starts with", () => {
+    const page = load("sdui-activity-comments", PATHS.comments);
+    page.doc.querySelector("[data-parent-post] span")!.textContent = "Congratulations to the whole team on the launch of our new placeholder product.";
+    const leadOf = (el: Element) => [...el.querySelectorAll("*")].find((node) => node.children.length === 0 && node.textContent?.includes("THE-LEAD-COMMENT"))!;
+    const first = findBlocks(page.doc)[0]!;
+    const second = first.cloneNode(true) as Element;
+    leadOf(first).textContent = "Well deserved";
+    leadOf(second).textContent = "Congratulations";
+    second.querySelector("[data-parent-post] span")!.textContent = "Congratulations to the whole team…";
+    first.after(second);
+    const block = readBlocks(context(page.doc))[0]!;
+    expect(block.text.endsWith("Congratulations to the whole team on the launch of our new placeholder product.\nWell deserved\nCongratulations")).toBe(true);
+    expect(block.text.match(/Congratulations to the whole team/g)).toHaveLength(1);
+  });
+
+  it("a later comment that an earlier one starts with is kept; a cut read never wins over a full one", () => {
+    const page = load("sdui-activity-comments", PATHS.comments);
+    const leadOf = (el: Element) => [...el.querySelectorAll("*")].find((node) => node.children.length === 0 && node.textContent?.includes("THE-LEAD-COMMENT"))!;
+    const first = findBlocks(page.doc)[0]!;
+    const fullPost = first.querySelector("[data-parent-post] span")!.textContent!;
+    const second = first.cloneNode(true) as Element;
+    leadOf(first).textContent = "Great post, see you there";
+    leadOf(second).textContent = "Great post";
+    first.querySelector("[data-parent-post] span")!.textContent = `${fullPost.slice(0, 20)}…`;
+    first.after(second);
+    const block = readBlocks(context(page.doc))[0]!;
+    expect(block.text).toContain("Great post, see you there\nGreat post");
+    expect(block.text).toContain(fullPost);
+    expect(block.text).not.toContain(`${fullPost.slice(0, 20)}…`);
+  });
+
+  it("an empty post box in a later item does not move its comment into the post's place", () => {
+    const page = load("sdui-activity-comments", PATHS.comments);
+    const leadOf = (el: Element) => [...el.querySelectorAll("*")].find((node) => node.children.length === 0 && node.textContent?.includes("THE-LEAD-COMMENT"))!;
+    const first = findBlocks(page.doc)[0]!;
+    first.querySelector("[data-parent-post] span")!.textContent = "Congratulations to the whole…";
+    const second = first.cloneNode(true) as Element;
+    leadOf(first).textContent = "Well deserved";
+    second.querySelector("[data-parent-post] span")!.textContent = "";
+    leadOf(second).textContent = "Congratulations to the whole team, you earned it";
+    first.after(second);
+    const block = readBlocks(context(page.doc))[0]!;
+    expect(block.text).toContain("Congratulations to the whole…\nWell deserved\nCongratulations to the whole team, you earned it");
+    expect(block.truncated).toBe(true);
+  });
+
+  it("two identical items without a post link are one block and one place against the cap", () => {
+    const page = load("sdui-activity-comments", PATHS.comments);
+    const noLink = findBlocks(page.doc)[1]!;
+    noLink.after(noLink.cloneNode(true));
+    expect(readBlocks(context(page.doc))).toHaveLength(2);
+    expect(new Set(blockOrder(page.doc).map(({ place }) => place)).size).toBe(2);
   });
 
   it("a comments item without a post link has no URN, and both its text boxes are read", () => {

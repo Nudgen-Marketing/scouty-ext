@@ -65,6 +65,19 @@ export const fake = {
   focusedWindows: [] as number[],
   lastFocusedWindow: 1,
   messages: {} as Record<string, string>,
+  reload: vi.fn(),
+  updateListeners: [] as (() => void)[],
+  /** Alarms set and not cleared, by name: when (ms). */
+  alarms: new Map<string, number>(),
+  alarmCalls: [] as { op: "create" | "clear"; name: string; when?: number }[],
+  alarmListeners: [] as ((alarm: { name: string; scheduledTime: number }) => void)[],
+  /** Fires an alarm as the browser would (it stays set until cleared or replaced only if periodic; one-shot alarms go). */
+  fireAlarm(name: string): void {
+    const when = fake.alarms.get(name);
+    if (when === undefined) throw new Error(`No alarm ${name}`);
+    fake.alarms.delete(name);
+    for (const listener of fake.alarmListeners) listener({ name, scheduledTime: when });
+  },
 };
 
 export function resetFakeExt(): void {
@@ -80,6 +93,11 @@ export function resetFakeExt(): void {
   fake.updatedTabs.length = 0;
   fake.focusedWindows.length = 0;
   fake.lastFocusedWindow = 1;
+  fake.alarms.clear();
+  fake.reload.mockReset();
+  fake.updateListeners.length = 0;
+  fake.alarmCalls.length = 0;
+  fake.alarmListeners.length = 0;
 }
 
 export function installFakeExt(target: "chrome" | "browser" = "chrome"): void {
@@ -100,6 +118,8 @@ export function installFakeExt(target: "chrome" | "browser" = "chrome"): void {
       onMessage: { addListener: vi.fn(), removeListener: vi.fn() },
       onStartup: { addListener: vi.fn() },
       onInstalled: { addListener: vi.fn() },
+      onUpdateAvailable: { addListener: (fn: () => void) => { fake.updateListeners.push(fn); } },
+      reload: () => fake.reload(),
     },
     tabs: {
       create: async (o: { url: string }) => { fake.createdTabs.push(o.url); return {}; },
@@ -126,6 +146,11 @@ export function installFakeExt(target: "chrome" | "browser" = "chrome"): void {
       },
       onRemoved: { addListener: vi.fn() },
       onUpdated: { addListener: vi.fn() },
+    },
+    alarms: {
+      create: async (name: string, info: { when: number }) => { fake.alarms.set(name, info.when); fake.alarmCalls.push({ op: "create", name, when: info.when }); },
+      clear: async (name: string) => { fake.alarmCalls.push({ op: "clear", name }); return fake.alarms.delete(name); },
+      onAlarm: { addListener: (fn: (alarm: { name: string; scheduledTime: number }) => void) => { fake.alarmListeners.push(fn); } },
     },
     windows: {
       update: async (windowId: number, props: { focused?: boolean }) => { if (props.focused) fake.focusedWindows.push(windowId); return {}; },

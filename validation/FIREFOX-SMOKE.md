@@ -2,7 +2,7 @@
 
 Firefox gets two checks for every release (release gate 8): an automated start-up check that CI
 runs on every push, and this manual walk-through, because Playwright cannot drive an extension in
-Firefox. About fifteen minutes.
+Firefox. About twenty minutes.
 
 ## Part A: automated start-up check
 
@@ -23,6 +23,12 @@ To run it by hand:
 
 Record: the CI run link (or the local output), Firefox version, commit.
 
+`npm run lint:firefox` (web-ext lint) must report 0 errors. Its known warnings are accepted
+(DEVIATIONS 15 and 27): two `UNSAFE_VAR_ASSIGNMENT` inside React's own code in `popup.js`, and
+`KEY_FIREFOX_ANDROID_UNSUPPORTED_BY_MIN_VERSION` (`data_collection_permissions` needs Firefox for
+Android 142). The add-on is desktop-only by plan, with no `gecko_android` key, so that warning is
+expected and Android support is not added for it.
+
 ## Part B: manual walk-through
 
 Use a Firefox profile with no other add-ons. Use only your own LinkedIn profile or one whose owner
@@ -32,14 +38,15 @@ agreed, referred to by its label (P1); record no name, URL, text or screenshot o
    `validation/VALIDATION.md`, Local setup) or `npm run build` (against Scouty).
 2. Open `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on…** → choose
    `dist/firefox/manifest.json`.
-   Expected: "Scouty B2B Prospector - Lead Research & Outreach Coach" is listed with no error and no warning banner. Note the
+   Expected: "Scouty B2B Prospector - Lead Research & Outreach" (the Firefox name, 50 characters at most for addons.mozilla.org) is listed with no error and no warning banner. Note the
    Internal UUID.
 3. On its entry press **Inspect**, open the Console.
    Expected: no error.
 4. Open `about:addons` → the extension → **Permissions**.
    Expected: optional access to `www.linkedin.com` (profile pages) and the Scouty origin only;
    no "access your data for all websites", no history, tabs or cookies permission. Leave the
-   switches off.
+   switches off. (`scripting`, `storage`, `identity` and `alarms` are not listed: Firefox shows no
+   prompt for them.)
 5. Click the toolbar icon (pin it from the extensions menu first if needed).
    Expected: "Allow access" with **Allow** and "What Scouty reads".
 6. Press **Allow** and accept the Firefox permission prompt.
@@ -70,10 +77,23 @@ agreed, referred to by its label (P1); record no name, URL, text or screenshot o
     start a capture of P1 in the other browser.
     Expected: the other browser's capture runs; Firefox shows "This capture stopped" with **OK**
     and **Capture here**, and nothing more from the Firefox run reaches the app.
-12. Popup → settings (gear) → **Disconnect**, then click the icon again.
+12. Security check during a capture. LinkedIn cannot be made to send a security check on demand,
+    so the redirect target is opened by hand: on P1 press **Capture again** and, while the panel
+    says it is reading (after the first section), type `https://www.linkedin.com/checkpoint/challenge/`
+    in the capture tab's address bar and press Enter. Also record it whenever LinkedIn itself sends
+    the tab to a security check during any Firefox capture.
+    Expected: the panel and the popup show "This site wants to check it's you" (the verification
+    screen) and the sections read before it are kept (Open in Scouty shows them).
+    Accepted fallback: Firefox may not show the extension the new address (the host permission
+    covers only the profile pages `/in/…`, so `tab.url` can be missing after the redirect). Then the
+    screen is "The page changed" / "Open the profile again and press Capture." (left the page),
+    still with the earlier sections kept and nothing read from the check page. Any other screen,
+    a capture that keeps running, or text from the check page in Scouty fails the step. Record
+    which of the two screens appeared.
+13. Popup → settings (gear) → **Disconnect**, then click the icon again.
     Expected: "Get started with Scouty" with **Sign in**. In Scouty, Settings → Connected Apps no longer lists an active
     "Scouty B2B Prospector (Firefox)" connection.
-13. Back in `about:debugging`, check the extension's Console once more.
+14. Back in `about:debugging`, check the extension's Console once more.
     Expected: no error was logged during the run.
 
 ## Recording and sign-off

@@ -6,6 +6,7 @@
 
 import type { ClickLogEntry } from "../messages";
 import { closestAny, isActionControl, isProfileSectionLabel, matchesAny, queryAll, queryFirst, selectors } from "./selectors";
+import type { Reach } from "./visible-text";
 
 export type ClickKind = "expandText" | "loadMore";
 
@@ -94,13 +95,23 @@ export type Interactions = {
   scrollStep(): void;
   /** Clicks an inline "… more" control if the allow-list permits. Each control is clicked at most once. */
   expandText(el: Element): boolean;
-  /** Clicks the "Show more results" control after the last block, if there is one and it is allowed. */
+  /** True when expandText(el) would press it now: clicks on, not pressed before, and allowed. */
+  canExpand(el: Element): boolean;
+  /**
+   * Clicks the "Show more results" control after the last block, if there is one, it is allowed and it
+   * is near the viewport (the same `reach` rule as the "… more" presses, deviation 28).
+   */
   loadMore(): boolean;
   wasClicked(el: Element): boolean;
   readonly clickLog: ClickLogEntry[];
 };
 
-export function createInteractions(doc: Document, options: { clicksEnabled: boolean; recordClicks: boolean }): Interactions {
+/**
+ * `reach` says where a control is against the viewport (domReach in the browser); without it every
+ * control is near (tests without layout).
+ */
+export function createInteractions(doc: Document, options: { clicksEnabled: boolean; recordClicks: boolean; reach?: Reach }): Interactions {
+  const reach: Reach = options.reach ?? ((): "near" => "near");
   const clicked = new WeakSet<Element>();
   const clickLog: ClickLogEntry[] = [];
 
@@ -126,6 +137,7 @@ export function createInteractions(doc: Document, options: { clicksEnabled: bool
       press(el, "expandText");
       return true;
     },
+    canExpand: (el) => options.clicksEnabled && !clicked.has(el) && mayClick(el, "expandText"),
     loadMore() {
       if (!options.clicksEnabled) return false;
       const main = queryFirst(doc, selectors.mainColumn) ?? doc.body;
@@ -136,6 +148,8 @@ export function createInteractions(doc: Document, options: { clicksEnabled: bool
       const blocks = queryAll(main, selectors.activity.block);
       const lastBlock = blocks[blocks.length - 1];
       if (lastBlock && !(lastBlock.compareDocumentPosition(control) & 4)) return false; // 4 = FOLLOWING
+      // Only near the viewport, like the "… more" presses: never one far below or scrolled past.
+      if (reach(control) !== "near") return false;
       press(control, "loadMore");
       return true;
     },

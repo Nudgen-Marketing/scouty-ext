@@ -1,6 +1,7 @@
 // Background entry: listeners only, all registered at top level so a restarted service worker
 // (Chromium) or event page (Firefox) is woken by the next event and picks up where it was.
 import { LINKEDIN_ORIGIN, PRIVACY_URL } from "../config";
+import { singleFlight } from "./single-flight";
 import { ext } from "../ext";
 import type { Message, UiAction } from "../messages";
 import { profileFromUrl } from "../profile-key";
@@ -8,14 +9,20 @@ import type { UiState } from "../ui/state";
 import { createApi } from "./api";
 import { appUrl, openAppPage, recentAppUrl } from "./app-tab";
 import * as auth from "./auth";
-import { devRequest, recordCapture } from "./dev-log";
+import { captureTab, setCaptureTab } from "./capture-tab";
+import { recordCapture } from "./dev-log";
+import { createGate } from "./gate";
 import * as outbox from "./outbox";
 import { CaptureController, type CaptureState } from "./session";
-import { captureTarget, captureUi, forgetSessionInfo, giveConsent, popupUi, sessionInfo, targetIsProfile, type UiContext } from "./ui-state";
+import { storeUrlFrom } from "./store-url";
+import { deferUpdates } from "./update";
+import { clearWake, onWake, wakeAt } from "./wake";
+import { captureUi, forgetSessionInfo, giveConsent, popupUi, sessionInfo, startCapture, targetIsProfile, type UiContext } from "./ui-state";
 
 const api = createApi(auth.tokenSource);
 let connecting = false;
-let captureTab: number | null = null;
+/** Applies a waiting extension update once no capture is in progress (src/background/update.ts). */
+let updateIfIdle: ((state: CaptureState) => Promise<void>) | null = null;
 
 const controller = new CaptureController({
   api,
@@ -59,6 +66,7 @@ const controller = new CaptureController({
     remove: (key) => ext.storage.session.remove(key),
   },
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  wake: { at: wakeAt, clear: clearWake },
   now: Date.now,
   uuid: () => crypto.randomUUID(),
   changed: (state) => void broadcast(state),
@@ -75,26 +83,38 @@ async function workspaceName(): Promise<string> {
 async function overlayState(state: CaptureState, tabId: number): Promise<UiState | null> {
   const extras = await controller.extras();
   const view = captureUi(state, { minutesLeft: extras.minutesLeft }, await workspaceName(), Date.now());
+  if (view?.kind === "capturing") await controller.noteMinutesLeft(view.minutesLeft);
   return view ? { ...view, onProfile: await targetIsProfile(state, tabId, await tabUrl(tabId)) } : null;
 }
 
 /** Tells the popup (if open) and the overlay in the capture tab to redraw. */
 async function broadcast(state: CaptureState): Promise<void> {
+  void updateIfIdle?.(state);
   ext.runtime.sendMessage({ type: "ui:changed" } satisfies Message).catch(() => undefined);
-  if ("tabId" in state) captureTab = state.tabId;
-  else if (state.notice?.kind === "recent") captureTab = null;
-  if (captureTab === null) return;
+  // The capture tab is kept in storage.session: an idle notice has no tab id, and a restarted
+  // background must still redraw that tab's overlay (src/background/capture-tab.ts).
+  let tab: number | null;
+  if ("tabId" in state) {
+    tab = state.tabId;
+    await setCaptureTab(tab);
+  } else if (state.notice?.kind === "recent") {
+    tab = null;
+    await setCaptureTab(null);
+  } else {
+    tab = await captureTab();
+  }
+  if (tab === null) return;
   // Development builds keep what the reader pressed for validation, outside every screen.
   if (__SCOUTY_DEV__ && state.phase === "done") {
     const url = await tabUrl(state.tabId);
     void recordCapture(state.result.appUrl, profileFromUrl(url, LINKEDIN_ORIGIN)?.key ?? "", (await controller.extras()).clickLog);
   }
-  const view = await overlayState(state, captureTab);
+  const view = await overlayState(state, tab);
   const message: Message = view ? { type: "overlay:state", state: view } : { type: "overlay:remove" };
-  ext.tabs.sendMessage(captureTab, message).catch(() => undefined);
+  ext.tabs.sendMessage(tab, message).catch(() => undefined);
 }
 
-/** Only pages of the Scouty app are ever opened (appUrl in app-tab.ts), plus the store page the server names. */
+/** Only pages of the Scouty app are ever opened (appUrl in app-tab.ts), plus the add-on store page the server names (store-url.ts). */
 function open(url: string): void {
   void ext.tabs.create({ url });
 }
@@ -130,18 +150,18 @@ async function connect(options: { create?: boolean } = {}): Promise<void> {
   }
 }
 
-async function disconnect(): Promise<void> {
+/**
+ * One disconnect at a time: a sign-out can wait up to about 50 s (a refresh in flight, then the
+ * revoke, each bounded by the request timeout), and a second press meanwhile joins it.
+ */
+const disconnect = singleFlight(async () => {
   await auth.signOut();
   await forgetSessionInfo();
   await controller.reset();
-}
+});
 
 async function capture(tabId: number | null, recapture: boolean): Promise<void> {
-  const state = await controller.current();
-  const target = captureTarget(state, tabId);
-  const url = await tabUrl(target);
-  if (target === null || !url) return;
-  await controller.start({ tabId: target, url, recapture });
+  await startCapture(controller, tabId, recapture, tabUrl);
 }
 
 async function act(action: UiAction, tabId: number | null): Promise<void> {
@@ -170,8 +190,8 @@ async function act(action: UiAction, tabId: number | null): Promise<void> {
     case "whatItReads": return open(PRIVACY_URL);
     case "openStore": {
       const info = await sessionInfo(ui, true);
-      const fromNotice = state.phase === "idle" && state.notice?.kind === "outdated" ? state.notice.storeUrl : null;
-      const fromInfo = info && "kind" in info && info.kind === "outdated" ? info.storeUrl : null;
+      const fromNotice = state.phase === "idle" && state.notice?.kind === "outdated" ? storeUrlFrom(state.notice.storeUrl) : null;
+      const fromInfo = info && "kind" in info && info.kind === "outdated" ? storeUrlFrom(info.storeUrl) : null;
       return open(fromNotice ?? fromInfo ?? appUrl(null));
     }
     case "showCapture":
@@ -183,50 +203,13 @@ async function act(action: UiAction, tabId: number | null): Promise<void> {
   }
 }
 
-/** What the overlay in the LinkedIn tab may ask for. Everything else comes from the popup only. */
-const OVERLAY_ACTIONS: readonly UiAction[] = ["stop", "dismiss", "openAnalysis", "retryNow", "captureAgain", "capture", "connect", "openScouty", "openStore"];
-
-type Sender = { id?: string; url?: string; tab?: { id?: number } };
-
-async function handle(message: Message, sender: Sender): Promise<unknown> {
-  if (sender.id !== ext.runtime.id) return null;
-  const fromPage = typeof sender.url === "string" && sender.url.startsWith(ext.runtime.getURL(""));
-  if (__SCOUTY_DEV__ && fromPage) {
-    const dev = devRequest(message);
-    if (dev) return dev;
-  }
-  const senderTab = sender.tab?.id ?? null;
-  // A capture waiting on Scouty is tried again whenever the popup or the overlay asks for the state
-  // and its wait is over, in case a stopped background context lost the timer.
-  if (message.type === "ui:getState" || message.type === "overlay:hello") void controller.retryIfDue();
-  switch (message.type) {
-    case "reader:hello": return fromPage ? null : controller.readerHello(senderTab);
-    case "reader:progress": return fromPage ? null : controller.readerProgress(senderTab, message.section, message.count);
-    case "reader:result":
-      if (!fromPage) await controller.readerResult(senderTab, message.section, message.seq, message.result);
-      return null;
-    case "overlay:hello": {
-      const state = await controller.current();
-      if (fromPage || !("tabId" in state) || state.tabId !== senderTab) return null;
-      return overlayState(state, senderTab);
-    }
-    case "ui:getState":
-      if (!fromPage) return null;
-      return popupUi(ui, { tabId: message.tabId, tabUrl: await tabUrl(message.tabId), settings: message.settings });
-    case "ui:action": {
-      if (!fromPage) {
-        const state = await controller.current();
-        const owns = senderTab !== null && (("tabId" in state && state.tabId === senderTab) || captureTab === senderTab);
-        if (!owns || !OVERLAY_ACTIONS.includes(message.action)) return null;
-        await act(message.action, senderTab);
-        return null;
-      }
-      await act(message.action, message.tabId);
-      return null;
-    }
-    default: return null;
-  }
-}
+const handle = createGate({
+  controller,
+  captureTab,
+  overlayState,
+  popupState: async (tabId, settings) => popupUi(ui, { tabId, tabUrl: await tabUrl(tabId), settings }),
+  act,
+});
 
 function listen(): void {
   auth.onConnectionEnded(async () => {
@@ -246,9 +229,17 @@ function listen(): void {
   // A browser start never finds a capture from the previous run.
   ext.runtime.onStartup.addListener(() => void outbox.purgeOnStartup().then(() => controller.reset()));
   ext.runtime.onInstalled.addListener(() => void auth.hardenStorage());
+  // An update waits while a capture is in progress (a reload would clear it) or sign-in is under way, then reloads.
+  updateIfIdle = deferUpdates(() => controller.current(), { connecting: () => connecting });
+  // "You're offline" is tried again as soon as the browser says the network is back (while this
+  // background context is awake; otherwise when the popup or the overlay next asks, deviation 8).
+  self.addEventListener("online", () => void controller.retryIfDue({ online: true }));
+  // The retry alarm wakes a stopped background to try sending again (deviation 8), and to delete a
+  // capture whose time ran out, also while it waits for sign-in (deviation 28).
+  onWake(() => void controller.alarmFired());
 
   void auth.hardenStorage();
-  void outbox.purgeIfExpired(Date.now()).then(() => controller.recover());
+  void outbox.purgeIfExpired(Date.now()).then(() => controller.recover()).then(async () => updateIfIdle?.(await controller.current()));
 }
 
 if (__SCOUTY_ENTRY__) listen();

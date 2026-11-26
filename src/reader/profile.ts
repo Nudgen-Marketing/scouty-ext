@@ -7,7 +7,7 @@
 // each entry's lines (its paragraphs and text boxes) in page order, as one labelled section.
 import { HARD_LIMITS } from "../config";
 import type { ProfileContent, ReadMode, SectionName } from "../protocol";
-import { expandWithin, hasEmptyState, mainText, readText, stillTruncated, textSkip, type ReadContext } from "./blocks";
+import { expandWithin, hasEmptyState, mainText, readText, stillTruncated, textSkip, type ExpandStep, type ReadContext } from "./blocks";
 import { clampHead, codePointLength } from "./clamp";
 import { isProfileSectionLabel, queryAll, queryFirst, selectors } from "./selectors";
 import { visibleText } from "./visible-text";
@@ -113,8 +113,9 @@ export function profileProgress(ctx: ReadContext, section: SectionName): number 
   return rawSections(ctx, section).reduce((sum, s) => sum + 1 + s.text.length, 0);
 }
 
-export function expandProfile(ctx: ReadContext, section: SectionName): void {
-  expandWithin(expandable(ctx, section), ctx);
+/** Presses at most one allowed expand control of the section (paced by the scroll loop). */
+export function expandProfile(ctx: ReadContext, section: SectionName): ExpandStep {
+  return expandWithin(expandable(ctx, section), ctx);
 }
 
 /** Name and headline from the top card. Links (such as the contact one) and controls are never read. */

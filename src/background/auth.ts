@@ -94,14 +94,21 @@ async function clearTokens(): Promise<void> {
   await ext.storage.local.remove(REFRESH_KEY);
 }
 
-/** Keeps extension storage out of reach of injected scripts where the browser supports the call. */
+/**
+ * Asks for each storage area to be limited to trusted contexts (extension pages and the background)
+ * where the browser accepts the call. What it protects (browser-compat-data, docs/BROWSER-FACTS.md):
+ * storage.session (the access token) is limited by default in Chromium, so the call only confirms it;
+ * storage.local (the refresh token) accepts the call from Chrome 140 only. On Chrome 116-139 the call
+ * on storage.local is refused, and Firefox implements neither, so there the refresh token can be read
+ * by the extension's own content scripts. Accepted (deviation 28): those scripts are our own code and
+ * contain no storage call, and no script of the page can reach extension storage.
+ */
 export async function hardenStorage(): Promise<void> {
-  for (const area of [ext.storage.local, ext.storage.session]) {
+  for (const area of [ext.storage.session, ext.storage.local]) {
     try {
       await area.setAccessLevel?.({ accessLevel: "TRUSTED_CONTEXTS" });
     } catch {
-      // Not supported here (Firefox, older Chromium): the areas are still not handed to the reader,
-      // which contains no storage call at all.
+      // Refused (storage.local before Chrome 140): the area keeps the browser's default.
     }
   }
 }
@@ -142,13 +149,17 @@ export function cancelConnect(): void {
 /** Disconnect: revoke the refresh token on the server, then forget everything. */
 export async function signOut(): Promise<void> {
   cancelConnect();
-  const refresh = await readRefresh();
-  try {
-    if (refresh) await revokeRequest({ token: refresh, token_type_hint: "refresh_token", client_id: CLIENT_ID });
-  } catch {
-    // Revocation is best effort; the tokens are forgotten either way.
-  }
-  await clearTokens();
+  // Inside the refresh lock: a refresh in flight finishes (and stores) first, then this revokes and
+  // clears what it stored, so a sign-out is never undone by a refresh that ends after it.
+  await withLock(async () => {
+    const refresh = await readRefresh();
+    try {
+      if (refresh) await revokeRequest({ token: refresh, token_type_hint: "refresh_token", client_id: CLIENT_ID });
+    } catch {
+      // Revocation is best effort; the tokens are forgotten either way.
+    }
+    await clearTokens();
+  });
 }
 
 // ---- refresh (single flight) ----

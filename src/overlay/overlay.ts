@@ -5,7 +5,7 @@
 // <html>, a CLOSED shadow root, a small static stylesheet built from the same tokens as the popup,
 // and only text nodes, buttons and the Scouty mark (SVG) created with DOM APIs (no HTML strings). It reads nothing from
 // the page, touches no storage and makes no request.
-import { ext } from "../ext";
+import { cutOff, ext } from "../ext";
 import { BRAND_MARK_PATHS } from "../ui/brand";
 import type { Message, UiAction } from "../messages";
 import { t } from "../ui/i18n";
@@ -101,12 +101,42 @@ export function mountOverlay(doc: Document, onAction: (action: UiAction) => void
   };
 }
 
-/** The error a content script gets once its extension was reloaded, updated or removed. */
-export function cutOff(error: unknown): boolean {
-  return /context invalidated|extension context|receiving end does not exist/i.test(error instanceof Error ? error.message : String(error)) && !ext.runtime?.id;
+/**
+ * How often the overlay asks for the state again while it shows "You're offline", or "Scouty isn't
+ * answering" while sending (deviation 8).
+ */
+export const OFFLINE_RECHECK_MS = 15_000;
+
+type Timers = { set: (fn: () => void, ms: number) => unknown; clear: (id: unknown) => void };
+const realTimers: Timers = { set: (fn, ms) => setInterval(fn, ms), clear: (id) => clearInterval(id as ReturnType<typeof setInterval>) };
+
+/**
+ * While the overlay shows "You're offline", or "Scouty isn't answering" while sending, asks for the
+ * state every OFFLINE_RECHECK_MS: each ask wakes the background and lets it try sending again once
+ * its wait is over (retryIfDue). Any other state (the create form of "Scouty isn't answering"
+ * included: nothing waits to be sent), or none, stops asking. Returns the function to call with
+ * every state shown.
+ */
+export function offlineRecheck(ask: () => void, timers: Timers = realTimers): (state: UiState | null) => void {
+  let timer: unknown = null;
+  return (state) => {
+    const offline = state?.kind === "offline" || (state?.kind === "notAnswering" && state.sending);
+    if (offline && timer === null) timer = timers.set(ask, OFFLINE_RECHECK_MS);
+    if (!offline && timer !== null) {
+      timers.clear(timer);
+      timer = null;
+    }
+  };
 }
 
-function main(): void {
+/**
+ * Starts the overlay in this document: asks the background for its screen and redraws on every
+ * message. An answer of null to overlay:hello (the first ask or a recheck) means the background no
+ * longer shows a capture screen in this tab, for example after it restarted with nothing to show
+ * here: the overlay removes itself instead of keeping a stale screen whose buttons would do nothing
+ * (deviation 28). A failed ask (no answer at all) leaves the screen as it is.
+ */
+export function startOverlay(doc: Document = document, timers: Timers = realTimers): void {
   const scope = globalThis as unknown as { __scoutyOverlay?: boolean };
   if (scope.__scoutyOverlay) return;
   scope.__scoutyOverlay = true;
@@ -115,28 +145,35 @@ function main(): void {
   // After the extension is reloaded or updated this script is cut off: sendMessage then throws at
   // once ("Extension context invalidated") instead of rejecting. The overlay leaves the page quietly;
   // the new copy of the extension shows its own.
-  const leave = (): null => {
+  const leave = (): undefined => {
     orphaned = true;
+    recheck(null);
     overlay?.remove();
     overlay = null;
-    return null;
+    return undefined;
   };
+  /** The background's answer, or undefined when the ask failed (no answer). */
   const send = (message: Message): Promise<unknown> => {
-    if (orphaned) return Promise.resolve(null);
+    if (orphaned) return Promise.resolve(undefined);
     try {
-      return ext.runtime.sendMessage(message).catch((error: unknown) => (cutOff(error) ? leave() : null));
+      return ext.runtime.sendMessage(message).catch((error: unknown) => (cutOff(error) ? leave() : undefined));
     } catch (error) {
-      return Promise.resolve(cutOff(error) ? leave() : null);
+      return Promise.resolve(cutOff(error) ? leave() : undefined);
     }
   };
   const onAction = (action: UiAction): void => void send({ type: "ui:action", action, tabId: null });
+  const hello = (): void => void send({ type: "overlay:hello" }).then((answer) => {
+    if (answer !== undefined && !orphaned) show((answer as UiState | null) ?? null);
+  });
+  const recheck = offlineRecheck(hello, timers);
   const show = (state: UiState | null): void => {
+    recheck(state);
     if (!state) {
       overlay?.remove();
       overlay = null;
       return;
     }
-    overlay ??= mountOverlay(document, onAction);
+    overlay ??= mountOverlay(doc, onAction);
     overlay.update(state);
   };
   ext.runtime.onMessage.addListener((message: Message) => {
@@ -145,7 +182,7 @@ function main(): void {
     if (message?.type === "overlay:remove") show(null);
     return undefined;
   });
-  void send({ type: "overlay:hello" }).then((state) => show((state as UiState | null) ?? null));
+  hello();
 }
 
-if (__SCOUTY_ENTRY__) main();
+if (__SCOUTY_ENTRY__) startOverlay();

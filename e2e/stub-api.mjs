@@ -30,7 +30,7 @@ export function createStubApi(options = {}) {
     now: options.now ?? (() => Date.now()),
     clients: options.clients ?? null, // null: any client id and redirect are accepted (tests)
     minVersion: options.minVersion ?? "0.1.0",
-    storeUrl: options.storeUrl ?? "https://example.invalid/store",
+    storeUrl: options.storeUrl ?? "https://chromewebstore.google.com/detail/synthetic-store-entry",
     caps: { posts: 50, comments: 50, reactions: 50, ...(options.caps ?? {}) },
     /** The `prompt` of every authorization request, in order (null when absent). */
     prompts: [],

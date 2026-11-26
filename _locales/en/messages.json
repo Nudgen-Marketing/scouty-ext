@@ -3,7 +3,7 @@
     "message": "Scouty B2B Prospector - Lead Research & Outreach Coach"
   },
   "extDescription": {
-    "message": "Research the B2B leads you choose on social networks and get a step-by-step outreach plan in Scouty. Only reads; never acts for you."
+    "message": "Research B2B leads you choose on a social network and get a step-by-step outreach plan in Scouty. Never posts or messages for you."
   },
   "brand": {
     "message": "Scouty"
@@ -24,7 +24,7 @@
     "message": "Allow access"
   },
   "permissionBody": {
-    "message": "Scouty only reads the profiles you choose."
+    "message": "Scouty only opens the profiles you choose to capture."
   },
   "actionAllow": {
     "message": "Allow"
@@ -69,7 +69,7 @@
     "message": "Scouty reads this profile and the person's recent posts, comments and reactions."
   },
   "consentPoint2": {
-    "message": "It never clicks, likes, connects, messages or posts for you."
+    "message": "It only presses \"see more\" and \"show more results\" to read in full. It never likes, comments, connects, messages or posts for you."
   },
   "consentPoint3": {
     "message": "The person may see that you viewed their profile. This site may not allow tools like this and may limit your account."
@@ -126,7 +126,7 @@
     "message": "Reading reactions…"
   },
   "readingTrust": {
-    "message": "Scouty never clicks or posts for you."
+    "message": "Scouty never posts or messages for you."
   },
   "progressCount": {
     "message": "$1 of $2"
@@ -359,6 +359,10 @@
   "extShortName": {
     "message": "Scouty B2B",
     "description": "Short name shown where space is tight (12 characters at most)."
+  },
+  "extNameFirefox": {
+    "message": "Scouty B2B Prospector - Lead Research & Outreach",
+    "description": "The Firefox build's name: addons.mozilla.org limits a name to 50 characters (extName is 54)."
   },
   "extTitle": {
     "message": "Scouty B2B Prospector",

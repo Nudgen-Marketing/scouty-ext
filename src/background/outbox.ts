@@ -57,11 +57,30 @@ async function save(outbox: Outbox): Promise<void> {
   await session().set({ [META_KEY]: outbox });
 }
 
-export async function begin(created: CreateCreated): Promise<Outbox> {
+/**
+ * When the capture runs out, on this browser's clock: the time Scouty gave it (`expiresAt - serverTime`,
+ * both on Scouty's clock) from now, so a browser clock that is off does not shorten or stretch it.
+ * Null when either time cannot be read.
+ */
+export function localExpiresAt(created: Pick<CreateCreated, "expiresAt" | "serverTime">, now: number): number | null {
+  const expires = typeof created.expiresAt === "string" ? Date.parse(created.expiresAt) : NaN;
+  const server = typeof created.serverTime === "string" ? Date.parse(created.serverTime) : NaN;
+  if (!Number.isFinite(expires) || !Number.isFinite(server)) return null;
+  // Never longer than the privacy promise, whatever window the server answers.
+  return now + Math.min(expires - server, HARD_LIMITS.outboxWindowMs);
+}
+
+/**
+ * Starts the outbox of a new capture. Null (nothing kept) when the create answer's times cannot be
+ * read: the caller ends the capture as for any other answer it cannot use.
+ */
+export async function begin(created: CreateCreated, now: number = Date.now()): Promise<Outbox | null> {
   await clear();
+  const expiresAt = localExpiresAt(created, now);
+  if (expiresAt === null) return null;
   const outbox: Outbox = {
     captureId: created.captureId, uploadToken: created.uploadToken, profileKey: created.profileKey, profileUrl: created.profileUrl,
-    expected: [...created.expected], caps: created.caps, expiresAt: Date.parse(created.expiresAt),
+    expected: [...created.expected], caps: created.caps, expiresAt,
     sections: [], declared: {}, stop: null, finalize: null, nextOrder: 1,
   };
   await save(outbox);

@@ -9,6 +9,7 @@ import { ApiError, SignedOutError, type Api } from "./api";
 import * as auth from "./auth";
 import { hasHostPermissions } from "./permissions";
 import type { CaptureController, CaptureState, Notice } from "./session";
+import { storeUrlFrom } from "./store-url";
 
 const INFO_KEY = "session.info";
 const CONSENT_KEY = "consent.v1";
@@ -46,8 +47,7 @@ export async function sessionInfo(ctx: UiContext, fresh = false): Promise<Sessio
   } catch (error) {
     if (error instanceof SignedOutError) return null;
     if (error instanceof ApiError && error.status === 426) {
-      const store = error.body?.storeUrl;
-      return { kind: "outdated", storeUrl: typeof store === "string" && store.startsWith("https://") ? store : null };
+      return { kind: "outdated", storeUrl: storeUrlFrom(error.body?.storeUrl) };
     }
     if (error instanceof ApiError && (error.code === "LINKEDIN_NOT_AVAILABLE" || error.code === "LINKEDIN_DISABLED")) return { kind: "notAvailable" };
     // Offline or a server fault: show what is known rather than blocking the popup.
@@ -130,6 +130,19 @@ export function captureTarget(state: CaptureState, tabId: number | null): number
   return tabId ?? ("tabId" in state ? state.tabId : state.phase === "idle" && state.notice?.kind === "recent" ? state.notice.tabId : null);
 }
 
+/**
+ * A Capture action: starts a capture in the target tab. Consent is checked here too, not only on the
+ * screen (defence in depth): an action that skips the one-time notice starts nothing.
+ */
+export async function startCapture(controller: Pick<CaptureController, "current" | "start">, tabId: number | null, recapture: boolean, urlOf: (tabId: number) => Promise<string | null>): Promise<boolean> {
+  if (!(await consentGiven())) return false;
+  const target = captureTarget(await controller.current(), tabId);
+  const url = target === null ? null : await urlOf(target);
+  if (target === null || !url) return false;
+  await controller.start({ tabId: target, url, recapture });
+  return true;
+}
+
 /** Whether a capture action on this screen could start: the target tab is a LinkedIn profile. */
 export async function targetIsProfile(state: CaptureState, tabId: number | null, knownUrl: string | null): Promise<boolean> {
   const target = captureTarget(state, tabId);
@@ -170,6 +183,7 @@ export async function popupUi(ctx: UiContext, query: PopupQuery): Promise<UiStat
   const active = state.phase !== "idle" && state.phase !== "done";
   if (active && "tabId" in state && query.tabId !== null && query.tabId !== state.tabId) return { kind: "busy", workspace };
   const capture = captureUi(state, { minutesLeft: extras.minutesLeft }, workspace, ctx.now());
+  if (capture?.kind === "capturing") await ctx.controller.noteMinutesLeft(capture.minutesLeft);
   // Off a profile, the screen's Capture action is disabled with what to do instead (no dead button).
   if (capture) return { ...capture, onProfile: await targetIsProfile(state, query.tabId, query.tabUrl) };
 

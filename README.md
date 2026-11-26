@@ -1,9 +1,11 @@
 # Scouty B2B Prospector
 
 A Manifest V3 browser extension for Chrome, Edge and Firefox (desktop). When you press **Capture**
-on a `linkedin.com/in/<slug>` profile, it reads that person's profile and recent posts, comments
-and reactions from your own signed-in LinkedIn tab, at the pace of a person reading, and sends
-them to your Scouty workspace for analysis.
+on a lead's profile on a supported social network, it reads that person's profile and recent
+posts, comments and reactions from your own signed-in tab, at the pace of a person reading, and
+sends them to your Scouty workspace for analysis. (Its user-facing name and copy name no network;
+the sections below are for developers and name the one site it reads today, LinkedIn, whose
+`/in/<slug>` pages it reads.)
 
 - **Read-only on LinkedIn.** It only loads the lead's six profile pages in your tab (the profile,
   its experience and skills detail pages, and the posts, comments and reactions activity pages),
@@ -22,10 +24,12 @@ them to your Scouty workspace for analysis.
 Using automated tools on LinkedIn is against LinkedIn's User Agreement and LinkedIn may restrict
 accounts that use them. See [PRIVACY.md](PRIVACY.md).
 
-> **Status: not validated against live LinkedIn.** Every LinkedIn selector, the activity-id
-> timestamp rule and the assumptions about the activity pages were written without access to a
-> LinkedIn session. All fixtures are synthetic. The owner task E0 in
-> [fixtures/README.md](fixtures/README.md) settles them before any release.
+> **Status: partly validated against live LinkedIn.** On 2026-11-26 the post ids, links and times
+> were checked on live pages (structure and counts only) and fixed in selectors version 3
+> ([docs/DEVIATIONS.md](docs/DEVIATIONS.md) 23; results in
+> [validation/RESULTS-0.1.0.md](validation/RESULTS-0.1.0.md)). The full E0 matrix with a tester
+> ([fixtures/README.md](fixtures/README.md)) is still open and settles the rest before any release.
+> All fixtures are synthetic.
 
 ## Architecture
 
@@ -34,12 +38,14 @@ popup (extension page)          background (service worker / event page)        
 React + Tailwind                plain TypeScript                                 plain TypeScript
 ────────────────────            ───────────────────────────────────────         ─────────────────────────
 popup.tsx  ── ui:getState ──►   index.ts      listeners only
+                                gate.ts       who may ask for what
 PopupView.tsx                   session.ts    capture state machine      ──►     reader.js   (injected per page)
   draws viewFor(state)          auth.ts       OAuth code + PKCE, tokens          overlay.js  (closed shadow root)
                                 api.ts        THE ONLY fetch, Scouty only
                                 outbox.ts     storage.session, resume
                                 app-tab.ts    "Open in Scouty": back to the app tab
                                 permissions.ts, ui-state.ts
+                                wake.ts       retry alarm; update.ts  deferred update
 ```
 
 | Part | Files | Notes |

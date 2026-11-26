@@ -1,18 +1,18 @@
 // Reader entry: injected into the LinkedIn tab only during a capture. Reads one section, reports
 // progress and returns the payload. It makes no network request and touches no storage.
 import { BROWSER, DEBUG_CLICKS, HARD_LIMITS, PACING, SUPPORTED_UI_LANGS } from "../config";
-import { ext } from "../ext";
+import { contextGone, cutOff, ext } from "../ext";
 import type { ReaderArgs, ReaderMessage, ReaderResult } from "../messages";
 import { profileKeyFromSlug, slugFromPath } from "../profile-key";
 import { ACTIVITY_SECTIONS, buildActivityPayload, buildProfilePayload, serialize, type SectionPayload } from "../protocol";
-import { activityListEmpty, degradedBlock, expandWithin, findBlocks, hasEmptyState, isLoading, readBlocks, textContainersOf, type ReadContext } from "./blocks";
+import { activityListEmpty, blockOrder, degradedBlock, expandWithin, hasEmptyState, isLoading, readBlocks, textContainersOf, type ReadContext } from "./blocks";
 import { fitByteBudget, utf8Length } from "./clamp";
 import { createInteractions } from "./interactions";
 import { runScrollLoop } from "./pacing";
 import { detectPageState, pageStateFromPath, stopReasonFor, type PageState } from "./page-state";
 import { expandProfile, profileProgress, readProfile, topCard } from "./profile";
 import { SELECTORS_VERSION, selectors } from "./selectors";
-import { domIsVisible, type IsVisible } from "./visible-text";
+import { domIsVisible, domReach, type IsVisible, type Reach } from "./visible-text";
 
 export type ReaderEnv = {
   doc: Document;
@@ -21,6 +21,10 @@ export type ReaderEnv = {
   random: () => number;
   now: () => number;
   onProgress: (count: number, step: number) => Promise<"continue" | "stop">;
+  /** Where a control is against the viewport (domReach in the browser). Without it every control is near. */
+  reach?: Reach;
+  /** True once the extension was reloaded or updated under this reader: it stops at once and sends nothing. */
+  cutOff?: () => boolean;
 };
 
 const SETTLE_TRIES = 20;
@@ -34,9 +38,9 @@ export function uiLanguageSupported(doc: Document): boolean {
 export async function readSection(args: ReaderArgs, env: ReaderEnv): Promise<ReaderResult> {
   const doc = env.doc;
   const address = doc.defaultView?.location ?? doc.location;
-  const interactions = createInteractions(doc, { clicksEnabled: uiLanguageSupported(doc), recordClicks: DEBUG_CLICKS });
+  const interactions = createInteractions(doc, { clicksEnabled: uiLanguageSupported(doc), recordClicks: DEBUG_CLICKS, ...(env.reach ? { reach: env.reach } : {}) });
   const clickLog = interactions.clickLog;
-  const ctx: ReadContext = { doc, isVisible: env.isVisible, interactions, now: env.now() };
+  const ctx: ReadContext = { doc, isVisible: env.isVisible, interactions, now: env.now(), ...(env.reach ? { reach: env.reach } : {}) };
 
   // LinkedIn's sign-in, authwall or checkpoint address: stop before anything else.
   const byPath = pageStateFromPath(address?.pathname ?? "");
@@ -71,7 +75,9 @@ export async function readSection(args: ReaderArgs, env: ReaderEnv): Promise<Rea
   }
 
   const activity = ACTIVITY_SECTIONS.includes(args.section);
-  const cap = activity ? Math.max(0, Math.min(args.cap, HARD_LIMITS.maxCap)) : 0;
+  // An activity page always has a cap of at least 1: 0 means "no cap" to the scroll loop but "keep
+  // nothing" to the payload, and only a malformed answer from Scouty could ask for it.
+  const cap = activity ? Math.max(1, Math.min(args.cap, HARD_LIMITS.maxCap)) : 0;
   const limits = activity ? PACING.activity : PACING.profile;
 
   // Set when a step finds the tab on another profile (or off the profile pages): that ends the loop.
@@ -85,14 +91,16 @@ export async function readSection(args: ReaderArgs, env: ReaderEnv): Promise<Rea
       return drift.result ? "unknown" : "ok";
     },
     scrollStep: () => interactions.scrollStep(),
-    expandNew: () => {
-      if (activity) expandWithin(findBlocks(doc).flatMap((block) => textContainersOf(block)), ctx);
-      else expandProfile(ctx, args.section);
-    },
-    collect: () => (activity ? findBlocks(doc).length : profileProgress(ctx, args.section)),
+    // Only the items that will be kept are expanded.
+    expandNew: () => (activity
+      ? expandWithin(blockOrder(doc).filter(({ place }) => cap <= 0 || place < cap).flatMap(({ el }) => textContainersOf(el)), ctx)
+      : expandProfile(ctx, args.section)),
+    // Distinct posts, as the cap counts them: repeats of one post never end the read early.
+    collect: () => (activity ? new Set(blockOrder(doc).map(({ place }) => place)).size : profileProgress(ctx, args.section)),
     loading: () => activity && isLoading(doc),
     loadMore: () => interactions.loadMore(),
     onProgress: env.onProgress,
+    ...(env.cutOff ? { cutOff: env.cutOff } : {}),
     wait: env.wait,
     random: env.random,
     now: env.now,
@@ -100,6 +108,8 @@ export async function readSection(args: ReaderArgs, env: ReaderEnv): Promise<Rea
     maxSteps: limits.maxSteps,
     budgetMs: limits.budgetMs,
   });
+  // The extension was reloaded or updated: nothing is built, and there is no one to send it to.
+  if (loop.end === "cut_off") return { kind: "failed", clickLog };
   if (loop.end === "state" && loop.state !== "ok") {
     return drift.result ?? { kind: "stopped", reason: stopReasonFor(loop.state), address: null, clickLog };
   }
@@ -143,21 +153,36 @@ export async function readSection(args: ReaderArgs, env: ReaderEnv): Promise<Rea
   return { kind: "read", payload, state: "complete", reason: null, clickLog };
 }
 
-async function send<T>(message: ReaderMessage): Promise<T | null> {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      return (await ext.runtime.sendMessage(message)) as T;
-    } catch {
-      await new Promise((resolve) => setTimeout(resolve, 500));
+/**
+ * The reader's line to the background. Once the extension is reloaded or updated under it (the same
+ * test as the overlay's: the "context invalidated" error and no runtime id), it stops trying and
+ * marks itself cut off; the loop then ends before the next scroll or press.
+ */
+export function readerChannel(sendMessage: (message: ReaderMessage) => Promise<unknown>, pause: (ms: number) => Promise<void>) {
+  let cut = false;
+  const isCut = (): boolean => cut || contextGone();
+  async function send<T>(message: ReaderMessage): Promise<T | null> {
+    for (let attempt = 0; attempt < 3 && !isCut(); attempt += 1) {
+      try {
+        return (await sendMessage(message)) as T;
+      } catch (error) {
+        if (cutOff(error)) {
+          cut = true;
+          return null;
+        }
+        await pause(500);
+      }
     }
+    return null;
   }
-  return null;
+  return { send, isCut };
 }
 
 async function main(): Promise<void> {
   const scope = globalThis as unknown as { __scoutyReaderBusy?: boolean };
   if (scope.__scoutyReaderBusy) return;
   scope.__scoutyReaderBusy = true;
+  const { send, isCut } = readerChannel((message) => ext.runtime.sendMessage(message), (ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   try {
     const hello = await send<{ args: ReaderArgs | null }>({ type: "reader:hello" });
     const args = hello?.args;
@@ -165,6 +190,8 @@ async function main(): Promise<void> {
     const result = await readSection(args, {
       doc: document,
       isVisible: domIsVisible,
+      reach: domReach,
+      cutOff: isCut,
       wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
       random: Math.random,
       now: Date.now,
@@ -173,6 +200,7 @@ async function main(): Promise<void> {
         return reply?.stop ? "stop" : "continue";
       },
     });
+    if (isCut()) return;
     await send({ type: "reader:result", section: args.section, seq: args.seq, result });
   } finally {
     scope.__scoutyReaderBusy = false;

@@ -117,7 +117,7 @@ async function buildTarget(name, { target, apiOrigin, linkedinOrigin, key, swaps
     define: { ...define(true), "process.env.NODE_ENV": JSON.stringify("production") },
   });
   // Tailwind is compiled to a static stylesheet at build time. No runtime style injection.
-  execFileSync(process.execPath, [path.join(root, "node_modules/@tailwindcss/cli/dist/index.mjs"), "--input", "src/popup/popup.css", "--output", path.join(out, "popup.css"), "--minify"], { cwd: root, stdio: ["ignore", "ignore", quiet ? "ignore" : "ignore"] });
+  execFileSync(process.execPath, [path.join(root, "node_modules/@tailwindcss/cli/dist/index.mjs"), "--input", "src/popup/popup.css", "--output", path.join(out, "popup.css"), "--minify"], { cwd: root, stdio: ["ignore", "ignore", quiet ? "ignore" : "inherit"] });
   await cp(path.join(root, "src/popup/popup.html"), path.join(out, "popup.html"));
   await cp(path.join(root, "_locales"), path.join(out, "_locales"), { recursive: true });
   await cp(path.join(root, "icons"), path.join(out, "icons"), { recursive: true });

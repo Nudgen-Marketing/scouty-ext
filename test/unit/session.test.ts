@@ -2,10 +2,11 @@ import { afterEach, describe, expect, it } from "vitest";
 import * as auth from "../../src/background/auth";
 import * as outbox from "../../src/background/outbox";
 import {
-  EVENT_TYPES, EXPIRED, IDLE, OFFLINE_RETRY_MS, PAGE_STATE_STOPS, PHASES, READER_WATCHDOG_MS, SERVER_RETRY_MS, isTransient, noticeFor, transition,
+  EVENT_TYPES, EXPIRED, IDLE, OFFLINE_RETRY_MS, PAGE_STATE_STOPS, PHASES, READER_WATCHDOG_MS, SENDING_WAKE_MS, SERVER_RETRY_MS, isTransient, noticeFor, transition,
   type CaptureEvent, type CaptureState, type DoneResult, type EventType, type Phase,
 } from "../../src/background/session";
-import { ApiError, NetworkError } from "../../src/background/api";
+import { ApiError, NetworkError, setApiDeps } from "../../src/background/api";
+import { onWake, RETRY_ALARM } from "../../src/background/wake";
 import { captureUi } from "../../src/background/ui-state";
 import { validateManifest, type Manifest, type SectionName, type StopReason } from "../../src/protocol";
 import { fake } from "../helpers/fake-ext";
@@ -211,6 +212,33 @@ describe("capture controller", () => {
     expect((await r.controller.readerHello(TAB)).args).toMatchObject({ section: "reactions", cap: 100 });
   });
 
+  it("the minutes-left estimate shown is kept while running, so a later screen never shows more; a new capture starts fresh", async () => {
+    const r = await rig();
+    await r.controller.noteMinutesLeft(5);
+    expect((await r.controller.extras()).minutesLeft).toBeNull(); // not running: nothing kept
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    await r.controller.settledWork();
+    // 1, below the 3 minutes the caps give: the kept value wins (it never counts up).
+    await r.controller.noteMinutesLeft(1);
+    expect((await r.controller.extras()).minutesLeft).toBe(1);
+    const view = captureUi(await r.controller.current(), { minutesLeft: (await r.controller.extras()).minutesLeft }, "W", 0);
+    expect(view).toMatchObject({ kind: "capturing", minutesLeft: 1 });
+    // A new capture, started from the finished one (no reset in between), starts fresh.
+    await r.readAll();
+    expect(await r.phase()).toBe("done");
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: true });
+    await r.controller.settledWork();
+    expect((await r.controller.extras()).minutesLeft).toBeNull();
+  });
+
+  it("a fractional cap from Scouty is at least 1, never 0 (which the scroll loop would read as no cap)", async () => {
+    const r = await rig({ caps: { posts: 0.5, comments: 0, reactions: 0 } });
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    await r.controller.settledWork();
+    await r.read(); await r.read(); await r.read();
+    expect((await r.controller.readerHello(TAB)).args).toMatchObject({ section: "posts", cap: 1 });
+  });
+
   it("user stop: the current section is uploaded as partial, later ones are skipped", async () => {
     const r = await rig();
     await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
@@ -275,7 +303,11 @@ describe("capture controller", () => {
     expect(await r.controller.current()).toMatchObject({ phase: "done", result: { stop: "tab_closed", completeness: "partial" } });
     expect(line(manifestOf(r)).slice(0, 2)).toEqual(["profile:complete:null", "experience:skipped:tab_closed"]);
     // Another tab closing changes nothing.
+    const before = await r.controller.current();
+    const requests = r.stub.state.requests.length;
     await r.controller.tabRemoved(12345);
+    expect(await r.controller.current()).toEqual(before);
+    expect(r.stub.state.requests).toHaveLength(requests);
   });
 
   it("leaving /in/ for an address the extension cannot see stops with left_linkedin: 'The page changed', not a sign-in", async () => {
@@ -334,6 +366,22 @@ describe("capture controller", () => {
     expect(r.injected.filter((f) => f === "reader.js")).toHaveLength(1);
   });
 
+  it("a page still loading after 30 s stops the capture as timed out, not as the user leaving", async () => {
+    const r = await rig();
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    r.tab.hang = true;
+    await r.read();
+    await r.controller.settledWork();
+    expect(await r.controller.current()).toMatchObject({ phase: "done", result: { stop: "timeout" } });
+  });
+  it("waits out the previous page still reported complete right after a navigation, instead of declaring the section missing", async () => {
+    const r = await rig();
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    r.tab.staleFor = 3; // the next page opened reports the old (profile) page as complete three times first
+    await r.read(); await r.read(); await r.read(); await r.read(); await r.read(); await r.read();
+    expect(line(manifestOf(r))).not.toContainEqual(expect.stringContaining("no_such_section"));
+    expect(await r.controller.current()).toMatchObject({ phase: "done", result: { completeness: "complete" } });
+  });
   it("an empty activity page is declared unavailable and not uploaded; an unreadable page is skipped: read_failed", async () => {
     const r = await rig();
     await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
@@ -354,6 +402,28 @@ describe("capture controller", () => {
     const manifest = manifestOf(r);
     expect(line(manifest).slice(3)).toEqual(["posts:partial:timeout", "comments:complete:null", "reactions:complete:null"]);
     expect(manifest.stop).toBeNull();
+  });
+
+  it("the upload during reading is sent once: a 503 or a dropped request defers it to finalize without holding the reader", async () => {
+    for (const kind of ["503", "drop"] as const) {
+      const r = await rig();
+      await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+      r.stub.fail(/PUT .*\/sections\/profile$/, kind, 1);
+      const sleepsBefore = r.sleeps.length;
+      await r.read();
+      // One PUT, no backoff waited inside the reader queue.
+      expect(r.stub.state.requests.filter((q) => q.method === "PUT"), kind).toHaveLength(1);
+      expect(r.sleeps.length, kind).toBe(sleepsBefore);
+      expect(await r.controller.current(), kind).toMatchObject({ phase: "running", section: "experience" });
+      await r.readAll();
+      // Finalize sent it (and the sections after it) from the outbox: nothing lost.
+      expect(await r.phase(), kind).toBe("done");
+      const puts = r.stub.state.requests.filter((q) => q.method === "PUT" && q.path.endsWith("/sections/profile"));
+      expect(puts, kind).toHaveLength(2);
+      expect(puts[1]!.status, kind).toBe(204);
+      expect(manifestOf(r).sections.every((e) => e.state === "complete"), kind).toBe(true);
+      unwire();
+    }
   });
 
   it("expiry is noticed lazily by the next event, clears everything and says so (screen 27)", async () => {
@@ -617,7 +687,7 @@ describe("capture controller", () => {
     let r = await rig({ minVersion: "9.0.0" });
     await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
     const state = await r.controller.current();
-    expect(state).toEqual({ phase: "idle", notice: { kind: "outdated", storeUrl: "https://example.invalid/store" } });
+    expect(state).toEqual({ phase: "idle", notice: { kind: "outdated", storeUrl: "https://chromewebstore.google.com/detail/synthetic-store-entry" } });
     expect(captureUi(state, { minutesLeft: null }, "W", 0)).toEqual({ kind: "outdated" });
     unwire();
     r = await rig();
@@ -789,6 +859,29 @@ describe("waiting on Scouty is not being offline", () => {
     expect(r.tab.updates).toHaveLength(opened);
   });
 
+  it("the browser's online event tries 'You're offline' again at once, without waiting out OFFLINE_RETRY_MS", async () => {
+    const r = await rig({ capsBySlug: NO_NETWORK_SECTIONS });
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    r.stub.fail(/POST .*\/finalize$/, "drop", 6);
+    await r.readAll();
+    expect(await r.controller.current()).toMatchObject({ phase: "finalizing", blocked: "offline" });
+    await r.controller.retryIfDue({ online: true });
+    await r.controller.settledWork();
+    expect(await r.phase()).toBe("done");
+  });
+
+  it("the online event does not cut short a wait Scouty asked for", async () => {
+    const r = await rig({ capsBySlug: NO_NETWORK_SECTIONS });
+    await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+    r.stub.fail(/POST .*\/finalize$/, "503", 6);
+    await r.readAll();
+    expect(await r.controller.current()).toMatchObject({ phase: "finalizing", blocked: "server" });
+    const before = r.stub.state.requests.length;
+    await r.controller.retryIfDue({ online: true });
+    expect(r.stub.state.requests).toHaveLength(before);
+    expect(await r.controller.current()).toMatchObject({ blocked: "server" });
+  });
+
   it("still offline when asked again: stays on 'You're offline' and waits another OFFLINE_RETRY_MS", async () => {
     const r = await rig({ capsBySlug: NO_NETWORK_SECTIONS });
     await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
@@ -801,6 +894,183 @@ describe("waiting on Scouty is not being offline", () => {
     await r.controller.settledWork();
     expect(r.stub.state.requests.length).toBeGreaterThan(before);
     expect(await r.controller.current()).toMatchObject({ phase: "finalizing", blocked: "offline", retryAt: r.clock.now + OFFLINE_RETRY_MS });
+  });
+
+  describe("the retry alarm (wakes a stopped background)", () => {
+    const alarm = (): number | undefined => fake.alarms.get(RETRY_ALARM);
+
+    it("a server wait sets the alarm for its end; done clears it", async () => {
+      const r = await rig({ capsBySlug: NO_NETWORK_SECTIONS });
+      await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+      r.stub.fail(/POST .*\/finalize$/, "503", 6);
+      await r.readAll();
+      const state = await r.controller.current();
+      expect(state).toMatchObject({ blocked: "server" });
+      expect(alarm()).toBe((state as { retryAt: number }).retryAt);
+      r.clock.now += SERVER_RETRY_MS;
+      r.timers.find((tm) => tm.ms === SERVER_RETRY_MS)!.fire();
+      await flush(r);
+      expect(await r.phase()).toBe("done");
+      expect(alarm()).toBeUndefined();
+      expect(fake.alarmCalls.at(-1)).toEqual({ op: "clear", name: RETRY_ALARM });
+    });
+
+    it("a 60 s Retry-After outlives the background: the alarm wakes a new one, which sends; nothing else asked", async () => {
+      const r = await rig({ capsBySlug: NO_NETWORK_SECTIONS });
+      await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+      r.stub.fail(/POST .*\/finalize$/, "429-long", 1);
+      await r.readAll();
+      const blockedAt = r.clock.now;
+      expect(alarm()).toBe(blockedAt + 60_000);
+      // The service worker stopped (its timer is gone); the alarm starts a new one, which registers its listener.
+      r.newController();
+      onWake(() => void r.controller.retryIfDue({ alarm: true }));
+      r.clock.now = blockedAt + 60_000;
+      fake.fireAlarm(RETRY_ALARM);
+      await flush(r);
+      expect(await r.phase()).toBe("done");
+      expect(alarm()).toBeUndefined();
+    });
+
+    it("'You're offline' sets the alarm too; one that goes off early is set again; still offline sets the next", async () => {
+      const r = await rig({ capsBySlug: NO_NETWORK_SECTIONS });
+      await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+      r.stub.fail(/(GET|POST) \/api\/linkedin\/ext\/captures\/.*/, "drop", 1000);
+      await r.readAll();
+      onWake(() => void r.controller.retryIfDue({ alarm: true }));
+      const first = r.clock.now + OFFLINE_RETRY_MS;
+      expect(await r.controller.current()).toMatchObject({ blocked: "offline", retryAt: first });
+      expect(alarm()).toBe(first);
+      // Early: nothing sent, the alarm is set again for the end of the wait.
+      const before = r.stub.state.requests.length;
+      fake.fireAlarm(RETRY_ALARM);
+      await flush(r);
+      expect(r.stub.state.requests).toHaveLength(before);
+      expect(alarm()).toBe(first);
+      // After the wait, still offline: tried, and the next alarm is set.
+      r.clock.now = first;
+      fake.fireAlarm(RETRY_ALARM);
+      await flush(r);
+      expect(r.stub.state.requests.length).toBeGreaterThan(before);
+      expect(await r.controller.current()).toMatchObject({ blocked: "offline", retryAt: r.clock.now + OFFLINE_RETRY_MS });
+      expect(alarm()).toBe(r.clock.now + OFFLINE_RETRY_MS);
+      // The network is back: the next alarm sends, done, and the alarm is cleared.
+      r.stub.clearFaults();
+      r.clock.now += OFFLINE_RETRY_MS;
+      fake.fireAlarm(RETRY_ALARM);
+      await flush(r);
+      expect(await r.phase()).toBe("done");
+      expect(alarm()).toBeUndefined();
+    });
+
+    it("while an outbox exists the alarm is kept, at its expiry while reading or waiting for sign-in", async () => {
+      const r = await rig();
+      await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+      const expiresAt = (await outbox.load())!.expiresAt;
+      expect(alarm()).toBe(expiresAt);
+      await r.read();
+      r.stub.revokeAll();
+      await r.read();
+      expect(await r.controller.current()).toMatchObject({ phase: "finalizing", blocked: "auth" });
+      expect(alarm()).toBe(expiresAt);
+    });
+
+    it("blocked on sign-in, the background restarts: the alarm at the expiry deletes the outbox (the 20 minutes)", async () => {
+      const r = await rig();
+      await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+      await r.read();
+      r.stub.revokeAll();
+      await r.read();
+      const expiresAt = (await outbox.load())!.expiresAt;
+      expect(alarm()).toBe(expiresAt);
+      // The background stopped; nothing else happens until the alarm starts a new one.
+      r.newController();
+      onWake(() => void r.controller.alarmFired());
+      await r.controller.recover();
+      expect(alarm()).toBe(expiresAt);
+      expect(await outbox.load()).not.toBeNull();
+      r.clock.now = expiresAt;
+      fake.fireAlarm(RETRY_ALARM);
+      await flush(r);
+      expect(await outbox.load()).toBeNull();
+      expect([...fake.session.data.keys()].filter((key) => key.startsWith("outbox"))).toEqual([]);
+      expect(r.states.at(-1)).toEqual(EXPIRED);
+      expect(alarm()).toBeUndefined();
+    });
+
+    it("an outbox left without a capture that ran out is deleted by the alarm", async () => {
+      const r = await rig();
+      await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+      const expiresAt = (await outbox.load())!.expiresAt;
+      // As if the capture state was lost but the outbox stayed.
+      fake.session.data.set("capture.state", IDLE);
+      r.newController();
+      r.clock.now = expiresAt + 1;
+      await r.controller.alarmFired();
+      expect(await outbox.load()).toBeNull();
+      expect(alarm()).toBeUndefined();
+    });
+
+    it("sending keeps the alarm SENDING_WAKE_MS ahead; a background stopped mid-finalize is woken and finishes", async () => {
+      const r = await rig({ capsBySlug: NO_NETWORK_SECTIONS });
+      // Finalize hangs: the background will stop while it is in flight.
+      let hold = true;
+      setApiDeps({
+        transport: (url, init) => (hold && /\/finalize$/.test(String(url)) ? new Promise<Response>(() => undefined) : r.stub.fetch(url, init)),
+        sleep: async (ms) => { r.clock.now += ms; }, random: () => 0.5, now: () => r.clock.now,
+      });
+      await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+      const expiresAt = (await outbox.load())!.expiresAt;
+      // Read every section; the queue then hangs in finalize, so wait for it only a moment each time.
+      const settle = (): Promise<unknown> => Promise.race([r.controller.settledWork(), new Promise((resolve) => setTimeout(resolve, 20))]);
+      for (let i = 0; i < 10; i += 1) {
+        await settle();
+        if ((await r.controller.current()).phase !== "running") break;
+        const hello = await r.controller.readerHello(TAB);
+        if (!hello.args) break;
+        void r.controller.readerResult(TAB, hello.args.section, hello.args.seq, okResult(hello.args.section, hello.args.seq));
+      }
+      await settle();
+      expect(await r.controller.current()).toMatchObject({ phase: "finalizing", blocked: null });
+      const sendingAt = r.clock.now;
+      expect(alarm()).toBe(Math.min(expiresAt, sendingAt + SENDING_WAKE_MS));
+      // The alarm goes off while the send is still in flight: it is set again at once.
+      r.clock.now += SENDING_WAKE_MS;
+      void r.controller.alarmFired();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(alarm()).toBe(r.clock.now + SENDING_WAKE_MS);
+      // The background stops mid-finalize; the alarm starts a new one, which picks the send up.
+      hold = false;
+      r.newController();
+      onWake(() => void r.controller.alarmFired());
+      r.states.length = 0;
+      void r.controller.recover();
+      fake.fireAlarm(RETRY_ALARM);
+      await flush(r);
+      await flush(r);
+      expect(await r.phase()).toBe("done");
+      // Straight back to sending: the restart never showed "You're offline".
+      expect(r.states.some((state) => state.phase === "finalizing" && state.blocked === "offline")).toBe(false);
+      expect(alarm()).toBeUndefined();
+    });
+
+    it("reset while waiting, or a send that fails for good: the alarm is cleared", async () => {
+      const r = await rig({ capsBySlug: NO_NETWORK_SECTIONS });
+      await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+      r.stub.fail(/POST .*\/finalize$/, "503", 6);
+      await r.readAll();
+      expect(alarm()).toBeDefined();
+      await r.controller.reset();
+      expect(alarm()).toBeUndefined();
+      // Failed for good (a 500 on finalize): the outbox goes after the notice, and the alarm with it.
+      const failed = await rig({ capsBySlug: NO_NETWORK_SECTIONS });
+      await failed.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+      failed.stub.fail(/POST .*\/finalize$/, "500", 1);
+      await failed.readAll();
+      expect(await failed.controller.current()).toEqual({ phase: "idle", notice: { kind: "failed" } });
+      expect(await outbox.load()).toBeNull();
+      expect(alarm()).toBeUndefined();
+    });
   });
 
   it("a create that spends its retries on 503: screen 26 with Try now (start again), not 22; a 429 says roughly when", async () => {
@@ -836,6 +1106,30 @@ describe("waiting on Scouty is not being offline", () => {
     r = await rig({ capturesLeftToday: 0 });
     await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
     expect(await r.controller.current()).toMatchObject({ phase: "idle", notice: { kind: "limit" } });
+  });
+
+  it("a state read right as the outbox is cleared (the popup polls) never turns a saved capture or a failure into \"timed out\"", async () => {
+    for (const fail of [false, true]) {
+      const r = await rig({ capsBySlug: NO_NETWORK_SECTIONS });
+      await r.controller.start({ tabId: TAB, url: PROFILE_URL, recapture: false });
+      if (fail) r.stub.fail(/POST .*\/finalize$/, "500", 1);
+      const original = fake.session.remove;
+      const seen: string[] = [];
+      fake.session.remove = async (keys: string | string[]) => {
+        await original.call(fake.session, keys);
+        if ((Array.isArray(keys) ? keys : [keys]).includes("outbox")) seen.push((await r.controller.current()).phase);
+      };
+      try {
+        await r.readAll();
+      } finally {
+        fake.session.remove = original;
+      }
+      const state = await r.controller.current();
+      if (fail) expect(state).toEqual({ phase: "idle", notice: { kind: "failed" } });
+      else expect(state).toMatchObject({ phase: "done" });
+      expect(seen.length).toBeGreaterThan(0);
+      expect(r.stub.state.requests.filter((q) => q.path.endsWith("/finalize"))).toHaveLength(1);
+    }
   });
 
   it("a 500 on finalize stays terminal", async () => {

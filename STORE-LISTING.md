@@ -1,6 +1,6 @@
 # Store listings
 
-What to type into each store for **Scouty B2B Prospector - Lead Research & Outreach Coach** (short form "Scouty B2B Prospector"; toolbar short name "Scouty B2B"). The name, summary and description name no
+What to type into each store for **Scouty B2B Prospector - Lead Research & Outreach Coach** (on Firefox "Scouty B2B Prospector - Lead Research & Outreach", within its 50-character limit; short form "Scouty B2B Prospector"; toolbar short name "Scouty B2B"). The name, summary and description name no
 social network on purpose (the reviewer-only fields below say "the network" too; the manifest's host permission is what names the site): more networks will follow, and the name should rank for B2B lead research
 and outreach rather than for one site. Click paths are in the app plan
 (`docs/plans/linkedin-outreach-coach.md` §15.10), the rejection playbook in §15.11, and the source of
@@ -11,8 +11,9 @@ other browser.
 
 | Field | Value |
 | --- | --- |
-| Name (≤ 75) | Scouty B2B Prospector - Lead Research & Outreach Coach (54, `extName`; title "Scouty B2B Prospector", `extTitle`; `short_name` "Scouty B2B", `extShortName`, 12 at most) |
-| Short description / summary (≤ 132) | Research the B2B leads you choose on social networks and get a step-by-step outreach plan in Scouty. Only reads; never acts for you. (132, `extDescription`) |
+| Name (Chrome, Edge ≤ 75) | Scouty B2B Prospector - Lead Research & Outreach Coach (54, `extName`; title "Scouty B2B Prospector", `extTitle`; `short_name` "Scouty B2B", `extShortName`, 12 at most) |
+| Name (Firefox ≤ 50) | Scouty B2B Prospector - Lead Research & Outreach (48, `extNameFirefox`, set by `manifest.firefox.json`): addons.mozilla.org limits a name to 50 characters, so the Firefox build drops "Coach". Type the same name into the AMO listing |
+| Short description / summary (≤ 132) | Research B2B leads you choose on a social network and get a step-by-step outreach plan in Scouty. Never posts or messages for you. (130, `extDescription`; it says what the extension never does rather than "only reads", because it presses "see more" and "show more results") |
 | Category | Chrome: **Productivity → Workflow & Planning**; Edge: **Productivity**; Firefox: **Social & Communication** |
 | Language | English |
 | Homepage / website | `https://scouty.to/scouty-b2b` (also the manifest's `homepage_url`) |
@@ -29,7 +30,7 @@ Scouty B2B Prospector helps you research a B2B lead and prepare your first messa
 
 Open the lead's profile on a supported social network in your browser and press Capture. The extension reads that one person's profile, experience and skills, and their recent posts, comments and reactions, as the network shows them to you. It sends what it read to your Scouty workspace, where Scouty writes a step-by-step plan: what to look at, when to connect, and a note and first message in their language, ready to copy.
 
-It only reads. It never posts, likes, comments, connects or messages for you, and it does not read your password, cookies, messages, contacts or feed. Nothing runs until you press Capture, and you can stop a capture at any time.
+It reads only the pages of the person you capture, and presses only "see more" and "show more results" to read them in full. It never posts, likes, comments, connects or messages for you, and it does not read your password, cookies, messages, contacts or feed. Nothing runs until you press Capture; the only background work is finishing sending a capture you started. You can stop a capture at any time.
 
 You need a Scouty account. Connect the extension to your workspace from its window; disconnect at any time in the extension or in Scouty under Settings, Connected Apps.
 
@@ -43,6 +44,7 @@ Social networks often don't allow automated tools like this one and may restrict
   - `scripting`: to read the profile pages of the person the user chose to capture, only during that capture.
   - `storage`: to keep the user's Scouty connection, the first-run consent, and a capture in progress (in memory) until Scouty confirms it.
   - `identity`: to sign the user in to Scouty through the browser's sign-in window.
+  - `alarms`: to wake the extension's background and try sending a capture the user started again after Scouty or the network did not take it (the browser stops an idle background, which loses a timer). Nothing is read on an alarm, and it is cleared once the capture is sent or ends.
   - The social network host permission declared in the manifest: the browser shows it as access to that site; the extension reads only the profile pages (`/in/…`) of the person being captured, checked in code before every read, and only after the user presses Capture.
   - Host `https://scouty.to/*`: the only place data is sent.
 - **Remote code:** No. Everything the extension runs is in the package.
@@ -59,7 +61,7 @@ Steps:
 2. Open a public profile on the supported network, for example <a public profile URL>, while signed in to that network.
 3. Click the extension icon, read the one-time notice, and press Capture. The window shows what it reads; you can press Stop.
 4. When it says Done, press "Open in Scouty": the plan for that person opens in the Scouty app.
-The extension never clicks, posts or sends anything on the network; it only loads that person's profile and activity pages in your tab.
+The extension only loads that person's profile and activity pages in your tab. To read longer posts and lists it presses only inline "see more" and "show more results" controls; it never posts, likes, comments, connects or messages, and sends nothing to the network.
 ```
 
 Firefox add-on id: `prospector@scouty.to` (permanent once published; the OAuth redirect URL derives

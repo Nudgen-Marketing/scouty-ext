@@ -239,13 +239,44 @@ describe("auth", () => {
     expect(fake.session.data.size + fake.local.data.size).toBe(0);
   });
 
-  it("asks for trusted-context storage where supported and survives where it is not (Firefox)", async () => {
+  it("a sign-out during a refresh in flight waits for it, then revokes what it stored: never signed in again by the late refresh", async () => {
+    await connectWith(approve);
+    calls = [];
+    clock += 900_000;
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    respond = async (call) => {
+      if (call.url.endsWith("/oauth/token")) { await held; return tokenJson(2); }
+      return new Response(null, { status: 200 });
+    };
+    const refreshing = auth.tokenSource.current();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const signingOut = auth.signOut();
+    release();
+    expect(await refreshing).toBe("access-2");
+    await signingOut;
+    expect(calls.map((c) => new URL(c.url).pathname)).toEqual(["/oauth/token", "/oauth/revoke"]);
+    // The revoked token is the one the refresh stored, and nothing is left.
+    expect(body(calls[1]!).get("token")).toBe("refresh-2");
+    expect(fake.session.data.size + fake.local.data.size).toBe(0);
+    expect(await auth.isConnected()).toBe(false);
+  });
+
+  it("asks for trusted-context storage on each area; a refusal (storage.local before Chrome 140) or no call at all (Firefox) is survived", async () => {
     await auth.hardenStorage();
+    expect(fake.session.setAccessLevel).toHaveBeenCalledWith({ accessLevel: "TRUSTED_CONTEXTS" });
     expect(fake.local.setAccessLevel).toHaveBeenCalledWith({ accessLevel: "TRUSTED_CONTEXTS" });
-    const original = fake.local.setAccessLevel;
-    fake.local.setAccessLevel = undefined;
-    fake.session.setAccessLevel = vi.fn(async () => { throw new Error("not implemented"); });
+    const original = { local: fake.local.setAccessLevel, session: fake.session.setAccessLevel };
+    // Chrome 116-139: storage.session accepts it, storage.local refuses; the session call is still made.
+    fake.session.setAccessLevel = vi.fn(async () => undefined);
+    fake.local.setAccessLevel = vi.fn(async () => { throw new Error("This StorageArea is not available for setting access level"); });
     await expect(auth.hardenStorage()).resolves.toBeUndefined();
-    fake.local.setAccessLevel = original;
+    expect(fake.session.setAccessLevel).toHaveBeenCalledTimes(1);
+    // Firefox: no such call on either area.
+    fake.local.setAccessLevel = undefined;
+    fake.session.setAccessLevel = undefined;
+    await expect(auth.hardenStorage()).resolves.toBeUndefined();
+    fake.local.setAccessLevel = original.local;
+    fake.session.setAccessLevel = original.session;
   });
 });

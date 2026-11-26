@@ -8,7 +8,7 @@ for any changed popup state.
 
 ## 1. What the product does (for context)
 
-- **Scouty B2B Prospector - Lead Research & Outreach Coach** ("Scouty B2B Prospector"; renamed from "Scouty Extension" on 2026-11-26; Chrome, Edge, Firefox; published by the company in a public repository and
+- **Scouty B2B Prospector - Lead Research & Outreach Coach** (on Firefox "Scouty B2B Prospector - Lead Research & Outreach", within addons.mozilla.org's 50-character limit; "Scouty B2B Prospector"; renamed from "Scouty Extension" on 2026-11-26; Chrome, Edge, Firefox; published by the company in a public repository and
   three stores): when the user presses **Capture** on a LinkedIn profile, it loads that person's six
   profile pages in the user's own tab (profile, experience, skills, posts, comments, reactions),
   reads the text LinkedIn shows the user, and sends it to the user's Scouty workspace. It presses
@@ -27,12 +27,12 @@ for any changed popup state.
 | --- | --- | --- |
 | T1 | First-run consent and risk notice (popup state 5 "Before you start") | `scouty-ext` → `_locales/en/messages.json` (`consentTitle`, `consentPoint1–3`) |
 | T2 | Permission screen (state 1) | `scouty-ext` → `_locales/en/messages.json` (`permissionTitle`, `permissionBody`) |
-| T3 | Store description and extension description | `scouty-ext` → `STORE-LISTING.md`; `_locales/en/messages.json` (`extDescription`) |
+| T3 | Store description and extension description ("Research B2B leads you choose on a social network and get a step-by-step outreach plan in Scouty. Never posts or messages for you."; it said "Only reads; never acts for you" until 2026-11-26, DEVIATIONS 27, but the extension presses "see more" and "show more results") | `scouty-ext` → `STORE-LISTING.md`; `_locales/en/messages.json` (`extDescription`) |
 | T4 | Store privacy disclosures: single purpose, permission justifications, data collected, certifications, Edge personal-information answer, Firefox data collection (`data_collection_permissions` in the manifest) | `scouty-ext` → `STORE-LISTING.md` "Privacy practices"; `manifest.firefox.json` |
 | T5 | Extension privacy statement (the store "privacy policy" text) | `scouty-ext` → `PRIVACY.md` |
 | T6 | App privacy page, section "Scouty B2B Prospector" (`/privacy#scouty-b2b`) | `scouty` → `src/app/(legal)/privacy/page.tsx` (marked `PENDING LEGAL SIGN-OFF`) |
-| T7 | App terms sentence (`/terms#linkedin-extension`) | `scouty` → `src/app/(legal)/terms/page.tsx` (marked `PENDING LEGAL SIGN-OFF`) |
-| T8 | Public page `/scouty-b2b` (was `/scouty-extension`, which redirects) (what it reads, what it never does, LinkedIn risk, trademark line, FAQ) and the two homepage FAQ items | `scouty` → `src/lib/scouty-extension-page.ts` |
+| T7 | App terms sentence (`/terms#scouty-b2b`) | `scouty` → `src/app/(legal)/terms/page.tsx` (marked `PENDING LEGAL SIGN-OFF`) |
+| T8 | Public page `/scouty-b2b` (was `/scouty-extension`, which redirects) (what it reads, what it never does, the network-neutral risk notice "Social networks often don't allow automated tools like this one…", the trademark line "Names of social networks are trademarks of their owners…", FAQ) and the two homepage FAQ items | `scouty` → `src/lib/scouty-extension-page.ts` |
 | T9 | "Can't capture this profile / Scouty doesn't keep data about this person" (a person who asked to be erased) | `scouty-ext` → `_locales/en/messages.json` (`suppressedTitle`, `suppressedBody`) |
 | T10 | Sign-up acceptance line ("By creating an account, you agree to our Terms and Privacy Policy") | `scouty` → `src/components/auth/sign-up-form.tsx` |
 
@@ -40,10 +40,13 @@ Current wording of the user-facing consent (T1, T2), quoted for convenience:
 
 > **Before you start**
 > - Scouty reads this profile and the person's recent posts, comments and reactions.
-> - It never clicks, likes, connects, messages or posts for you.
+> - It only presses "see more" and "show more results" to read in full. It never likes, comments, connects, messages or posts for you.
 > - The person may see that you viewed their profile. This site may not allow tools like this and may limit your account.
 
-> **Allow access**: Scouty only reads the profiles you choose.
+> **Allow access**: Scouty only opens the profiles you choose to capture.
+
+Consent point 2 was reworded on 2026-11-26 (DEVIATIONS 26): it said only "see more" on posts, but the
+reader also presses "see more" in profile sections and "show more results".
 
 Terms sentence (T7): "If you use Scouty B2B Prospector, you are responsible for using it in line
 with the terms of each social network you use it on, and only on people you have a legitimate
@@ -56,8 +59,14 @@ because more social networks will follow. The risk notice is now "Social network
 automated tools like this one and may restrict accounts that use them. You use the extension at your
 own risk.", and the trademark line "Names of social networks are trademarks of their owners. Scouty
 is not affiliated with or endorsed by any of them." The popup now says "this site" (T1: "This site may not allow tools like this and may limit your
-account."), and the reviewer-only store fields say "the network"; only the manifest's host permission
-names the site. **Question 10 below** asks whether this is enough.
+account."), and the reviewer-only store fields say "the network" (for example "Open a public profile
+on the supported network"). The manifest's host permission is the only place the site is named; the
+browser shows it as access to that site when the extension is installed. **Question 10 below** asks whether this is enough.
+
+**When the app texts go public.** T6, T7, T8 and the homepage FAQ items are shown only once the
+feature is on for everyone (`LINKEDIN_COACH_ENABLED=true` and `LINKEDIN_COACH_AUDIENCE=all`, app
+`src/lib/extension-publication.ts`), so deploying the app with the feature off or for administrators
+only publishes none of them before this review.
 
 ## 3. Data handling as built (to check against the texts)
 
@@ -74,8 +83,9 @@ names the site. **Question 10 below** asks whether this is enough.
 ## 4. Questions for the reviewer
 
 1. **LinkedIn's User Agreement.** The extension reads LinkedIn in the user's own session, on the
-   user's action, at a human pace, and the texts say plainly that LinkedIn does not allow tools like
-   this and may limit the user's account, and that the user uses it at their own risk (T1, T5, T8).
+   user's action, at a human pace, and the texts say plainly that this site (T1) or social networks
+   (T3, T5, T8) may not allow tools like this and may limit the user's account, and that the user
+   uses it at their own risk; they do not name LinkedIn (see question 10).
    Is this disclosure enough for users, and is the company's own exposure (publishing it in three
    stores and a public repository) acceptable?
 2. **Arbitrary people and connections-only content.** Users may capture anyone, not only leads,
@@ -95,8 +105,10 @@ names the site. **Question 10 below** asks whether this is enough.
 7. **AI processing.** Is the AI-provider disclosure in T6 ("sent to OpenAI through its API… we
    don't use it to train our own models") sufficient, and consistent with the main AI-processing
    section of the privacy page?
-8. **Trademark.** Is the LinkedIn trademark line on `/scouty-b2b` (T8) and the use of the
-   word "LinkedIn" in the store listings acceptable?
+8. **Trademark.** Is the neutral trademark line on `/scouty-b2b` (T8), "Names of social networks
+   are trademarks of their owners. Scouty is not affiliated with or endorsed by any of them.",
+   acceptable when it names no network? The store listings (name, summary, description) name no
+   network either; only the manifest's host permission names the site.
 9. **New accounts from the extension.** Is the sign-up acceptance line (T10) enough when someone
    creates their Scouty account from the extension's sign-in window?
 

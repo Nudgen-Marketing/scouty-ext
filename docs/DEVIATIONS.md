@@ -42,6 +42,18 @@ one API client, least-privilege manifests, nothing reduced submitted as complete
    Since 2026-11-26 (24) "You're offline" is also tried again without **Try now**: whenever the
    popup or the overlay asks for the state and 15 s (`OFFLINE_RETRY_MS`) have passed since the last
    try, as the server-error state already was (that one also has its own timer; offline has none).
+   Since round 2 (25) the overlay asks again by itself every 15 s while it shows "You're offline",
+   and the background tries again at once on the browser's `online` event (without waiting out the
+   15 s; a wait Scouty asked for is still kept). The `online` event reaches only an awake service
+   worker or event page; a stopped one is covered by the overlay's asks and by a restart (`recover`).
+   Since round 3 (26) both waits also set an alarm (`alarms` permission, no install warning;
+   `src/background/wake.ts`) for the end of the wait: the alarm starts a stopped service worker or
+   event page, which tries again, so a 60 s `Retry-After` or a closed capture tab no longer leaves
+   the capture waiting until its 20 minutes run out. Chromium fires an alarm no sooner than 30 s
+   after it is set (Chrome 120 and later; 1 minute on Chrome 116-119, which `minimum_chrome_version`
+   116 still allows), so the in-memory timer still covers a shorter server wait while the background
+   is awake. The alarm is cleared when the wait ends (sent, failed, expired, reset). The overlay
+   also asks again every 15 s while it shows "Scouty isn't answering" during sending.
 9. **Sanitizer keeps a few things the plan's list drops:** the bare attribute names `hidden`,
    `disabled` and `href` (no value), and the ids `global-nav` and `captcha-internal`, because the
    page-state and click rules depend on their presence. Every other id and every value is dropped.
@@ -70,8 +82,11 @@ one API client, least-privilege manifests, nothing reduced submitted as complete
     "all rights reserved, published for review" notice is used until the owner decides.
 15. **Firefox lint warnings.** `web-ext lint` reports no errors and three warnings: two for
     `innerHTML` inside React's own code in `popup.js`, and one that
-    `data_collection_permissions` needs Firefox for Android 142 (Android is not targeted and the
-    plan asks for no `gecko_android` key).
+    `data_collection_permissions` needs Firefox for Android 142
+    (`KEY_FIREFOX_ANDROID_UNSUPPORTED_BY_MIN_VERSION`). **Accepted:** the add-on is desktop-only by
+    plan ("no `gecko_android`"); web-ext reads Android's minimum from `strict_min_version` because no
+    `gecko_android` key narrows it, and adding one would declare Android support the add-on does not
+    have (deviation 27).
 
 16. **Host permission scope in Chromium.** The plan relies on the `/in/*` host pattern to keep the
     extension off LinkedIn's sign-in and checkpoint pages. Chromium ignores the path and grants the
@@ -156,8 +171,8 @@ one API client, least-privilege manifests, nothing reduced submitted as complete
     sentence and one clear primary action, with no technical words; this replaces the plan 12.4
     wording (the screens, their order, actions and roles are unchanged). Main changes: the
     overlay's fixed line ("Scouty is reading this page. It won't click or post anything.") is
-    gone; the trust message is shown once, while reading ("Reading posts…" / "Scouty never clicks
-    or posts for you."), with a bar, "23 of 50" and the time left, and no list of steps. A
+    gone; the trust message is shown once, while reading ("Reading posts…" / "Scouty never posts
+    or messages for you.", worded so since §25), with a bar, "23 of 50" and the time left, and no list of steps. A
     finished capture says "Done" with "Profile · 19 posts · 20 comments · 20 reactions",
     **Open in Scouty** and **Close** (no "Complete" pill); a partial one says "Partly done", what
     was read, and one line on what is missing, in place of a line per section. The ready screen no
@@ -299,6 +314,228 @@ Tested in `test/unit/urn.test.ts`, `test/unit/blocks.test.ts`, `e2e/capture.spec
   the only background work is finishing sending a capture the user started.
 - **Offline retry** on the popup or overlay asking (deviation 8).
 
+### 25. Review fixes, round 2 (2026-11-26)
+
+- **Paced "… more" presses.** `expandWithin` pressed every rendered expand control in one
+  synchronous loop, off-screen ones too. It now presses at most one per call, the first that is
+  visible and near the viewport (`domReach`: in it, or within one viewport height above or below);
+  the scroll loop (`runScrollLoop`) calls it up to `PACING.maxClicksPerStep` (3) times per scroll
+  step, `clickGapMs` (300 to 900 ms, from the same injected randomness as the scroll pauses) apart.
+  A control further down is pressed on a later step; one scrolled far past is not come back to (its
+  item stays `truncated`). On activity pages only the items that will be kept (the first `cap`) are
+  expanded, and at the cap the loop goes on scrolling only while those still have controls ahead,
+  for no longer than its idle steps, step limit or time budget allow (that still ends as "cap").
+  Budgets are unchanged (activity 40 steps / 90 s, profile 15 / 45 s); the gaps count against them.
+  Tests: `test/unit/pacing.test.ts`, `test/unit/blocks.test.ts` ("expandWithin"),
+  `test/unit/visible-text.test.ts` ("domReach"); the e2e runs still read the expanded text.
+- **Reader after an extension reload or update.** The reader's `send` swallowed "Extension context
+  invalidated", retried and answered null, and the loop went on scrolling and pressing. The overlay's
+  test (`cutOff`: that message and no `runtime.id`) is now shared in `src/ext.ts`; the reader's
+  channel (`readerChannel`) stops trying on it, and the loop checks it (`cutOff` in `LoopOptions`)
+  before every scroll and every press: it ends as `cut_off`, nothing is built and nothing is sent.
+  Tests: `test/unit/reader.test.ts`, `test/unit/pacing.test.ts`.
+- **STORE-LISTING.md** reviewer note said the extension "never clicks"; it now says, as PRIVACY.md
+  and README do, that it presses only inline "see more" and "show more results" controls and never
+  posts, likes, comments, connects or messages. The popup and overlay copy now say the same: the
+  consent point "It only opens "see more" on posts. It never likes, comments, connects, messages or
+  posts for you." and the reading line "Scouty never posts or messages for you." (legal pack T1).
+- **Store link.** A 426's `storeUrl` was opened if it was any https address. Only https pages of
+  `chromewebstore.google.com`, `chrome.google.com`, `microsoftedge.microsoft.com` and
+  `addons.mozilla.org` (default port, no credentials), or of the configured API origin, are kept
+  (`src/background/store-url.ts`), when parsed and again before opening. Tests:
+  `test/unit/store-url.test.ts`.
+- **Offline retry** without asking: deviation 8. Tests: `test/unit/session.test.ts` ("online event"),
+  `test/unit/overlay-recheck.test.ts`.
+- **Consent in the background.** Consent was enforced only by the screens. A Capture action now
+  starts nothing without it (`startCapture` in `ui-state.ts`, used by the background's `capture`).
+  Tests: `test/unit/ui-state.test.ts`.
+- **Firefox security check.** validation/FIREFOX-SMOKE.md step 12 checks that a security check
+  during a capture shows the verification screen in Firefox, and accepts "The page changed" when
+  Firefox hides the redirect address (the host permission covers `/in/…` only).
+
+### 26. Review fixes, round 3 (2026-11-26)
+
+- **Retries survive a stopped background.** A server wait (`Retry-After` of 60 s on a 429) used a
+  plain timer, lost when the service worker or event page stopped after about 30 s idle; the
+  overlay asked again only for "You're offline", and a closed capture tab woke nothing, so a capture
+  could wait until its 20 minutes ran out. Both waits now set the retry alarm (deviation 8), whose
+  handler is `retryIfDue` (an alarm that fires before the wait is over is set again); the alarm is
+  cleared when the wait ends. `alarms` is in `manifest.base.json`, `STORE-LISTING.md`'s permission
+  justifications, PRIVACY.md "In detail", `test/static/manifest.test.ts`, EDGE-SMOKE step 3 and
+  FIREFOX-SMOKE step 4 (RELEASE-0.1.0 row 9 notes that its Edge check predates it). The overlay's
+  15 s recheck also runs while "Scouty isn't answering" waits to send (not in its create form,
+  where nothing is kept). Tests: `test/unit/wake.test.ts`, `test/unit/session.test.ts` ("the
+  retry alarm"), `test/unit/overlay-recheck.test.ts`.
+- **Capture expiry on the browser's clock.** The outbox stored Scouty's `expiresAt` as is and
+  compared it with the browser's clock, so a clock 30 minutes off ended a capture at once or kept
+  it 30 minutes too long. It now keeps `now + (expiresAt - serverTime)` from the create answer
+  (`localExpiresAt` in `src/background/outbox.ts`). A create answer whose `expiresAt` or
+  `serverTime` cannot be read ends as "Scouty couldn't receive this capture", like any other answer
+  the extension cannot use, with nothing kept. Tests: `test/unit/outbox.test.ts` (clock ±30 min,
+  directly and through the controller; unreadable times).
+- **Consent point 2** now names every press: "It only presses "see more" and "show more results" to
+  read in full. It never likes, comments, connects, messages or posts for you." (it said only "see
+  more" on posts; the reader also expands profile sections and the legacy "Show more results").
+  `test/ui/states.test.tsx`, LEGAL-REVIEW-0.1.0 T1 quote; the gallery's 360 × 560 check still
+  passes.
+- **Packaging from a clean tree.** `tools/package.mjs` built the source archive from
+  `git ls-files` and the zips from the working tree. In a git checkout it now refuses while
+  `git status --porcelain` lists anything, unless `--allow-dirty` is given (BUILD.md). No test
+  runs it, so `npm test` and `test:static` are unaffected in a dirty tree; the release workflow
+  packages a fresh checkout.
+- **Update mid-capture.** An extension update reloads the extension, which clears storage.session
+  and with it a capture in progress, without a word. The background now listens to
+  `runtime.onUpdateAvailable` (`src/background/update.ts`): the update waits while any capture is
+  not idle (a finished capture's screen included) and is applied by `runtime.reload()` on the
+  first idle state, at once if there is none, also after the background restarted (the flag is in
+  storage.session). **Accepted:** Chromium still applies a waiting update when its service worker
+  stops after about 30 s idle (for example during a long wait to send); that cannot be prevented,
+  and the capture then ends as it did before. Firefox waits for the reload. Tests:
+  `test/unit/update.test.ts`.
+- **README status** points to deviation 23 and `validation/RESULTS-0.1.0.md` (live checks of post
+  ids on 2026-11-26; the full E0 matrix with a tester is still open).
+- **RELEASE-0.1.0 row 1** carries this working tree's test counts.
+
+### 27. Review fixes, round 4 (2026-11-26)
+
+- **The upload during reading is sent once.** `upload()` in `src/background/session.ts` called
+  `putSection` with the client's full retry policy (up to 6 attempts of 25 s each plus backoff,
+  `src/background/api.ts`), which held the reader queue for up to about 2.5 minutes with no alarm,
+  while the browser could stop the background. `putSection` now takes `{ onRetry, maxAttempts }`
+  (`Call.maxAttempts`, never above `RETRY.maxAttempts`); the in-read upload passes `maxAttempts: 1`.
+  A transient failure defers the section to the outbox and finalize (as the comment always said),
+  which retries with the alarm of deviation 26; finalize keeps the full policy. Tests:
+  `test/unit/api.test.ts` ("putSection with maxAttempts 1"), `test/unit/session.test.ts` ("the
+  upload during reading is sent once", a 503 and a dropped request).
+- **The message gate is tested.** `handle()` and `OVERLAY_ACTIONS` moved unchanged from
+  `src/background/index.ts` to `src/background/gate.ts` (`createGate`, given the controller, the
+  capture tab, the overlay and popup states and `act`); `index.ts` wires it as before. Tests:
+  `test/unit/gate.test.ts` (a foreign `sender.id`; an overlay message or action from a tab that is
+  not the capture tab; overlay actions outside `OVERLAY_ACTIONS` such as `disconnect` and
+  `acceptConsent`; `reader:*` from the popup; the popup's `ui:getState` answered).
+- **Firefox name within AMO's 50 characters.** addons.mozilla.org limits a name to 50 characters
+  (addons-server `Addon.name = TranslatedField(max_length=50)`); `extName`, "Scouty B2B Prospector -
+  Lead Research & Outreach Coach", is 54. Chrome and Edge keep it (limit 75). The Firefox build is
+  named "Scouty B2B Prospector - Lead Research & Outreach" (48) through a locale message
+  `extNameFirefox` that `manifest.firefox.json` names. `test/static/manifest.test.ts` resolves each
+  target's name and checks it against its store's limit (75, 75, 50) and that it names no network.
+  STORE-LISTING.md (Firefox name row), FIREFOX-SMOKE step 2 and LEGAL-REVIEW §1 say so.
+- **Updates also wait for sign-in, and a done screen holds them for 30 minutes only.**
+  `holdsUpdate` (`src/background/update.ts`) now holds while `connecting` (a reload would cancel the
+  browser's sign-in window); `index.ts` passes it, and the state broadcast at the end of sign-in
+  checks again. The done phase held an update for as long as the screen stayed open, and Firefox
+  applies an update only when told; it now holds for `DONE_HOLD_MS` (30 minutes) from when the done
+  screen was first seen (`update.doneSince` in storage.session, so a restarted background keeps the
+  count), with a timer to look again while the background is awake, otherwise at the next event
+  that starts it. Tests: `test/unit/update.test.ts`.
+- **Firefox for Android lint warning accepted.** `web-ext lint` warns
+  `KEY_FIREFOX_ANDROID_UNSUPPORTED_BY_MIN_VERSION`: `data_collection_permissions` needs Firefox for
+  Android 142 and the minimum is 140. The add-on is desktop-only by plan ("no `gecko_android`"), so
+  no Android support is added and the warning stays (deviation 15, FIREFOX-SMOKE Part A).
+- **Alarm minimum.** `src/background/wake.ts` and `session.ts` said Chromium fires an alarm no
+  sooner than 30 s; that holds from Chrome 120, and `minimum_chrome_version` 116 allows Chrome
+  116–119, where it is 1 minute. Comments and deviation 8 corrected; behaviour unchanged (the
+  in-memory timer covers shorter waits while awake, and an early alarm is set again).
+- **Summary wording.** `extDescription` said "Only reads; never acts for you" while the extension
+  presses "see more" and "show more results". It now reads "Research B2B leads you choose on social
+  networks and get a step-by-step outreach plan in Scouty. Never posts or messages for you." (129;
+  the suggested "Research the B2B leads…" is 133, over the 132 limit, so "the" was dropped).
+  `test/static/manifest.test.ts`, STORE-LISTING.md summary row, LEGAL-REVIEW T3.
+- **Legal review pack brought up to date.** T7 is `/terms#scouty-b2b`; T8 names the network-neutral
+  risk notice and trademark line; question 1 no longer says the texts name LinkedIn; question 8 asks
+  about the neutral trademark line and store listings that name no network; the "where the site is
+  named" statement matches the app plan (the manifest's host permission only; the reviewer fields
+  say "the network"). RELEASE-0.1.0 row 10: ten questions, not nine.
+
+### 28. Review fixes, round 5 (2026-11-26)
+
+- **The overlay after a background restart.** The capture tab was kept in memory only
+  (`src/background/index.ts`). An idle notice ("This capture timed out", "failed"…) has no tab id,
+  so after the background restarted the gate refused that tab's overlay actions and its hello, and
+  `broadcast` sent it nothing: the overlay kept a stale screen with dead buttons, and its recheck
+  ignored the null answer. The capture tab is now kept in storage.session
+  (`src/background/capture-tab.ts`, key `capture.overlayTab`, written only when it changes; cleared
+  with the session, when a tab id means nothing any more). `broadcast` and the gate read it there;
+  `overlay:hello` is answered for the capture's own tab or that kept tab, as `ui:action` already
+  was. The overlay's entry is `startOverlay()` (`src/overlay/overlay.ts`): an answer of null to
+  overlay:hello, the first ask or a recheck, removes the overlay; a failed ask (no answer at all)
+  leaves the screen. Tests: `test/unit/gate.test.ts` ("after the background restarted while an
+  idle notice was shown"), `test/unit/overlay-start.test.ts`.
+- **The alarm while an outbox exists.** Nothing woke a background stopped mid-finalize (the full
+  retry policy, no alarm) or while waiting for sign-in (`blocked: "auth"`, no alarm), so the
+  20-minute deletion PRIVACY.md promises depended on an unrelated event. `CaptureController.syncWake`
+  now keeps the `scouty.retry` alarm (`src/background/wake.ts`) while an outbox exists, at the
+  earlier of the outbox's `expiresAt` and the next try: a server or offline wait's `retryAt`, or
+  `SENDING_WAKE_MS` (60 s) ahead while sending; no outbox, no alarm. It runs on every state change
+  that moves that time (`wakeKey`) and on `recover`. The alarm's handler is `alarmFired()`: it sets
+  the alarm again at once, outside the queue (a send in flight holds the queue), then ends a capture
+  whose time ran out ("This capture timed out", outbox deleted), deletes an expired outbox left
+  without a capture, or tries a due wait again (`retryIfDue`). A background stopped mid-finalize is
+  started by the alarm, and its `recover` picks the send up. Tests: `test/unit/session.test.ts`,
+  "the retry alarm" (the alarm at the expiry while reading and while waiting for sign-in; a
+  restarted controller blocked on sign-in deletes the outbox when the alarm fires at the expiry; an
+  orphaned expired outbox; a finalize that hangs keeps the alarm 60 s ahead, is set again when it
+  fires early, and a restarted controller woken by it finishes).
+- **Texts that contradicted the behaviour.** PRIVACY.md said "It only reads" and "has no
+  background activity", while the extension presses "see more" and "show more results", holds the
+  `alarms` permission and finishes sending in the background (its own "When" row); STORE-LISTING.md's
+  description also said "It only reads" (dropped from the summary in deviation 27). Both now say it
+  reads only the pages of the person you capture, presses only "see more" and "show more results" to
+  read in full, never posts, likes, comments, connects or messages, and that the only background
+  work is finishing sending a capture you started. No network is named ("published texts name no
+  social network" passes). LEGAL-REVIEW quotes none of these lines. Afterwards the app's `/scouty-b2b` page ("It reads, you
+  act"; FAQ and description: "never posts or messages for you") and the popup's permission line
+  ("Scouty only opens the profiles you choose to capture.", LEGAL-REVIEW §2) were aligned too.
+- **setAccessLevel claimed too much.** `hardenStorage` (`src/background/auth.ts`) said it kept
+  extension storage away from injected scripts. Per browser-compat-data, Chromium accepts
+  `setAccessLevel` on storage.session (already limited to trusted contexts by default) and on every
+  area only from Chrome 140; on Chrome 116–139 the call on storage.local is refused, and Firefox
+  implements neither. The comment, `docs/BROWSER-FACTS.md` and the test now say so (the test makes
+  storage.local refuse and checks the session call is still made). **Accepted:** where the call is
+  refused or missing, the refresh token in storage.local is readable from the extension's own
+  content scripts. Those are our own code (the reader and the overlay contain no storage call), and
+  no script of the page can reach extension storage. Token storage is unchanged.
+- **Load-more near the viewport.** `loadMore` (`src/reader/interactions.ts`) pressed the last
+  allowed "show more results" control wherever it was. It now takes the same `reach` rule as the
+  "… more" presses (deviation 25): pressed only when `domReach` says near (in the viewport or within
+  one viewport height of it); `readSection` passes its `reach`. Tests:
+  `test/unit/interactions.test.ts` (an injected reach; `domReach` with placed rects),
+  `test/unit/reader.test.ts` (a far control is not pressed through `readSection`).
+- **RELEASE-0.1.0 row 1** carries this working tree's test counts.
+
+- **Test harness race (not the product).** The e2e helper `connect` looked for the popup's Sign in
+  button once, before the popup had drawn, then waited forever for "Connect": the rare 4-minute
+  timeout of "extension below the minimum version", earlier put down to machine load. It now waits
+  for either button (`e2e/harness.ts`); 40 of 40 repeats pass, against 39 of 40 before.
+- **A navigation could be taken for the old page.** Right after `tabs.update` a browser may still
+  report the previous page as complete; `waitForLoad` took it for where LinkedIn sent the tab and
+  declared the section missing. It now ignores a "complete" that still shows the previous address,
+  before any "loading", for up to about 3 s of reads (`src/background/session.ts`; tested in
+  `test/unit/session.test.ts` with a fake that keeps the old page for three reads).
+- **CI fails on flaky tests** (`failOnFlakyTests` in `e2e/playwright.config.ts`): the retry stays for
+  slow runners, but a test that passes only on retry fails the job.
+
+### 29. Review fixes, round 8 (2026-11-26)
+
+- **Sign-out during a refresh.** `signOut` ran outside the refresh lock: a refresh in flight when
+  the user pressed Disconnect or switched workspace stored a new refresh token after the tokens were
+  cleared, silently signing the extension in again (or keeping the old workspace's grant). The
+  revoke and clear now run inside the same lock (`src/background/auth.ts`), so they wait for that
+  refresh and revoke the token it stored. Test: `test/unit/auth.test.ts`, "a sign-out during a
+  refresh in flight" (fails without the lock).
+- **The 20-minute window is enforced here.** `localExpiresAt` took the server's window as given; a
+  longer one would have kept read data in storage.session longer than PRIVACY.md promises. It is now
+  cut to `HARD_LIMITS.outboxWindowMs` (20 minutes, `src/config.ts`). Test: `test/unit/outbox.test.ts`.
+- **E2E "the stopped tab does not move".** The fixed 3-second wait is now a 3-second watch of the
+  mock site's request log and the tab's URL (`e2e/capture.spec.ts`).
+- **Disconnect while a sign-out runs (round 9).** A sign-out can now wait up to about 50 s (a refresh
+  in flight, then the revoke, each bounded by the 25 s request timeout). A second press of Disconnect
+  or Switch workspace meanwhile joins the running one (`disconnect()` in `src/background/index.ts`)
+  instead of queuing another (`singleFlight`, `src/background/single-flight.ts`; unit test
+  `test/unit/single-flight.test.ts` proves the join). No "Disconnecting…" screen was added: it would be a 28th state outside
+  the reviewed gallery. E2E: "Disconnect pressed twice" checks the end state (one revoke, back to Get started); it would pass
+  without the join too, since a second sign-out finds no token.
+
 ## Contract decisions (to reconcile with the app)
 
 `protocol-v1/` is the app's directory, copied byte for byte. Where the plan left a shape open, the
@@ -355,9 +592,9 @@ extension follows the app's `src/lib/linkedin/protocol.ts`:
   and that Scouty keeps trying while this browser is open; for a 429 it also says roughly when
   (the time from `Retry-After`). It has the same **Try now** as screen 16, and it tries again on
   its own after the longer of 20 s and `Retry-After` (`SERVER_RETRY_MS` in
-  `src/background/session.ts`; under the 30 s a Chromium service worker may idle). A timer lost
-  to a stopped background context is picked up on its next start (`recover`) and whenever the
-  popup or the overlay asks for the state. Like 25, this screen is not in plan 12.4 and is
+  `src/background/session.ts`), by an in-memory timer and by the retry alarm, which also wakes a
+  stopped background context (deviation 8, round 3). It is also picked up on the background's
+  next start (`recover`) and whenever the popup or the overlay asks for the state. Like 25, this screen is not in plan 12.4 and is
   numbered after it (tested in `test/unit/session.test.ts`, "waiting on Scouty is not being
   offline", and `test/ui/states.test.tsx`). When creating, the same failures (after the same
   retries, or a 429 with a wait over 30 s) also end in screen 26, in its create form: nothing was
@@ -390,7 +627,7 @@ extension follows the app's `src/lib/linkedin/protocol.ts`:
   it can only start there on a LinkedIn profile. On every screen with one (7 **Capture again**, 11
   **Capture again**, 12 **Capture again**, 15 **Capture this page**, 22 **Capture again**, 25
   **Capture here**, 26 at create **Try now**, 27 **Capture**), when that tab is not a profile the
-  action is shown disabled and the screen says "Open a LinkedIn profile in this tab first."
+  action is shown disabled and the screen says "Open a lead's profile in this tab first." (originally "Open a LinkedIn profile…", reworded in deviation 22)
   (wording of deviation 19); the popup re-checks the tab every 1.5 s, so the action turns on once the
   profile is open. Other actions on the screen stay usable (`onProfile` in `src/ui/state.ts`,
   `targetIsProfile` in `src/background/ui-state.ts`; tested in `test/ui/states.test.tsx`,
@@ -404,9 +641,40 @@ extension follows the app's `src/lib/linkedin/protocol.ts`:
 
 ## Open points for the owner
 
-- Run E0 (live LinkedIn) again with selectors version 2 (deviation 17) and record the click log.
+- Run E0 (live LinkedIn) again with selectors version 3 (deviations 17, 23) and record the click log.
 - Decide the licence.
 - Rebuild on Node 24 on a clean machine and record the hashes in BUILD.md.
 - CI now runs `npm run smoke:firefox` (Firefox installed by `browser-actions/setup-firefox`, under
   `xvfb-run`); it has not yet been seen to pass on GitHub. Run the manual steps of
   `validation/FIREFOX-SMOKE.md` and of `validation/EDGE-SMOKE.md`.
+
+### 30. Full-coverage review fixes (2026-11-26)
+
+- **A saved capture shown as "This capture timed out".** `finalize` and `fail` cleared the outbox
+  before moving the state on, and `current()` (the popup polls it outside the queue) ends a capture
+  with no outbox as timed out: a poll in between turned a saved capture, or a real notice, into
+  "timed out". The state now moves first and the outbox is cleared after, then the alarm is set
+  again (no outbox, no alarm); an outbox left by a stop in between is deleted by the alarm. Test:
+  `test/unit/session.test.ts`, "a state read right as the outbox is cleared…" (fails on the old order).
+- **Two items of the lead on one post.** On the comments and reactions pages the URN is the post
+  answered, and the reader kept the first item per URN, dropping a second comment (or the like of a
+  comment) on the same post. Scouty keys activities by that URN too (`normalize.ts` `dedupeKey`), so
+  the reader now keeps them together in the post's block (`readBlocks`, `src/reader/blocks.ts`),
+  merged part by part (the post once, then each item's own lines), so a 3,000-character post never
+  pushes a first comment into the cut middle; the same item read twice, or a cut and a full read,
+  keeps the fuller text. An item's own lines are never compared with each other (a short comment or
+  a date that also occurs in the post stays). A later item's line is compared only with kept lines
+  of the same role (post box with post box, comment with comment, hint, date): equal text is kept once
+  in its uncut form, and a full read replaces a cut one. "Cut" is per text box (its own unpressed
+  "… more" or its own ellipsis), so a collapsed post never makes the lead's comment look cut.
+  Roles follow each box's place in the item before empty boxes are left out, so an empty post box
+  never moves a comment into the post's role. Known limit: a different text that starts with exactly
+  the visible words of a cut one cannot be told apart from its full read on the page; it replaces it
+  (the words read are kept). Marking every such replacement as cut would mark real full reads as cut,
+  and a comment step on a cut post becomes a reaction. Items without a URN are
+  grouped and counted by their text in both places. The cap now counts distinct
+  posts, and only items of kept posts are expanded (`blockOrder`). Test: `test/unit/blocks.test.ts`.
+- **Smaller:** a positive fractional cap is at least 1 (0 meant "no cap" to the scroll loop and
+  "keep nothing" to the payload; an activity page reads at least 1); `recover` goes straight back to
+  sending instead of showing "You're offline" first; the shown "about N minutes left" is kept while
+  running (`noteMinutesLeft`), so the never-counts-up rule is live; notices use the controller's clock.

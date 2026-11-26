@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { expandProfile, readProfile, topCard } from "../../src/reader/profile";
 import { isContactLabel, isProfileSectionLabel } from "../../src/reader/selectors";
-import { context, load, PATHS } from "../helpers/fixture";
+import { context, load, PATHS, pressAll } from "../helpers/fixture";
 
 const NEVER = /OWNER-ONLY|STRANGER|AD-TEXT|NO-HEADING|PROFILE-ACTIVITY-SNIPPET|THIS-MUST-NEVER-BE-READ|Contact info|Don't want to see this|Endorse|Connect|Message|More actions/;
 
@@ -9,7 +9,7 @@ describe("profile (SDUI)", () => {
   it("reads the top card and the profile's own sections only", () => {
     const page = load("sdui-profile");
     const ctx = context(page.doc);
-    expandProfile(ctx, "profile");
+    pressAll(() => expandProfile(ctx, "profile"));
     const out = readProfile(ctx, "profile")!;
     expect(out.read).toBe("ok");
     expect(out.content.name).toBe("Synthetic Person One");
@@ -34,7 +34,7 @@ describe("profile (SDUI)", () => {
     const page = load("sdui-profile-nested");
     const ctx = context(page.doc);
     expect(topCard(page.doc)!.id).toBe("com.linkedin.sdui.profile.card.ref0000001Topcard");
-    expandProfile(ctx, "profile");
+    pressAll(() => expandProfile(ctx, "profile"));
     const out = readProfile(ctx, "profile")!;
     expect(out.read).toBe("ok");
     expect(out.content.name).toBe("Synthetic Person One");
@@ -80,7 +80,7 @@ describe("profile (SDUI)", () => {
   it("records the labels still cut short when nothing may be expanded", () => {
     const page = load("sdui-profile");
     const ctx = context(page.doc, { clicksEnabled: false });
-    expandProfile(ctx, "profile");
+    pressAll(() => expandProfile(ctx, "profile"));
     const out = readProfile(ctx, "profile")!;
     expect(page.clicks).toHaveLength(0);
     expect(out.content.truncated).toEqual(["About"]);
@@ -90,7 +90,7 @@ describe("profile (SDUI)", () => {
   it("reads the experience detail page as entries, with the description expanded", () => {
     const page = load("sdui-details-experience", PATHS.experience);
     const ctx = context(page.doc);
-    expandProfile(ctx, "experience");
+    pressAll(() => expandProfile(ctx, "experience"));
     const out = readProfile(ctx, "experience")!;
     expect(out.read).toBe("ok");
     expect(out.content.name).toBeNull();
@@ -107,7 +107,7 @@ describe("profile (SDUI)", () => {
   it("reads the skills detail page without the filter tabs", () => {
     const page = load("sdui-details-skills", PATHS.skills);
     const ctx = context(page.doc);
-    expandProfile(ctx, "skills");
+    pressAll(() => expandProfile(ctx, "skills"));
     const out = readProfile(ctx, "skills")!;
     expect(out.content.sections).toEqual([{ label: "Skills", text: "Placeholder planning\nEndorsed by 3 invented colleagues\n\nImaginary logistics\n\nFixture design\n\nSynthetic data" }]);
     expect(page.clicks).toHaveLength(0);
@@ -130,6 +130,27 @@ describe("profile (SDUI)", () => {
     expect(education.text.length).toBe(8000);
     expect(out.content.truncated).toContain("Education");
     expect(out.cut).toBe(true);
+  });
+
+  it("never more than 20 sections or 40,000 characters in all: the rest is cut and named in truncated", () => {
+    const many = load("sdui-profile");
+    const education = many.doc.querySelector("[componentkey='synthetic-edu-1']")!.closest("section")!;
+    for (let i = 0; i < 25; i += 1) education.after(education.cloneNode(true));
+    const counted = readProfile(context(many.doc), "profile")!;
+    expect(counted.content.sections).toHaveLength(20);
+    expect(counted.cut).toBe(true);
+    expect(counted.content.truncated).toContain("Education");
+
+    const long = load("sdui-profile");
+    long.doc.querySelector("[componentkey='synthetic-edu-1'] p")!.textContent = "y".repeat(7000);
+    const big = long.doc.querySelector("[componentkey='synthetic-edu-1']")!.closest("section")!;
+    for (let i = 0; i < 7; i += 1) big.after(big.cloneNode(true));
+    const out = readProfile(context(long.doc), "profile")!;
+    const total = out.content.sections.reduce((sum, s) => sum + Array.from(s.text).length, 0);
+    expect(total).toBeLessThanOrEqual(40_000);
+    expect(total).toBeGreaterThan(39_000);
+    expect(out.cut).toBe(true);
+    expect(out.content.truncated).toContain("Education");
   });
 
   it("with the detail root gone, degrades to one section for the whole page", () => {

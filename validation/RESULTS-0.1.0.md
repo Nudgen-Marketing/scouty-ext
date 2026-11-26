@@ -139,7 +139,7 @@ App plan §15.3. Engineer run.
 - Command: `node --env-file=.env --env-file=.env.local ./node_modules/.bin/vitest run --config vitest.ai-eval.config.mts src/lib/__evals__/linkedin-coach.eval.test.ts`, three times in a row
 - Model id: `gpt-6-sol` (`OPENAI_MODEL`)
 - Real-shape fixtures used: 2, labels `capture-1` (P1, English, active) and `capture-2` (the second
-  test profile). Rebuilt with `rebuildPayloads` from the two staging captures above: every text
+  test profile; rebuilt on 2026-11-26 from its selectors-v3 capture). Rebuilt with `rebuildPayloads` from the two staging captures above: every text
   replaced by placeholder text of the same script and length, every URN made up; checked for names,
   words and ids of the originals (none found). Not committed.
 
@@ -148,15 +148,16 @@ App plan §15.3. Engineer run.
 | 1 | All assertions pass (187 s) | 13 / 13 |
 | 2 | All assertions pass | 13 / 13 |
 | 3 | All assertions pass | 13 / 13 |
+| 4 (2026-11-26, after the review fixes; capture-2 rebuilt from its selectors-v3 capture) | All assertions pass | 13 / 13 |
 
 13 = the 6 + 3 × 2 cases of §15.3 for two fixtures, plus the fixture check: both fixtures ran, in
 the rule cases and in the emailed and replied outreach cases.
 
 | Per lead (from Langfuse) | Value |
 | --- | --- |
-| Input tokens per lead | **Open**: Langfuse is not configured in this environment (no `LANGFUSE_*` keys) |
-| Output tokens per lead | **Open** (same) |
-| Cost per lead (USD) | **Open** (same; can be read from the OpenAI usage page for 2026-11-26 07:58–08:08 UTC) |
+| Input tokens per lead | 14,514–17,748 (2,450 cached), measured 2026-11-26 from each response's usage (Langfuse is not configured) |
+| Output tokens per lead | 1,403–1,512 (incl. reasoning) |
+| Cost per lead (USD) | ≈ 0.046–0.053 (`gpt-6-sol`: $2 / $10 per 1M input / output, $2.50 cache write, $0.20 cached read). Recorded in the app's `docs/linkedin-outreach-coach.md` "Measured cost" |
 
 | Assertion | Pass | Change made |
 | --- | --- | --- |

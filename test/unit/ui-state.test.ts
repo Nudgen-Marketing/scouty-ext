@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import * as auth from "../../src/background/auth";
 import { EXPIRED } from "../../src/background/session";
-import { captureTarget, giveConsent, minutesLeft, popupUi, targetIsProfile, type UiContext } from "../../src/background/ui-state";
+import { captureTarget, giveConsent, minutesLeft, popupUi, startCapture, targetIsProfile, type UiContext } from "../../src/background/ui-state";
 import { fake, installFakeExt } from "../helpers/fake-ext";
 import { PROFILE_URL, rig, TAB, type Rig } from "../helpers/session";
 import { unwire } from "../helpers/stub";
@@ -11,6 +11,28 @@ afterEach(() => { unwire(); installFakeExt("chrome"); });
 const grant = (): void => { fake.granted.add("https://www.linkedin.com/in/*"); fake.granted.add("https://scouty.to/*"); };
 const ctx = (r: Rig, connecting = false): UiContext => ({ api: r.api, controller: r.controller, connecting: () => connecting, now: () => r.clock.now });
 const on = { tabId: TAB, tabUrl: PROFILE_URL, settings: false };
+
+describe("starting a capture (background)", () => {
+  it("starts nothing without consent, even when a Capture action skips the notice; starts once it is given", async () => {
+    const r = await rig();
+    grant();
+    const urlOf = async (): Promise<string> => PROFILE_URL;
+    expect(await startCapture(r.controller, TAB, false, urlOf)).toBe(false);
+    expect(await r.controller.current()).toMatchObject({ phase: "idle" });
+    expect(r.stub.state.requests.filter((q) => q.method === "POST")).toEqual([]);
+    await giveConsent();
+    expect(await startCapture(r.controller, TAB, false, urlOf)).toBe(true);
+    expect((await r.controller.current()).phase).not.toBe("idle");
+  });
+
+  it("starts nothing without a tab address", async () => {
+    const r = await rig();
+    grant();
+    await giveConsent();
+    expect(await startCapture(r.controller, TAB, false, async () => null)).toBe(false);
+    expect(await r.controller.current()).toMatchObject({ phase: "idle" });
+  });
+});
 
 describe("popup state", () => {
   it("without both host permissions, asks for them and offers nothing else (the Firefox default)", async () => {

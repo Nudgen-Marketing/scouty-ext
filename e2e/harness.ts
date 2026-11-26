@@ -110,7 +110,11 @@ async function launch(extensionId: string, linkedinPort: number, stubPort: numbe
     },
     async connect(popup, options = {}) {
       // Signed out shows "Create account" and "Sign in"; a connection that ended shows "Connect".
-      const name = options.create ? "Create account" : (await popup.getByRole("button", { name: "Sign in", exact: true }).count()) ? "Sign in" : "Connect";
+      // Wait until the popup has drawn one of them: a count taken before the first render is 0 and
+      // would wait for "Connect" on a signed-out popup forever (seen as a rare 4-minute timeout).
+      const signIn = popup.getByRole("button", { name: "Sign in", exact: true }), again = popup.getByRole("button", { name: "Connect", exact: true });
+      await expect(signIn.or(again).first()).toBeVisible({ timeout: 30_000 });
+      const name = options.create ? "Create account" : (await signIn.count()) ? "Sign in" : "Connect";
       await popup.getByRole("button", { name, exact: true }).click();
       await expect(popup.getByRole("heading", { level: 1 })).not.toHaveText(/^(Get started with Scouty|Connect to Scouty again|Connecting…)$/, { timeout: 30_000 });
     },
@@ -173,9 +177,12 @@ export const test = base.extend<{ rig: Rig }>({
 
 export { expect };
 
-/** The mock LinkedIn saw only GET navigations to the expected pages (and the assets they reference). */
-export function expectReadOnly(rig: Rig, slugs: string[]): void {
-  const allowed = new Set(["/static/behaviour.js", "/favicon.ico", ...slugs.flatMap((slug) => rig.linkedin.pagesOf(slug))]);
+/**
+ * The mock LinkedIn saw only GET navigations to the expected pages (and the assets they reference),
+ * plus any `extra` paths a scenario has LinkedIn send the tab to.
+ */
+export function expectReadOnly(rig: Rig, slugs: string[], extra: string[] = []): void {
+  const allowed = new Set(["/static/behaviour.js", "/favicon.ico", ...extra, ...slugs.flatMap((slug) => rig.linkedin.pagesOf(slug))]);
   for (const request of rig.linkedin.requests) {
     expect(request.method, `${request.method} ${request.path}`).toBe("GET");
     expect([...allowed], `unexpected request ${request.path}`).toContain(request.path);

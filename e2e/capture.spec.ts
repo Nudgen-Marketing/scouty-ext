@@ -39,7 +39,7 @@ test("happy path: connect, consent, six pages read, finalize, back to the app ta
   await expect(heading(popup)).toHaveText(/^Reading /);
   await expect(popup.getByRole("progressbar")).toBeVisible();
   // The in-page overlay is there, says what it is (and, once, that Scouty never acts), and is closed to the page.
-  await expect.poll(() => rig.overlayText(page)).toContain("Scouty never clicks or posts for you.");
+  await expect.poll(() => rig.overlayText(page)).toContain("Scouty never posts or messages for you.");
   expect(await page.evaluate(() => document.querySelector("scouty-capture-overlay")?.shadowRoot ?? null)).toBeNull();
   expect(await page.evaluate(() => document.querySelector("scouty-capture-overlay")?.getAttribute("aria-label"))).toBe("Scouty capture");
 
@@ -268,9 +268,12 @@ test("the same profile started in a second browser profile takes the capture ove
   expect(capture.status).toBe("finalized");
   expect(capture.result).toMatchObject({ completeness: "complete" });
   // The first profile stopped reading: its LinkedIn tab stays on the page it was on.
+  // Watched for 3 s through the mock site's request log: no profile page is requested after the stop.
   const stoppedAt = first.page.url();
-  await first.page.waitForTimeout(3000);
-  expect(first.page.url()).toBe(stoppedAt);
+  const profileRequests = () => rig.linkedin.requests.filter((r) => r.path.startsWith("/in/")).length;
+  const before = profileRequests();
+  const watchUntil = Date.now() + 3000;
+  await expect.poll(() => (profileRequests() === before && first.page.url() === stoppedAt ? Date.now() >= watchUntil : "moved"), { timeout: 6000, intervals: [250] }).toBe(true);
   expectReadOnly(rig, [SLUG]);
   expectOnlyExpandClicks(await rig.clicks(first.page));
   expectOnlyExpandClicks(await other.clicks(second.page));
@@ -373,4 +376,111 @@ test("permission not granted: the popup asks first and offers nothing else", asy
   expectReadOnly(rig, [SLUG]);
   expect(await rig.clicks(page)).toEqual([]);
   expect(await page.evaluate(() => document.querySelector("scouty-capture-overlay"))).toBeNull();
+});
+
+test("the service worker is stopped mid-capture: it wakes, picks the capture up and finishes it, each page read once", async ({ rig }) => {
+  rig.stub.state.caps = { posts: 8, comments: 0, reactions: 0 };
+  const { page, popup } = await startCapture(rig, "slow-person");
+  await expect(heading(popup)).toHaveText("Reading posts…");
+  await expect(popup.getByRole("progressbar")).toHaveAttribute("aria-valuetext", /^[1-6] of 8 posts$/, { timeout: 60_000 });
+  // Chrome stops an idle or misbehaving extension worker at will; here it is stopped through the
+  // DevTools protocol (Target.closeTarget, what Puppeteer's WebWorker.close() does), mid-read of the
+  // posts page. A marker in the worker's global scope shows that the one that finishes is a new one.
+  const sw = await rig.worker();
+  await sw.evaluate(() => { (globalThis as { __e2eFirstLife?: boolean }).__e2eFirstLife = true; });
+  // (A persistent context has no Browser object, so the session is opened on a page; its Target domain sees every target.)
+  const cdp = await rig.context.newCDPSession(page);
+  const { targetInfos } = await cdp.send("Target.getTargets");
+  const target = targetInfos.find((t) => t.type === "service_worker" && t.url === `chrome-extension://${rig.extensionId}/background.js`);
+  expect(target).toBeDefined();
+  await cdp.send("Target.closeTarget", { targetId: target!.targetId });
+  await cdp.detach();
+
+  await expect(heading(popup)).toHaveText("Done", { timeout: 90_000 });
+  // The worker that finished is not the one that was stopped (Chrome reuses the target, and
+  // Playwright's handle evaluates in whichever worker runs now).
+  expect(await sw.evaluate(() => (globalThis as { __e2eFirstLife?: boolean }).__e2eFirstLife ?? false)).toBe(false);
+  const capture = [...rig.stub.state.captures.values()][0]!;
+  expect(capture.status).toBe("finalized");
+  expect(capture.result).toMatchObject({ completeness: "complete" });
+  expect(capture.manifest!.sections.map((s) => `${s.section}:${s.state}`)).toEqual(["profile:complete", "experience:complete", "skills:complete", "posts:complete"]);
+  expect(capture.sections.get("posts")!.payload).toMatchObject({ pageSlug: "slow-person", blockCount: 8 });
+  // Each page was loaded once: the restart re-read nothing (the watchdog's one re-read would be a second posts load).
+  expect(rig.linkedin.requests.filter((r) => r.path.startsWith("/in/")).map((r) => r.path)).toEqual(rig.linkedin.pagesOf("slow-person").slice(0, 4));
+  // Every section was sent once, and one finalize.
+  const calls = rig.stub.state.requests.filter((r) => r.path.startsWith(`/api/linkedin/ext/captures/${capture.id}`)).map((r) => `${r.method} ${r.path.replace(capture.id, ":id")}`);
+  expect(calls.filter((c) => c.startsWith("PUT")).sort()).toEqual(["experience", "posts", "profile", "skills"].map((s) => `PUT /api/linkedin/ext/captures/:id/sections/${s}`));
+  expect(calls.filter((c) => c.endsWith("/finalize"))).toHaveLength(1);
+  expectReadOnly(rig, ["slow-person"]);
+  expectOnlyExpandClicks(await rig.clicks(page));
+});
+
+test("the page moves in-page to another profile during the posts read: nothing of it is sent, the capture stops as moved", async ({ rig }) => {
+  rig.stub.state.caps = { posts: 100, comments: 0, reactions: 0 };
+  const { page, popup } = await startCapture(rig, "slow-person");
+  await expect(heading(popup)).toHaveText("Reading posts…");
+  await expect(popup.getByRole("progressbar")).toHaveAttribute("aria-valuetext", /^[2-9] of 100 posts$/, { timeout: 60_000 });
+  // LinkedIn's application moves to another profile without a page load: the address changes
+  // (history.pushState) and the other profile's posts are drawn into the same list.
+  await page.evaluate(() => {
+    history.pushState({}, "", "/in/someone-else/recent-activity/all/");
+    const list = document.querySelector("main#workspace [role='list'][data-component-type='LazyColumn']")!;
+    for (const item of Array.from(list.children)) item.remove();
+    const item = document.createElement("div");
+    item.setAttribute("role", "listitem");
+    item.setAttribute("componentkey", "someone-else-1");
+    item.innerHTML = `<span data-testid="expandable-text-box">SECOND-PROFILE-TEXT of someone else.</span><a href="/feed/update/urn:li:activity:7130316800000099999/">View post</a>`;
+    list.append(item);
+  });
+  await expect(heading(popup)).toHaveText("This profile has moved");
+  const capture = [...rig.stub.state.captures.values()][0]!;
+  expect(capture.status).toBe("finalized");
+  expect(capture.manifest!.stop).toBe("wrong_profile");
+  expect(capture.manifest!.sections.map((s) => `${s.section}:${s.state}:${s.reason}`)).toEqual([
+    "profile:complete:null", "experience:complete:null", "skills:complete:null", "posts:skipped:wrong_profile",
+  ]);
+  // Nothing of the posts page was sent (not even what was read of the right profile before the move),
+  // and nothing of the other profile at all.
+  expect(capture.sections.has("posts")).toBe(false);
+  expect(rig.stub.state.requests.some((r) => r.method === "PUT" && r.path.endsWith("/posts"))).toBe(false);
+  expect([...capture.sections.values()].every((s) => s.payload.pageSlug === "slow-person")).toBe(true);
+  expect(JSON.stringify([...rig.stub.state.captures.values()])).not.toMatch(/SECOND-PROFILE-TEXT|someone-else/);
+  // The popup offers to capture the page the tab is on now.
+  await expect(popup.getByRole("button", { name: "Capture this page" })).toBeVisible();
+  // The move was in-page: no request for the other profile reached LinkedIn.
+  expectReadOnly(rig, ["slow-person"]);
+  expectOnlyExpandClicks(await rig.clicks(page));
+});
+
+test("LinkedIn sends the tab to a security check between sections: the verification screen, earlier sections kept", async ({ rig }) => {
+  const slug = "checkpoint-redirect-person";
+  const { page, popup } = await startCapture(rig, slug);
+  await expect(heading(popup)).toHaveText("This site wants to check it's you");
+  await expect(heading(popup)).not.toHaveText(/Sign in to this site|The page changed/);
+  await expect.poll(() => new URL(page.url()).pathname).toBe("/checkpoint/challenge/AgHsyntheticChallenge/");
+  const capture = [...rig.stub.state.captures.values()][0]!;
+  expect(capture.status).toBe("finalized");
+  expect(capture.manifest!.stop).toBe("checkpoint");
+  expect(capture.manifest!.sections.map((s) => `${s.section}:${s.state}:${s.reason}`)).toEqual([
+    "profile:complete:null", "experience:skipped:checkpoint", "skills:skipped:checkpoint", "posts:skipped:checkpoint",
+  ]);
+  expect([...capture.sections.keys()]).toEqual(["profile"]);
+  // Nothing was read after the redirect: no later section page was asked for.
+  expect(rig.linkedin.requests.filter((r) => r.path.startsWith("/in/")).map((r) => r.path)).toEqual([`/in/${slug}/`, `/in/${slug}/details/experience/`]);
+  expectReadOnly(rig, [slug], ["/checkpoint/challenge/AgHsyntheticChallenge/"]);
+  expectOnlyExpandClicks(await rig.clicks(page));
+});
+
+test("Disconnect pressed twice: one sign-out, the grant revoked once, back to Get started", async ({ rig }) => {
+  const { tabId } = await rig.openProfile("synthetic-person-0001");
+  const popup = await rig.openPopup(tabId);
+  await rig.connect(popup);
+  await expect(heading(popup)).toHaveText("Before you start");
+  await popup.getByRole("button", { name: "Settings" }).click();
+  const disconnect = popup.getByRole("button", { name: "Disconnect" });
+  await expect(disconnect).toBeVisible();
+  await disconnect.dblclick();
+  await expect(heading(popup)).toHaveText("Get started with Scouty");
+  expect(rig.stub.state.requests.filter((r) => r.path === "/oauth/revoke")).toHaveLength(1);
+  expect([...rig.stub.state.grants.values()].every((grant) => grant.revoked)).toBe(true);
 });

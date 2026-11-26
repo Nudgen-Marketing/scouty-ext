@@ -29,6 +29,9 @@ npm run package    # writes release/scouty-ext-<version>-{chrome,edge,firefox}.z
    `https://scouty.to`; it reads no environment variable and no `.env` file.
 3. `npm run package` rebuilds, then zips each `dist/<target>/` with a deterministic archive writer
    (`tools/zip.mjs`: sorted entries, a fixed timestamp), so the same source gives the same bytes.
+   In a git checkout it refuses to run while `git status --porcelain` lists anything, so the zips and
+   the source archive come from the same files; `npm run package -- --allow-dirty` overrides that for
+   a local try only.
 4. The source archive holds the files tracked by git. Without git (for example when working from
    the source archive itself) it holds every file except `node_modules/`, `dist/` and `release/`.
 

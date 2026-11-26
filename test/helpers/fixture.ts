@@ -3,7 +3,7 @@ import path from "node:path";
 import { JSDOM } from "jsdom";
 import { vi } from "vitest";
 import { createInteractions, type Interactions } from "../../src/reader/interactions";
-import type { ReadContext } from "../../src/reader/blocks";
+import type { ExpandStep, ReadContext } from "../../src/reader/blocks";
 import type { IsVisible } from "../../src/reader/visible-text";
 
 export const SLUG = "synthetic-person-one";
@@ -46,4 +46,11 @@ export const testIsVisible: IsVisible = (el) => !el.hasAttribute("data-test-invi
 export function context(doc: Document, options: { clicksEnabled?: boolean } = {}): ReadContext & { interactions: Interactions } {
   const interactions = createInteractions(doc, { clicksEnabled: options.clicksEnabled ?? true, recordClicks: true });
   return { doc, isVisible: testIsVisible, interactions, now: FIXED_NOW };
+}
+
+/** Presses one expand control at a time until none is left in reach, as the scroll loop does over its steps. Returns the presses. */
+export function pressAll(step: () => ExpandStep): number {
+  let presses = 0;
+  while (step().clicked) presses += 1;
+  return presses;
 }

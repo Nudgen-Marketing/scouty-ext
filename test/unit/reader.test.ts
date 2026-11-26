@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { validateSectionPayload } from "../../src/protocol";
-import { readSection, uiLanguageSupported, type ReaderEnv } from "../../src/reader/index";
+import { readerChannel, readSection, uiLanguageSupported, type ReaderEnv } from "../../src/reader/index";
+import { cutOff } from "../../src/ext";
+import { ext } from "../../src/ext";
 import type { ReaderArgs } from "../../src/messages";
 import { FIXED_NOW, load, PATHS, testIsVisible, type Loaded } from "../helpers/fixture";
 
@@ -32,6 +34,16 @@ describe("reader", () => {
     expect(page.clicks.map((el) => el.getAttribute("data-testid"))).toEqual(["expandable-text-button"]);
     expect(e.progress.length).toBeGreaterThanOrEqual(3);
     expect(page.scrolls()).toBe(3);
+  });
+
+  it("passes its reach to load-more: a control that is not near the viewport is not pressed (deviation 28)", async () => {
+    const loadMores = (page: Loaded): number => page.clicks.filter((el) => el.getAttribute("data-ok") === "loadmore").length;
+    const far = load("sdui-interaction-traps", PATHS.posts);
+    await readSection(args("posts"), env(far, { reach: (el) => (el.getAttribute("data-ok") === "loadmore" ? "ahead" : "near") }));
+    expect(loadMores(far)).toBe(0);
+    const near = load("sdui-interaction-traps", PATHS.posts);
+    await readSection(args("posts"), env(near, { reach: () => "near" }));
+    expect(loadMores(near)).toBeGreaterThan(0);
   });
 
   it("stops at the cap and says so", async () => {
@@ -252,5 +264,66 @@ describe("reader", () => {
     const result = await readSection(args("posts"), e);
     if (result.kind !== "read") throw new Error(result.kind);
     expect(result.payload.blockCount).toBe(5);
+  });
+
+  describe("after an extension reload or update (cut off)", () => {
+    const INVALIDATED = new Error("Extension context invalidated.");
+    const withoutId = async (fn: () => Promise<void>): Promise<void> => {
+      const runtime = ext.runtime as { id?: string };
+      const id = runtime.id;
+      try {
+        await fn();
+      } finally {
+        runtime.id = id;
+      }
+    };
+
+    it("cutOff is the overlay's test: the message and no runtime id", async () => {
+      expect(cutOff(INVALIDATED)).toBe(false); // the runtime still has its id: not cut off
+      await withoutId(async () => {
+        (ext.runtime as { id?: string }).id = undefined;
+        expect(cutOff(INVALIDATED)).toBe(true);
+        expect(cutOff("Could not establish connection. Receiving end does not exist.")).toBe(true);
+        expect(cutOff(new Error("Something else"))).toBe(false);
+      });
+    });
+
+    it("the reader's channel stops at once on it instead of retrying, and says so", async () => {
+      await withoutId(async () => {
+        let calls = 0;
+        const pauses: number[] = [];
+        // The extension is reloaded while the reader runs: the runtime loses its id and sending throws.
+        const channel = readerChannel(async () => { calls += 1; (ext.runtime as { id?: string }).id = undefined; throw INVALIDATED; }, async (ms) => { pauses.push(ms); });
+        expect(channel.isCut()).toBe(false);
+        expect(await channel.send({ type: "reader:hello" })).toBeNull();
+        expect(calls).toBe(1);
+        expect(pauses).toEqual([]);
+        expect(channel.isCut()).toBe(true);
+        expect(await channel.send({ type: "reader:hello" })).toBeNull();
+        expect(calls).toBe(1); // nothing more is sent
+      });
+      // Any other failure is retried, three tries in all, and does not cut the reader off.
+      let calls = 0;
+      const channel = readerChannel(async () => { calls += 1; throw new Error("busy"); }, async () => undefined);
+      expect(await channel.send({ type: "reader:hello" })).toBeNull();
+      expect(calls).toBe(3);
+      expect(channel.isCut()).toBe(false);
+    });
+
+    it("the loop stops at once: no more scrolling or pressing, and nothing is built", async () => {
+      const page = load("sdui-activity-posts", PATHS.posts);
+      let cut = false;
+      const e = env(page, { cutOff: () => cut, onProgress: async () => { cut = true; return "continue"; } });
+      const result = await readSection(args("posts"), e);
+      expect(result).toMatchObject({ kind: "failed" });
+      expect(page.scrolls()).toBe(0);
+      const clicksAtCut = page.clicks.length;
+      expect(clicksAtCut).toBeLessThanOrEqual(1); // only the press made before the cut
+      // Cut off from the start: nothing is pressed at all.
+      const fresh = load("sdui-activity-posts", PATHS.posts);
+      expect(await readSection(args("posts"), env(fresh, { cutOff: () => true }))).toMatchObject({ kind: "failed" });
+      expect(fresh.clicks).toHaveLength(0);
+      expect(fresh.scrolls()).toBe(0);
+    });
   });
 });

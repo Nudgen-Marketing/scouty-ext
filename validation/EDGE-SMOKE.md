@@ -13,7 +13,8 @@ steps 2–4 and 6 can be scripted, but Edge then refuses the sign-in window at o
 3. On the extension's card open **Details**. Expected site access: `www.linkedin.com` and the
    Scouty origin, nothing else (Chromium shows the host, not the `/in/` path the manifest declares;
    the extension itself refuses every page outside `/in/<slug>/`). No "all sites", history, tabs
-   or cookies permission.
+   or cookies permission. The API permissions are `scripting`, `storage`, `identity` and `alarms`
+   (none of them shows an install warning).
 4. Open **Inspect views: service worker**. Expected: no error in the console.
 5. Make sure the app knows this build: the `scouty-ext-edge` entry of `SCOUTY_EXTENSION_CLIENTS`
    has `https://<edge id>.chromiumapp.org/` and `chrome-extension://<edge id>`.

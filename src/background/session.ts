@@ -17,6 +17,7 @@ import { sectionPaths } from "../reader/selectors";
 import type { SectionLine } from "../ui/state";
 import { ApiError, NetworkError, SignedOutError, isRetryableStatus, type Api, type CaptureRef } from "./api";
 import * as outbox from "./outbox";
+import { storeUrlFrom } from "./store-url";
 
 export type Notice =
   | { kind: "recent"; finalizedAt: string; tabId: number; url: string; appUrl?: string }
@@ -179,6 +180,11 @@ export type SessionDeps = {
   readerAlive(tabId: number): Promise<boolean>;
   store: { get(key: string): Promise<unknown>; set(key: string, value: unknown): Promise<void>; remove(key: string): Promise<void> };
   sleep(ms: number): Promise<void>;
+  /**
+   * Wakes the background at a time (ms) to try sending again, also after it stopped (an alarm,
+   * src/background/wake.ts); `clear` when nothing waits any more.
+   */
+  wake: { at(when: number): void; clear(): void };
   now(): number;
   uuid(): string;
   /** Called after every state change (the popup and the overlay are told to redraw). */
@@ -204,18 +210,21 @@ const STATE_KEY = "capture.state";
 const AUX_KEY = "capture.aux";
 const LOAD_POLL_MS = 250;
 const LOAD_TIMEOUT_MS = 30_000;
+/** Right after `tabs.update` a browser may still report the previous page as complete for a moment. */
+const STALE_LOAD_GRACE_MS = 3_000;
 const STOP_GRACE_MS = 6000;
 /**
  * The least wait before trying again on its own after Scouty answered but could not take the
- * capture (the API client has already retried with backoff by then). Kept under the 30 s a
- * Chromium service worker may idle, so the timer is not lost; a longer Retry-After is honored, and
- * a timer that is lost anyway is picked up on the next wake (recover, or the popup asking).
+ * capture (the API client has already retried with backoff by then). A longer Retry-After is
+ * honored. The in-memory timer is backed by an alarm (src/background/wake.ts), which wakes a
+ * stopped service worker or event page; recover and the popup or overlay asking also pick it up.
  */
 export const SERVER_RETRY_MS = 20_000;
 /**
- * After a network failure ("You're offline") sending is tried again when the popup or the overlay
- * asks for the state and at least this long has passed since the last try (the popup asks every
- * 1.5 s; this keeps it from sending a request each time).
+ * After a network failure ("You're offline") sending is tried again by the retry alarm, or when the
+ * popup or the overlay asks for the state, once at least this long has passed since the last try
+ * (the popup asks every 1.5 s; this keeps it from sending a request each time). Chromium fires the
+ * alarm no sooner than 30 s after it was set (1 minute on Chrome 116-119; see wake.ts).
  */
 export const OFFLINE_RETRY_MS = 15_000;
 /**
@@ -226,6 +235,13 @@ export const OFFLINE_RETRY_MS = 15_000;
  * idle, so the timer is not lost.
  */
 export const READER_WATCHDOG_MS = 15_000;
+/**
+ * While sending is under way (finalizing, not waiting), the retry alarm is kept this far ahead, so a
+ * background stopped mid-send is woken to pick it up (recover). More than the 30 s a Chromium service
+ * worker may idle and the 1 minute alarm minimum of Chrome 116-119; an alarm that goes off while the
+ * send is still in flight is set again.
+ */
+export const SENDING_WAKE_MS = 60_000;
 
 export type StartOutcome = "started" | "busy" | "not_profile";
 
@@ -261,6 +277,14 @@ export class CaptureController {
     return this.aux;
   }
 
+  /** Keeps the "about N minutes left" shown, so a later screen never shows more (ui-state `minutesLeft`). */
+  async noteMinutesLeft(minutes: number): Promise<void> {
+    await this.ready();
+    if (this.state.phase !== "running" || this.aux.minutesLeft === minutes) return;
+    this.aux.minutesLeft = minutes;
+    await this.saveAux();
+  }
+
   /** Resolves when no work is in flight. */
   settledWork(): Promise<unknown> {
     return this.queue;
@@ -273,10 +297,33 @@ export class CaptureController {
   private async dispatch(event: CaptureEvent): Promise<boolean> {
     const next = transition(this.state, event);
     if (!next) return false;
+    const rewake = wakeKey(this.state) !== wakeKey(next);
     this.state = next;
     await this.deps.store.set(STATE_KEY, next);
+    if (rewake) await this.syncWake();
     this.deps.changed(next);
     return true;
+  }
+
+  /**
+   * Keeps the retry alarm (src/background/wake.ts) while an outbox exists, at the earlier of the next
+   * try (a wait on Scouty or the network, or SENDING_WAKE_MS ahead while sending) and the outbox's
+   * expiry, so a stopped background is woken to send, or to delete what ran out of time (the
+   * 20 minutes PRIVACY.md promises), also while it waits for sign-in. No outbox: no alarm.
+   */
+  private async syncWake(): Promise<void> {
+    const box = await outbox.load();
+    if (!box) {
+      this.deps.wake.clear();
+      return;
+    }
+    const state = this.state;
+    let when = box.expiresAt;
+    if (state.phase === "finalizing") {
+      if (waitsToRetry(state) && typeof state.retryAt === "number") when = Math.min(when, state.retryAt);
+      else if (state.blocked === null) when = Math.min(when, this.deps.now() + SENDING_WAKE_MS);
+    }
+    this.deps.wake.at(when);
   }
 
   private enqueue<T>(task: () => Promise<T>): Promise<T> {
@@ -307,14 +354,16 @@ export class CaptureController {
 
   private async fail(notice: Notice | null): Promise<void> {
     if (notice?.kind === "expired") return this.expire();
-    await outbox.clear();
     this.aux = freshAux();
     await this.saveAux();
+    // As in finalize: the notice first, then the outbox, so a read in between never shows "timed out".
     await this.dispatch({ type: "failed", notice });
+    await outbox.clear();
+    await this.syncWake(); // no outbox now: no alarm
   }
 
   private async failWith(error: unknown, creating = false): Promise<void> {
-    await this.fail(noticeFor(error, creating));
+    await this.fail(noticeFor(error, creating, this.deps.now()));
   }
 
   // -- start --
@@ -341,7 +390,11 @@ export class CaptureController {
           await this.fail({ kind: "failed" });
           return "started";
         }
-        await outbox.begin(clampCaps(answer));
+        // Times that cannot be read are an answer the extension cannot use, like a wrong profile.
+        if (!(await outbox.begin(clampCaps(answer), this.deps.now()))) {
+          await this.fail({ kind: "failed" });
+          return "started";
+        }
         await this.dispatch({ type: "created", expected: answer.expected, caps: clampCaps(answer).caps });
         void this.enqueue(() => this.readCurrent(false));
       } catch (error) {
@@ -354,14 +407,25 @@ export class CaptureController {
 
   // -- reading --
 
-  private async waitForLoad(tabId: number): Promise<{ kind: "loaded"; url: string } | { kind: "closed" } | { kind: "left" } | { kind: "stop" }> {
+  /**
+   * `previous`: the address the tab showed before this navigation. A "complete" still showing it,
+   * before any "loading" was seen, is the old page (not yet replaced), so it is waited out for a
+   * moment instead of being taken for where LinkedIn sent the tab (which would declare the section
+   * missing and skip it silently).
+   */
+  private async waitForLoad(tabId: number, previous: string | null = null): Promise<{ kind: "loaded"; url: string } | { kind: "closed" } | { kind: "left" } | { kind: "stop" } | { kind: "timeout" }> {
     const deadline = this.deps.now() + LOAD_TIMEOUT_MS;
+    let sawLoading = false, staleReads = Math.ceil(STALE_LOAD_GRACE_MS / LOAD_POLL_MS);
     for (;;) {
       const tab = await this.deps.tabs.get(tabId);
       if (!tab) return { kind: "closed" };
       if (this.aux.stopRequested) return { kind: "stop" };
-      if (tab.status === "complete") return tab.url ? { kind: "loaded", url: tab.url } : { kind: "left" };
-      if (this.deps.now() >= deadline) return { kind: "left" };
+      if (tab.status !== "complete") sawLoading = true;
+      // Bounded by reads (about 3 s at the poll interval), so it ends even if the clock stalls.
+      const stale = previous !== null && !sawLoading && tab.url === previous && staleReads-- > 0;
+      if (tab.status === "complete" && !stale) return tab.url ? { kind: "loaded", url: tab.url } : { kind: "left" };
+      // Still loading after 30 s: a slow network, not the user going elsewhere.
+      if (this.deps.now() >= deadline) return { kind: "timeout" };
       await this.deps.sleep(LOAD_POLL_MS);
     }
   }
@@ -374,20 +438,25 @@ export class CaptureController {
     this.aux.readerActive = false;
     this.aux.navigating = true;
     await this.saveAux();
+    let previousUrl: string | null = null;
     try {
       // The first page is read where the user pressed Capture only when that is already this
       // section's page: a capture started from the activity or a detail page opens the profile first.
-      const open = navigate ? null : await this.deps.tabs.get(state.tabId);
-      if (navigate || (open?.url && !samePage(open.url, expectedUrl))) await this.deps.tabs.update(state.tabId, expectedUrl);
+      const open = await this.deps.tabs.get(state.tabId);
+      if (navigate || (open?.url && !samePage(open.url, expectedUrl))) {
+        previousUrl = open?.url ?? null;
+        await this.deps.tabs.update(state.tabId, expectedUrl);
+      }
     } catch {
       return this.stop("tab_closed", null);
     }
-    const loaded = await this.waitForLoad(state.tabId);
+    const loaded = await this.waitForLoad(state.tabId, previousUrl);
     this.aux.navigating = false;
     await this.saveAux();
     if (loaded.kind === "closed") return this.stop("tab_closed", null);
     if (loaded.kind === "stop") return this.stop("user_stopped", null);
     if (loaded.kind === "left") return this.stop("left_linkedin", null);
+    if (loaded.kind === "timeout") return this.stop("timeout", null);
     // Target check before every read.
     const profile = profileFromUrl(loaded.url, LINKEDIN_ORIGIN);
     if (!profile) return this.stop(leftReason(loaded.url), null);
@@ -519,7 +588,10 @@ export class CaptureController {
     const ref = await this.captureRef();
     if (!entry || body === null || !ref) return "deferred";
     try {
-      await this.deps.api.putSection(ref, { section, body, digestBase64: entry.digestBase64 });
+      // One attempt only: a retry here would hold the reader queue (up to 6 x 25 s plus backoff) with
+      // no alarm to wake a stopped worker. A transient failure leaves the section in the outbox for
+      // finalize, which retries with alarms.
+      await this.deps.api.putSection(ref, { section, body, digestBase64: entry.digestBase64 }, { maxAttempts: 1 });
       await outbox.ack(section, entry.sha256);
       return "sent";
     } catch (error) {
@@ -623,7 +695,7 @@ export class CaptureController {
             continue;
           }
           try {
-            await this.deps.api.putSection(ref, { section: entry.section, body, digestBase64: entry.digestBase64 }, onRetry);
+            await this.deps.api.putSection(ref, { section: entry.section, body, digestBase64: entry.digestBase64 }, { onRetry });
           } catch (error) {
             // The server finalized this capture already (our finalize got through, its answer did not):
             // send nothing more; the same finalize again returns the same answer (plan 5.5).
@@ -641,8 +713,12 @@ export class CaptureController {
         if (!request) return this.fail({ kind: "failed" });
         const answer = await this.deps.api.finalize(ref, request.manifest, request.key, onRetry);
         const result = await this.resultFrom(answer, state.stop, state.address);
-        await outbox.clear();
+        // The state first, then the outbox: a state read in between (the popup polls, outside the
+        // queue) must never see this capture without its outbox and end it as timed out. An outbox
+        // left behind by a stop here is deleted by the alarm (expired, no capture).
         await this.dispatch({ type: "finalized", result });
+        await outbox.clear();
+        await this.syncWake(); // no outbox now: no alarm
         return;
       } catch (error) {
         if (error instanceof SignedOutError) {
@@ -716,32 +792,74 @@ export class CaptureController {
    */
   private async waitOut(error: unknown): Promise<void> {
     if (!(error instanceof ApiError)) {
-      // No timer: the next try comes from Try now, or when the popup or the overlay asks for the
-      // state after OFFLINE_RETRY_MS (retryIfDue).
-      await this.dispatch({ type: "blocked", by: "offline", retryAt: this.deps.now() + OFFLINE_RETRY_MS });
+      // No timer: the next try comes from the alarm (which also wakes a stopped background), Try
+      // now, the browser's `online` event, or the popup or the overlay asking for the state after
+      // OFFLINE_RETRY_MS (retryIfDue).
+      const retryAt = this.deps.now() + OFFLINE_RETRY_MS;
+      await this.dispatch({ type: "blocked", by: "offline", retryAt });
+      // A second offline wait has the same key as the first: set the alarm for its end.
+      await this.syncWake();
       return;
     }
     const wait = Math.max(SERVER_RETRY_MS, error.retryAfterMs ?? 0);
     await this.dispatch({ type: "blocked", by: "server", retryAt: this.deps.now() + wait, rateLimited: error.status === 429 });
-    this.scheduleRetry(wait);
+    await this.scheduleRetry(wait);
   }
 
-  private scheduleRetry(ms: number): void {
+  /**
+   * A timer for while the background stays awake (an alarm fires no sooner than 30 s in Chromium, 1 minute on Chrome 116-119),
+   * and an alarm for when it does not: a stopped service worker or event page loses the timer.
+   */
+  private async scheduleRetry(ms: number): Promise<void> {
+    await this.syncWake();
     void this.deps.sleep(ms).then(() => this.retryIfDue());
   }
 
   /**
    * Tries again when sending waits on Scouty or on the network and the wait is over. Called by the
-   * timer (server only), on a restart of the background context, and whenever the popup or the
-   * overlay asks for the state.
+   * timer (server only) and the alarm (both), on a restart of the background context, whenever the
+   * popup or the overlay asks for the state, and when the browser reports the network back
+   * (`online`: then "You're offline" does not wait out its 15 s; a server wait still does). An
+   * alarm that went off before the wait was over is set again for its end.
    */
-  retryIfDue(): Promise<void> {
+  retryIfDue(options: { online?: boolean; alarm?: boolean } = {}): Promise<void> {
     return this.enqueue(async () => {
       await this.ready();
-      const state = this.state;
-      if (state.phase !== "finalizing" || (state.blocked !== "server" && state.blocked !== "offline")) return;
-      if ((state.retryAt ?? 0) > this.deps.now()) return;
-      return this.resumeNow();
+      return this.retryNowIfDue(options);
+    });
+  }
+
+  private async retryNowIfDue(options: { online?: boolean; alarm?: boolean }): Promise<void> {
+    const state = this.state;
+    if (state.phase !== "finalizing" || (state.blocked !== "server" && state.blocked !== "offline")) {
+      // The alarm went off while sending, waiting for sign-in or reading: set it again.
+      if (options.alarm) await this.syncWake();
+      return;
+    }
+    const waitOver = (state.retryAt ?? 0) <= this.deps.now();
+    if (!waitOver && !(options.online && state.blocked === "offline")) {
+      if (options.alarm) await this.syncWake();
+      return;
+    }
+    return this.resumeNow();
+  }
+
+  /**
+   * The retry alarm went off (it may have started this background). The alarm is set again at once,
+   * outside the queue, in case a send in flight holds the queue and the background stops during it.
+   * Then, in order: a capture whose time ran out ends ("This capture timed out") and its outbox is
+   * deleted, an outbox left without a capture that ran out is deleted, and a due wait is tried again.
+   */
+  alarmFired(): Promise<void> {
+    void this.ready().then(() => this.syncWake());
+    return this.enqueue(async () => {
+      await this.ready();
+      if (await this.expireIfDue()) return;
+      if (await outbox.purgeIfExpired(this.deps.now())) {
+        this.deps.wake.clear();
+        return;
+      }
+      return this.retryNowIfDue({ alarm: true });
     });
   }
 
@@ -750,21 +868,24 @@ export class CaptureController {
     return this.enqueue(async () => {
       await this.ready();
       if (await this.expireIfDue()) return;
+      // An older version kept no alarm while sending or waiting for sign-in: set it now.
+      await this.syncWake();
       const state = this.state;
       if (state.phase === "starting" || state.phase === "stopped") return this.fail({ kind: "failed" });
       if (state.phase === "finalizing" && !state.blocked) {
-        await this.dispatch({ type: "blocked", by: "offline" });
+        // Straight back to sending: no "You're offline" in between, the network may be fine.
         void this.resume();
         return;
       }
       if (state.phase === "finalizing" && state.blocked === "offline") {
+        // The alarm is set (above); try if the wait is over.
         void this.retryIfDue();
         return;
       }
       if (state.phase === "finalizing" && state.blocked === "server") {
         // A restart lost the timer: try now if the wait is over, else when it is.
         const left = (state.retryAt ?? 0) - this.deps.now();
-        if (left > 0) this.scheduleRetry(left);
+        if (left > 0) await this.scheduleRetry(left);
         else void this.retryIfDue();
         return;
       }
@@ -797,6 +918,7 @@ export class CaptureController {
       await outbox.clear();
       this.aux = freshAux();
       await this.saveAux();
+      this.deps.wake.clear();
       this.state = IDLE;
       await this.deps.store.set(STATE_KEY, IDLE);
       this.deps.changed(IDLE);
@@ -813,7 +935,9 @@ export class CaptureController {
 }
 
 function clampCaps(created: CreateCreated): CreateCreated {
-  const clamp = (value: unknown): number => (typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(HARD_LIMITS.maxCap, Math.floor(value))) : HARD_LIMITS.defaultCap);
+  // A positive cap is at least 1 (a fractional 0.5 is not "nothing"); 0 or less stays 0, which Scouty
+  // never lists as expected.
+  const clamp = (value: unknown): number => (typeof value === "number" && Number.isFinite(value) ? (value > 0 ? Math.max(1, Math.min(HARD_LIMITS.maxCap, Math.floor(value))) : 0) : HARD_LIMITS.defaultCap);
   return { ...created, caps: { posts: clamp(created.caps?.posts), comments: clamp(created.caps?.comments), reactions: clamp(created.caps?.reactions) } };
 }
 
@@ -844,6 +968,17 @@ function samePage(actual: string, expected: string): boolean {
   }
 }
 
+/** What the retry alarm's time depends on: a change of it sets the alarm again (syncWake). */
+function wakeKey(state: CaptureState): string {
+  if (state.phase !== "finalizing") return state.phase;
+  return `finalizing:${state.blocked ?? "sending"}:${state.retryAt ?? ""}`;
+}
+
+/** Sending waits for a time to try again: on Scouty ("server") or on the network ("offline"). */
+function waitsToRetry(state: CaptureState): boolean {
+  return state.phase === "finalizing" && (state.blocked === "server" || state.blocked === "offline");
+}
+
 /**
  * An error the capture waits out instead of ending: a network error ("You're offline"), or a status
  * the API client retries (408, 429, 502, 503, 504; not LINKEDIN_DISABLED), which shows "Scouty isn't
@@ -855,20 +990,19 @@ export function isTransient(error: unknown): boolean {
 }
 
 /** One clear sentence per terminal error (plan 5.5, 12.4). */
-export function noticeFor(error: unknown, creating = false): Notice {
+export function noticeFor(error: unknown, creating = false, now: number = Date.now()): Notice {
   if (error instanceof ApiError) {
     if (error.status === 426) {
-      const store = error.body?.storeUrl;
-      return { kind: "outdated", storeUrl: typeof store === "string" && store.startsWith("https://") ? store : null };
+      return { kind: "outdated", storeUrl: storeUrlFrom(error.body?.storeUrl) };
     }
     if (error.code === "LINKEDIN_NOT_AVAILABLE" || error.code === "LINKEDIN_DISABLED") return { kind: "notAvailable" };
     if (error.code === "LINKEDIN_CAPTURE_LIMIT") {
-      const resetAt = error.retryAfterMs !== null ? new Date(Date.now() + error.retryAfterMs).toISOString() : null;
+      const resetAt = error.retryAfterMs !== null ? new Date(now + error.retryAfterMs).toISOString() : null;
       return { kind: "limit", resetAt };
     }
     // Scouty answered but could not start it now (the retries are spent): not a failure of this capture.
     if (creating && isRetryableStatus(error)) {
-      const retryAt = error.status === 429 && error.retryAfterMs !== null ? new Date(Date.now() + error.retryAfterMs).toISOString() : null;
+      const retryAt = error.status === 429 && error.retryAfterMs !== null ? new Date(now + error.retryAfterMs).toISOString() : null;
       return { kind: "notAnswering", retryAt };
     }
     // A 404 when creating means the server refuses this profile; it does not say why.

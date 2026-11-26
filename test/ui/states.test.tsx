@@ -112,14 +112,14 @@ describe("the 27 screens", () => {
 
   it("the exact copy of the screens with fixed text", () => {
     const text = (i: number): string => mount(SAMPLES[i]!).querySelector("main")!.textContent!;
-    expect(text(0)).toContain("Scouty only reads the profiles you choose.");
+    expect(text(0)).toContain("Scouty only opens the profiles you choose to capture.");
     expect(text(1)).toContain("Sign in, or create an account, to capture profiles.");
     expect(text(3)).toContain("Then click the Scouty icon again.");
-    expect(text(4)).toContain("It never clicks, likes, connects, messages or posts for you.");
+    expect(text(4)).toContain("It only presses \"see more\" and \"show more results\" to read in full. It never likes, comments, connects, messages or posts for you.");
     expect(text(4)).toContain("This site may not allow tools like this and may limit your account.");
     expect(text(4)).toContain("The person may see that you viewed their profile.");
     expect(text(5)).toContain("38 captures left today");
-    expect(text(7)).toContain("Scouty never clicks or posts for you.");
+    expect(text(7)).toContain("Scouty never posts or messages for you.");
     expect(text(7)).toContain("23 of 50");
     expect(text(7)).toContain("About 1 min left");
     expect(text(8)).toContain("Still sending, so keep this browser open.");
@@ -136,7 +136,7 @@ describe("the 27 screens", () => {
     expect(text(25)).toContain(`Scouty will try again at ${new Date("2026-11-23T10:42:00.000Z").toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`);
     expect(text(26)).toContain("It took too long, so nothing was saved.");
     // The trust message is shown once, where Scouty is on the page: not on every screen.
-    for (const [i, state] of SAMPLES.entries()) if (state.kind !== "capturing") expect(text(i), state.kind).not.toContain("never clicks or posts for you");
+    for (const [i, state] of SAMPLES.entries()) if (state.kind !== "capturing") expect(text(i), state.kind).not.toContain("never posts or messages for you");
     // The workspace is in the header, not repeated in the text; the profile address is not shown.
     expect(text(3)).not.toContain("Example Workspace");
     expect(text(5)).not.toContain("synthetic-person-one");
@@ -390,7 +390,7 @@ describe("view model", () => {
     const messages = JSON.parse(readFileSync(path.join(process.cwd(), "_locales/en/messages.json"), "utf8")) as Record<string, { message: string }>;
     const sources = ["src/ui/view.ts", "src/popup/PopupView.tsx", "src/popup/popup.tsx", "src/overlay/overlay.ts"].map((f) => readFileSync(path.join(process.cwd(), f), "utf8")).join("\n");
     const named = new Set([...sources.matchAll(/"([a-z][A-Za-z0-9]+)"/g)].map((m) => m[1]!));
-    for (const key of Object.keys(messages)) expect(named.has(key) || ["extName", "extShortName", "extTitle", "extDescription"].includes(key), key).toBe(true);
+    for (const key of Object.keys(messages)) expect(named.has(key) || ["extName", "extNameFirefox", "extShortName", "extTitle", "extDescription"].includes(key), key).toBe(true);
     for (const call of sources.matchAll(/\bt\("([A-Za-z0-9]+)"/g)) expect(messages[call[1]!], call[1]).toBeDefined();
     for (const value of Object.values(messages)) expect(value.message.trim().length).toBeGreaterThan(0);
   });
@@ -445,7 +445,7 @@ describe("in-page overlay", () => {
     expect(overlay.host.getAttribute("aria-label")).toBe("Scouty capture");
     expect(document.styleSheets.length).toBe(sheets);
     expect(document.querySelectorAll("style, link[rel='stylesheet']").length).toBe(styles);
-    expect(document.body.textContent).not.toContain("Scouty never clicks or posts for you");
+    expect(document.body.textContent).not.toContain("Scouty never posts or messages for you");
     overlay.remove();
     expect(document.querySelectorAll(HOST_TAG)).toHaveLength(0);
     attach.mockRestore();
@@ -492,7 +492,7 @@ describe("in-page overlay", () => {
   it("while reading: the step in plain words, the trust message once, a bar, the count and time left, Stop", () => {
     const card = renderOverlay(viewFor(OVERLAY_SAMPLES[0]!), () => undefined);
     expect(card.querySelector(".title")!.textContent).toBe("Reading posts…");
-    expect([...card.querySelectorAll(".message > .text")].map((p) => p.textContent)).toEqual(["Scouty never clicks or posts for you."]);
+    expect([...card.querySelectorAll(".message > .text")].map((p) => p.textContent)).toEqual(["Scouty never posts or messages for you."]);
     const bar = card.querySelector("[role='progressbar']")!;
     expect(bar.getAttribute("aria-valuetext")).toBe("23 of 50 posts");
     expect(card.querySelector(".progress-row")!.textContent).toBe("23 of 50About 1 min left");

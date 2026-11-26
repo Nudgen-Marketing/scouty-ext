@@ -19,7 +19,7 @@ const SHARED = {
   description: "__MSG_extDescription__",
   // The public page every store listing also names as homepage and support (app plan linkedin-extension-page.md).
   homepage_url: "https://scouty.to/scouty-b2b",
-  permissions: ["scripting", "storage", "identity"],
+  permissions: ["scripting", "storage", "identity", "alarms"],
   host_permissions: ["https://www.linkedin.com/in/*", "https://scouty.to/*"],
   action: { default_title: "__MSG_extTitle__", default_popup: "popup.html" },
   content_security_policy: { extension_pages: CSP },
@@ -29,6 +29,8 @@ const SHARED = {
 const CHROMIUM = { ...SHARED, background: { service_worker: "background.js", type: "module" }, minimum_chrome_version: "116" };
 const FIREFOX = {
   ...SHARED,
+  // addons.mozilla.org limits a name to 50 characters; Chrome and Edge allow 75 (STORE-LISTING.md).
+  name: "__MSG_extNameFirefox__",
   background: { scripts: ["background.js"], type: "module" },
   browser_specific_settings: {
     gecko: { id: "prospector@scouty.to", strict_min_version: "140.0", data_collection_permissions: { required: ["websiteContent", "personallyIdentifyingInfo", "authenticationInfo"] } },
@@ -42,7 +44,7 @@ describe("manifests", () => {
 
   it.each(["chrome", "edge", "firefox"])("%s: least privilege", (target) => {
     const m = manifest(target);
-    expect(m.permissions).toEqual(["scripting", "storage", "identity"]);
+    expect(m.permissions).toEqual(["scripting", "storage", "identity", "alarms"]);
     for (const key of ["content_scripts", "web_accessible_resources", "externally_connectable", "optional_permissions", "optional_host_permissions", "key", "update_url", "sandbox", "devtools_page", "options_page", "side_panel", "sidebar_action", "commands", "oauth2"]) expect(m, key).not.toHaveProperty(key);
     const text = read(`dist/${target}/manifest.json`);
     for (const word of ["tabs", "cookies", "webRequest", "activeTab", "<all_urls>", "unlimitedStorage", "nativeMessaging", "downloads", "history", "*://*"]) expect(text, word).not.toContain(`"${word}"`);
@@ -74,12 +76,27 @@ describe("manifests", () => {
     expect(messages.extName!.message.length).toBeLessThanOrEqual(75);
     expect(messages.extShortName!.message).toBe("Scouty B2B");
     expect(messages.extShortName!.message.length).toBeLessThanOrEqual(12);
-    expect(messages.extDescription!.message).toBe("Research the B2B leads you choose on social networks and get a step-by-step outreach plan in Scouty. Only reads; never acts for you.");
+    expect(messages.extDescription!.message).toBe("Research B2B leads you choose on a social network and get a step-by-step outreach plan in Scouty. Never posts or messages for you.");
     // The name and summary name no network: more than LinkedIn will follow.
     expect(`${messages.extName!.message} ${messages.extShortName!.message} ${messages.extDescription!.message}`).not.toMatch(/linkedin/i);
     // No message names a network either: they say "this site", the one the user is on.
     for (const [key, { message }] of Object.entries(messages)) expect(message, key).not.toMatch(/linkedin/i);
     expect(messages.extDescription!.message.length).toBeLessThanOrEqual(132);
+  });
+
+  // Store name limits: Chrome Web Store and Edge Add-ons 75 (the manifest's own limit), addons.mozilla.org 50
+  // (addons-server: Addon.name = TranslatedField(max_length=50)).
+  it.each([["chrome", 75], ["edge", 75], ["firefox", 50]] as const)("%s: the resolved name fits the store's limit and names no network", (target, limit) => {
+    const m = manifest(target);
+    const messages = JSON.parse(read(`dist/${target}/_locales/en/messages.json`)) as Record<string, { message: string }>;
+    const resolve = (value: unknown): string => String(value).replace(/^__MSG_(\w+)__$/, (_, key: string) => messages[key]!.message);
+    const name = resolve(m.name);
+    expect(name).not.toMatch(/__MSG_/);
+    expect(name.length, name).toBeLessThanOrEqual(limit);
+    expect(name).not.toMatch(/linkedin/i);
+    expect(name).toBe(target === "firefox" ? "Scouty B2B Prospector - Lead Research & Outreach" : "Scouty B2B Prospector - Lead Research & Outreach Coach");
+    expect(resolve(m.short_name).length).toBeLessThanOrEqual(12);
+    expect(resolve(m.description).length).toBeLessThanOrEqual(132);
   });
 
   it("a development build for a local app declares http://localhost/* with no port, in every target", async () => {
@@ -129,5 +146,22 @@ describe("the e2e build differs from the Chrome build in exactly the documented 
       }
     }
     expect(read("tools/package.mjs")).not.toMatch(/["']e2e["']/);
+  });
+});
+
+describe("published texts name no social network", () => {
+  it("PRIVACY.md and the store listing's public fields (name, summary, description)", () => {
+    expect(read("PRIVACY.md")).not.toMatch(/linkedin/i);
+    const listing = read("STORE-LISTING.md");
+    const description = /## Description[^\n]*\n+```\n([\s\S]*?)```/.exec(listing)?.[1] ?? "";
+    expect(description.length).toBeGreaterThan(300);
+    expect(description).not.toMatch(/linkedin/i);
+    const summary = /\| Short description[^|]*\|([^|]*)\|/.exec(listing)?.[1] ?? "";
+    // The summary row carries the exact extDescription.
+    const messages = JSON.parse(read("_locales/en/messages.json")) as Record<string, { message: string }>;
+    expect(summary).toContain(messages.extDescription!.message);
+    expect(summary).toContain(`(${messages.extDescription!.message.length}, \`extDescription\``);
+    for (const name of [messages.extName!.message, messages.extNameFirefox!.message]) expect(listing).toContain(name);
+    expect(summary).not.toMatch(/linkedin/i);
   });
 });

@@ -3,7 +3,8 @@ import { expandWithin, findBlocks, textContainersOf } from "../../src/reader/blo
 import { createInteractions, mayClick } from "../../src/reader/interactions";
 import { expandProfile } from "../../src/reader/profile";
 import { selectors } from "../../src/reader/selectors";
-import { context, load, PATHS } from "../helpers/fixture";
+import { domReach } from "../../src/reader/visible-text";
+import { context, load, PATHS, pressAll } from "../helpers/fixture";
 
 const everyCandidate = (doc: Document): Element[] =>
   Array.from(doc.querySelectorAll("button, a, [role='button']"));
@@ -83,7 +84,8 @@ describe("interactions: the allow-list", () => {
     expect(mayClick(about, "expandText")).toBe(true);
     expect(mayClick(ad, "expandText")).toBe(false);
     // Reading the profile presses the About control only.
-    expandProfile(context(page.doc), "profile");
+    const ctx = context(page.doc);
+    pressAll(() => expandProfile(ctx, "profile"));
     expect(page.clicks).toEqual([about]);
   });
 
@@ -108,6 +110,33 @@ describe("interactions: the allow-list", () => {
     expect(interactions.loadMore()).toBe(false);
   });
 
+  it("presses load-more only near the viewport, like the expand presses (domReach)", () => {
+    const page = load("sdui-interaction-traps", PATHS.posts);
+    let at: "near" | "ahead" | "behind" = "ahead";
+    const seen: Element[] = [];
+    const interactions = createInteractions(page.doc, { clicksEnabled: true, recordClicks: false, reach: (el) => { seen.push(el); return at; } });
+    expect(interactions.loadMore()).toBe(false);
+    at = "behind";
+    expect(interactions.loadMore()).toBe(false);
+    expect(page.clicks).toHaveLength(0);
+    expect(seen.every((el) => el.getAttribute("data-ok") === "loadmore")).toBe(true);
+    at = "near";
+    expect(interactions.loadMore()).toBe(true);
+    expect(page.clicks.map((el) => el.getAttribute("data-ok"))).toEqual(["loadmore"]);
+  });
+
+  it("with domReach, a load-more control more than a viewport below is not pressed, one in view is", async () => {
+    const page = load("sdui-interaction-traps", PATHS.posts);
+    const control = page.doc.querySelector(`[data-ok="loadmore"]`)!;
+    const interactions = createInteractions(page.doc, { clicksEnabled: true, recordClicks: false, reach: domReach });
+    // jsdom has no layout: place the control two and a half viewports down.
+    const height = page.doc.defaultView!.innerHeight;
+    control.getBoundingClientRect = () => ({ top: 2.5 * height, bottom: 2.5 * height + 40, left: 0, right: 0, width: 0, height: 40, x: 0, y: 2.5 * height, toJSON: () => ({}) });
+    expect(interactions.loadMore()).toBe(false);
+    control.getBoundingClientRect = () => ({ top: height - 40, bottom: height, left: 0, right: 0, width: 0, height: 40, x: 0, y: height - 40, toJSON: () => ({}) });
+    expect(interactions.loadMore()).toBe(true);
+  });
+
   it("clicks an expand control at most once, and logs it", () => {
     const page = load("sdui-interaction-traps");
     const interactions = createInteractions(page.doc, { clicksEnabled: true, recordClicks: true });
@@ -123,7 +152,7 @@ describe("interactions: the allow-list", () => {
     const page = load("sdui-interaction-traps", PATHS.posts);
     page.doc.documentElement.setAttribute("lang", "de");
     const ctx = context(page.doc, { clicksEnabled: false });
-    expandWithin(findBlocks(page.doc).flatMap((b) => textContainersOf(b)), ctx);
+    expect(expandWithin(findBlocks(page.doc).flatMap((b) => textContainersOf(b)), ctx)).toEqual({ clicked: false, pending: 0 });
     for (const el of everyCandidate(page.doc)) ctx.interactions.expandText(el);
     expect(ctx.interactions.loadMore()).toBe(false);
     expect(page.clicks).toHaveLength(0);
